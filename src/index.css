@@ -24,7 +24,7 @@
     --muted: 220 14% 96%;
     --muted-foreground: 0 0% 45%;
 
-    --accent: 263 70% 66%;
+    --accent: 35 80% 50%
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84.2% 60.2%;
@@ -32,11 +32,11 @@
 
     --border: 220 13% 91%;
     --input: 220 13% 91%;
-    --ring: 263 70% 66%;
+    --ring: 35 80% 50%;
 
     --radius: 1rem;
 
-    --ai-accent: 263 70% 66%;
+    --ai-accent: 35 80% 50%;
     --ai-accent-foreground: 0 0% 100%;
     --shop-accent: 224 82% 51%;
     --shop-accent-foreground: 0 0% 100%;
@@ -69,6 +69,6 @@
 @layer utilities {
   .text-gradient-ai {
     @apply bg-clip-text text-transparent;
-    background-image: linear-gradient(135deg, hsl(var(--ai-accent)), hsl(280 80% 75%));
+        background-image: linear-gradient(135deg, hsl(var(--ai-accent)), hsl(350 70% 45%));
   }
 }
