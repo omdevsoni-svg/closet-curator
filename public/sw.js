@@ -1,4 +1,4 @@
-const CACHE_NAME = 'stylevault-v2';
+const CACHE_NAME = 'vastrika-v1';
 const URLS_TO_CACHE = [
     '/',
     '/manifest.json',
@@ -34,15 +34,3 @@ self.addEventListener('fetch', (event) => {
                                       const responseClone = response.clone();
                                       caches.open(CACHE_NAME).then((cache) => {
                                                     cache.put(event.request, responseClone);
-                                      });
-                          }
-                      return response;
-            })
-            .catch(() => {
-                      // Fallback to cache
-                           return caches.match(event.request).then((cached) => {
-                                       return cached || caches.match('/');
-                           });
-            })
-        );
-});
