@@ -417,7 +417,7 @@ const Landing = () => {
         </div>
       </section>
 
-      {/+ ─── CTA Banner ─── */}
+      {/* ─── CTA Banner ─── */}
       <section className="py-14 sm:py-20">
         <div className="mx-auto max-w-6xl px-4 sm:px-5">
           <motion.div
@@ -448,7 +448,7 @@ const Landing = () => {
         </div>
       </section>
 
-      {/+ ─── Footer ─── */}
+      {/* ─── Footer ─── */}
       <footer className="border-t border-border py-10 sm:py-12">
         <div className="mx-auto max-w-6xl px-4 sm:px-5">
           <div className="grid gap-8 grid-cols-2 lg:grid-cols-4">
