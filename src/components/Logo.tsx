@@ -7,8 +7,8 @@ const Logo = ({ className = "h-8 w-8" }: { className?: string }) => (
   >
     <defs>
       <linearGradient id="logo-grad" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
-        <stop stopColor="hsl(263, 70%, 66%)" />
-        <stop offset="1" stopColor="hsl(280, 80%, 75%)" />
+        <stop stopColor="hsl(35, 80%, 50%)" />
+        <stop offset="1" stopColor="hsl(350, 70%, 45%)" />
       </linearGradient>
     </defs>
     {/* Hanger shape */}

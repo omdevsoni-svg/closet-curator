@@ -175,7 +175,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login", onSuccess }: AuthMo
                 <motion.button
                   whileTap={{ scale: 0.98 }}
                   type="submit"
-                  className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[hsl(263,70%,66%)] to-[hsl(280,80%,75%)] text-sm font-display font-semibold text-white shadow-lg shadow-accent/25 transition-all hover:shadow-xl hover:shadow-accent/30"
+                  className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[hsl(35,80%,50%)] to-[hsl(350,70%,45%)] text-sm font-display font-semibold text-white shadow-lg shadow-accent/25 transition-all hover:shadow-xl hover:shadow-accent/30"
                 >
                   {mode === "login" ? "Sign In" : "Create Account"}
                   <ArrowRight className="h-4 w-4" />
