@@ -83,7 +83,7 @@ const SplashScreen = ({ onFinish }: SplashScreenProps) => {
             transition={{ duration: 0.5, delay: 0.8 }}
             className="text-2xl font-display font-extrabold tracking-tight text-white sm:text-3xl"
           >
-            StyleVault
+                        Vastrika AI
           </motion.h1>
 
           {/* Tagline */}
@@ -95,7 +95,7 @@ const SplashScreen = ({ onFinish }: SplashScreenProps) => {
           >
             <Sparkles className="h-3.5 w-3.5 text-[hsl(263,70%,76%)]" />
             <span className="text-xs font-body font-medium tracking-wider text-white/50 uppercase">
-              AI Digital Closet
+                            AI-Powered Wardrobe
             </span>
           </motion.div>
 
