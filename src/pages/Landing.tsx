@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Sparkles,
   Camera,
@@ -11,10 +11,11 @@ import {
   Star,
   ArrowRight,
   ChevronRight,
-  Check,
   Instagram,
   Twitter,
   Github,
+  Menu,
+  X,
 } from "lucide-react";
 import Logo from "@/components/Logo";
 import AuthModal from "@/components/AuthModal";
@@ -35,6 +36,7 @@ const Landing = () => {
   const navigate = useNavigate();
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "signup">("signup");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const openAuth = (mode: "login" | "signup") => {
     setAuthMode(mode);
@@ -50,42 +52,84 @@ const Landing = () => {
     <div className="min-h-screen bg-background overflow-x-hidden">
       {/* ─── Navbar ─── */}
       <nav className="fixed top-0 z-40 w-full border-b border-white/10 bg-background/60 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5">
-          <div className="flex items-center gap-2.5">
-            <Logo className="h-8 w-8" />
-            <span className="text-lg font-display font-bold tracking-tight text-foreground">
+        <div className="mx-auto flex h-14 sm:h-16 max-w-6xl items-center justify-between px-4 sm:px-5">
+          <div className="flex items-center gap-2">
+            <Logo className="h-7 w-7 sm:h-8 sm:w-8" />
+            <span className="text-base sm:text-lg font-display font-bold tracking-tight text-foreground">
               StyleVault
             </span>
           </div>
           <div className="hidden items-center gap-8 md:flex">
             <a href="#features" className="text-sm font-body font-medium text-muted-foreground transition-colors hover:text-foreground">Features</a>
             <a href="#how-it-works" className="text-sm font-body font-medium text-muted-foreground transition-colors hover:text-foreground">How It Works</a>
-            <a href="#pricing" className="text-sm font-body font-medium text-muted-foreground transition-colors hover:text-foreground">Pricing</a>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <button
               onClick={() => openAuth("login")}
-              className="text-sm font-body font-medium text-foreground transition-colors hover:text-accent"
+              className="hidden sm:inline-flex text-sm font-body font-medium text-foreground transition-colors hover:text-accent"
             >
               Log In
             </button>
             <motion.button
               whileTap={{ scale: 0.96 }}
               onClick={() => openAuth("signup")}
-              className="rounded-xl bg-gradient-to-r from-[hsl(263,70%,66%)] to-[hsl(280,80%,75%)] px-5 py-2.5 text-sm font-display font-semibold text-white shadow-lg shadow-accent/20 transition-all hover:shadow-xl hover:shadow-accent/30"
+              className="rounded-xl bg-gradient-to-r from-[hsl(263,70%,66%)] to-[hsl(280,80%,75%)] px-4 py-2 sm:px-5 sm:py-2.5 text-xs sm:text-sm font-display font-semibold text-white shadow-lg shadow-accent/20 transition-all hover:shadow-xl hover:shadow-accent/30"
             >
               Get Started
             </motion.button>
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="ml-1 flex h-9 w-9 items-center justify-center rounded-xl border border-white/15 bg-white/50 backdrop-blur-sm md:hidden"
+              aria-label="Toggle menu"
+            >
+              {mobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+            </button>
           </div>
         </div>
+
+        {/* Mobile menu dropdown */}
+        <AnimatePresence>
+          {mobileMenuOpen && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2 }}
+              className="overflow-hidden border-t border-white/10 bg-background/80 backdrop-blur-xl md:hidden"
+            >
+              <div className="flex flex-col gap-1 px-4 py-3">
+                <a
+                  href="#features"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="rounded-xl px-3 py-2.5 text-sm font-body font-medium text-muted-foreground transition-colors hover:bg-white/50 hover:text-foreground"
+                >
+                  Features
+                </a>
+                <a
+                  href="#how-it-works"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="rounded-xl px-3 py-2.5 text-sm font-body font-medium text-muted-foreground transition-colors hover:bg-white/50 hover:text-foreground"
+                >
+                  How It Works
+                </a>
+                <button
+                  onClick={() => { setMobileMenuOpen(false); openAuth("login"); }}
+                  className="rounded-xl px-3 py-2.5 text-left text-sm font-body font-medium text-muted-foreground transition-colors hover:bg-white/50 hover:text-foreground sm:hidden"
+                >
+                  Log In
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </nav>
 
       {/* ─── Hero ─── */}
-      <section className="relative pt-32 pb-20 md:pt-44 md:pb-32">
+      <section className="relative pt-24 pb-14 sm:pt-32 sm:pb-20 md:pt-44 md:pb-32">
         {/* Background gradient orbs */}
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
-          <div className="absolute -left-32 top-20 h-[500px] w-[500px] rounded-full bg-accent/10 blur-[120px]" />
-          <div className="absolute -right-32 top-40 h-[400px] w-[400px] rounded-full bg-[hsl(280,80%,75%)]/10 blur-[100px]" />
+          <div className="absolute -left-32 top-20 h-[300px] w-[300px] sm:h-[500px] sm:w-[500px] rounded-full bg-accent/10 blur-[120px]" />
+          <div className="absolute -right-32 top-40 h-[250px] w-[250px] sm:h-[400px] sm:w-[400px] rounded-full bg-[hsl(280,80%,75%)]/10 blur-[100px]" />
         </div>
 
         <div className="relative mx-auto max-w-6xl px-5">
@@ -110,11 +154,11 @@ const Landing = () => {
               Upload your wardrobe, get AI-styled outfits for every occasion, and discover the gaps holding your style back.
             </p>
 
-            <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
+            <div className="mt-8 sm:mt-10 flex flex-col items-center gap-3 sm:gap-4 sm:flex-row sm:justify-center">
               <motion.button
                 whileTap={{ scale: 0.96 }}
                 onClick={() => openAuth("signup")}
-                className="flex items-center gap-2 rounded-2xl bg-gradient-to-r from-[hsl(263,70%,66%)] to-[hsl(280,80%,75%)] px-8 py-4 text-base font-display font-semibold text-white shadow-xl shadow-accent/25 transition-all hover:shadow-2xl hover:shadow-accent/30"
+                className="flex w-full sm:w-auto items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[hsl(263,70%,66%)] to-[hsl(280,80%,75%)] px-6 py-3.5 sm:px-8 sm:py-4 text-sm sm:text-base font-display font-semibold text-white shadow-xl shadow-accent/25 transition-all hover:shadow-2xl hover:shadow-accent/30"
               >
                 Start For Free
                 <ArrowRight className="h-4 w-4" />
@@ -124,7 +168,7 @@ const Landing = () => {
                   const el = document.getElementById("how-it-works");
                   el?.scrollIntoView({ behavior: "smooth" });
                 }}
-                className="flex items-center gap-2 rounded-2xl border border-black/10 bg-white/50 px-8 py-4 text-base font-display font-medium text-foreground backdrop-blur-sm transition-all hover:bg-white/70"
+                className="flex w-full sm:w-auto items-center justify-center gap-2 rounded-2xl border border-black/10 bg-white/50 px-6 py-3.5 sm:px-8 sm:py-4 text-sm sm:text-base font-display font-medium text-foreground backdrop-blur-sm transition-all hover:bg-white/70"
               >
                 See How It Works
                 <ChevronRight className="h-4 w-4" />
@@ -137,7 +181,7 @@ const Landing = () => {
             initial={{ opacity: 0, y: 48 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.2 }}
-            className="mx-auto mt-16 max-w-4xl"
+            className="mx-auto mt-10 sm:mt-16 max-w-4xl"
           >
             <div className="overflow-hidden rounded-3xl border border-white/20 bg-white/40 p-2 shadow-2xl backdrop-blur-xl">
               <div className="rounded-2xl bg-gradient-to-br from-background to-card p-6 sm:p-10">
@@ -162,9 +206,9 @@ const Landing = () => {
                     </motion.div>
                   ))}
                 </div>
-                <div className="mt-4 flex items-center justify-center gap-2 rounded-2xl bg-accent/5 p-3 border border-accent/10">
-                  <Sparkles className="h-4 w-4 text-accent" />
-                  <span className="text-sm font-body font-medium text-accent">AI suggests: Blazer + T-Shirt + Jeans for your meeting</span>
+                <div className="mt-4 flex items-center justify-center gap-2 rounded-2xl bg-accent/5 p-2.5 sm:p-3 border border-accent/10">
+                  <Sparkles className="h-4 w-4 shrink-0 text-accent" />
+                  <span className="text-xs sm:text-sm font-body font-medium text-accent text-center">AI suggests: Blazer + T-Shirt + Jeans for your meeting</span>
                 </div>
               </div>
             </div>
@@ -173,7 +217,7 @@ const Landing = () => {
       </section>
 
       {/* ─── Features ─── */}
-      <section id="features" className="py-20 md:py-28">
+      <section id="features" className="py-14 sm:py-20 md:py-28">
         <div className="mx-auto max-w-6xl px-5">
           <motion.div {...fadeUp} className="mx-auto max-w-2xl text-center">
             <span className="text-xs font-body font-semibold uppercase tracking-widest text-accent">Features</span>
@@ -185,7 +229,7 @@ const Landing = () => {
             </p>
           </motion.div>
 
-          <motion.div {...staggerContainer} className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <motion.div {...staggerContainer} className="mt-10 sm:mt-14 grid gap-4 sm:gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {[
               {
                 icon: Camera,
@@ -238,7 +282,7 @@ const Landing = () => {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: i * 0.08, duration: 0.5 }}
-                  className="group relative overflow-hidden rounded-3xl border border-white/20 bg-white/50 p-7 backdrop-blur-sm transition-all hover:bg-white/70 hover:shadow-xl hover:shadow-black/5"
+                  className="group relative overflow-hidden rounded-2xl sm:rounded-3xl border border-white/20 bg-white/50 p-5 sm:p-7 backdrop-blur-sm transition-all hover:bg-white/70 hover:shadow-xl hover:shadow-black/5"
                 >
                   <div className={`absolute inset-0 bg-gradient-to-br ${feature.gradient} opacity-0 transition-opacity group-hover:opacity-100`} />
                   <div className="relative">
@@ -256,7 +300,7 @@ const Landing = () => {
       </section>
 
       {/* ─── How It Works ─── */}
-      <section id="how-it-works" className="relative py-20 md:py-28">
+      <section id="how-it-works" className="relative py-14 sm:py-20 md:py-28">
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
           <div className="absolute left-1/2 top-0 h-[600px] w-[600px] -translate-x-1/2 rounded-full bg-accent/5 blur-[120px]" />
         </div>
@@ -268,7 +312,7 @@ const Landing = () => {
             </h2>
           </motion.div>
 
-          <div className="mt-16 grid gap-8 md:grid-cols-3">
+          <div className="mt-10 sm:mt-16 grid gap-8 md:grid-cols-3">
             {[
               {
                 step: "01",
@@ -312,8 +356,8 @@ const Landing = () => {
       </section>
 
       {/* ─── Testimonials ─── */}
-      <section className="py-20 md:py-28">
-        <div className="mx-auto max-w-6xl px-5">
+      <section className="py-14 sm:py-20 md:py-28">
+        <div className="mx-auto max-w-6xl px-4 sm:px-5">
           <motion.div {...fadeUp} className="mx-auto max-w-2xl text-center">
             <span className="text-xs font-body font-semibold uppercase tracking-widest text-accent">Testimonials</span>
             <h2 className="mt-3 text-3xl font-display font-bold tracking-tight text-foreground sm:text-4xl">
@@ -321,7 +365,7 @@ const Landing = () => {
             </h2>
           </motion.div>
 
-          <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-10 sm:mt-14 grid gap-4 sm:gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {[
               {
                 name: "Priya Sharma",
@@ -348,7 +392,7 @@ const Landing = () => {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.1, duration: 0.5 }}
-                className="rounded-3xl border border-white/20 bg-white/50 p-7 backdrop-blur-sm"
+                className="rounded-2xl sm:rounded-3xl border border-white/20 bg-white/50 p-5 sm:p-7 backdrop-blur-sm"
               >
                 <div className="flex gap-1">
                   {Array.from({ length: testimonial.rating }).map((_, j) => (
@@ -373,123 +417,28 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* ─── Pricing ─── */}
-      <section id="pricing" className="relative py-20 md:py-28">
-        <div className="pointer-events-none absolute inset-0 overflow-hidden">
-          <div className="absolute right-0 top-1/4 h-[500px] w-[500px] rounded-full bg-accent/5 blur-[120px]" />
-        </div>
-        <div className="relative mx-auto max-w-6xl px-5">
-          <motion.div {...fadeUp} className="mx-auto max-w-2xl text-center">
-            <span className="text-xs font-body font-semibold uppercase tracking-widest text-accent">Pricing</span>
-            <h2 className="mt-3 text-3xl font-display font-bold tracking-tight text-foreground sm:text-4xl">
-              Simple, transparent pricing
-            </h2>
-            <p className="mt-3 text-base text-muted-foreground font-body">
-              Start free. Upgrade when you're ready.
-            </p>
-          </motion.div>
-
-          <div className="mt-14 grid gap-6 md:grid-cols-3">
-            {[
-              {
-                name: "Free",
-                price: "₹0",
-                period: "forever",
-                description: "Perfect for getting started",
-                features: ["Upload up to 20 items", "Basic AI styling", "Closet health score", "1 occasion preset"],
-                cta: "Get Started",
-                highlight: false,
-              },
-              {
-                name: "Pro",
-                price: "₹299",
-                period: "/month",
-                description: "For the style-conscious",
-                features: ["Unlimited items", "Advanced AI styling", "Full closet analytics", "All occasion presets", "Shopping recommendations", "Outfit history"],
-                cta: "Start Free Trial",
-                highlight: true,
-              },
-              {
-                name: "Premium",
-                price: "₹599",
-                period: "/month",
-                description: "For fashion enthusiasts",
-                features: ["Everything in Pro", "Personal style coach AI", "Trend predictions", "Seasonal wardrobe planning", "Priority support", "Early access to features"],
-                cta: "Start Free Trial",
-                highlight: false,
-              },
-            ].map((plan, i) => (
-              <motion.div
-                key={plan.name}
-                initial={{ opacity: 0, y: 24 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.12, duration: 0.5 }}
-                className={`relative overflow-hidden rounded-3xl border p-8 transition-all ${
-                  plan.highlight
-                    ? "border-accent/30 bg-white/70 shadow-2xl shadow-accent/10 backdrop-blur-xl"
-                    : "border-white/20 bg-white/50 backdrop-blur-sm hover:bg-white/60"
-                }`}
-              >
-                {plan.highlight && (
-                  <div className="absolute -right-8 top-6 rotate-45 bg-gradient-to-r from-[hsl(263,70%,66%)] to-[hsl(280,80%,75%)] px-10 py-1 text-[10px] font-display font-bold uppercase text-white">
-                    Popular
-                  </div>
-                )}
-                <h3 className="text-lg font-display font-bold text-foreground">{plan.name}</h3>
-                <p className="mt-1 text-sm text-muted-foreground font-body">{plan.description}</p>
-                <div className="mt-4 flex items-baseline gap-1">
-                  <span className="text-4xl font-display font-extrabold text-foreground">{plan.price}</span>
-                  <span className="text-sm text-muted-foreground font-body">{plan.period}</span>
-                </div>
-                <ul className="mt-6 space-y-3">
-                  {plan.features.map((feature) => (
-                    <li key={feature} className="flex items-center gap-2 text-sm font-body text-foreground">
-                      <Check className="h-4 w-4 shrink-0 text-accent" />
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
-                <motion.button
-                  whileTap={{ scale: 0.97 }}
-                  onClick={() => openAuth("signup")}
-                  className={`mt-8 flex h-12 w-full items-center justify-center gap-2 rounded-xl text-sm font-display font-semibold transition-all ${
-                    plan.highlight
-                      ? "bg-gradient-to-r from-[hsl(263,70%,66%)] to-[hsl(280,80%,75%)] text-white shadow-lg shadow-accent/20 hover:shadow-xl"
-                      : "border border-black/10 bg-white/60 text-foreground hover:bg-white/80"
-                  }`}
-                >
-                  {plan.cta}
-                  <ArrowRight className="h-4 w-4" />
-                </motion.button>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ─── CTA Banner ─── */}
-      <section className="py-20">
-        <div className="mx-auto max-w-6xl px-5">
+      {/+ ─── CTA Banner ─── */}
+      <section className="py-14 sm:py-20">
+        <div className="mx-auto max-w-6xl px-4 sm:px-5">
           <motion.div
             {...fadeUp}
-            className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[hsl(263,70%,66%)] to-[hsl(280,80%,75%)] p-10 text-center sm:p-16"
+            className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-r from-[hsl(263,70%,66%)] to-[hsl(280,80%,75%)] p-7 text-center sm:p-10 md:p-16"
           >
             <div className="pointer-events-none absolute inset-0">
               <div className="absolute -left-20 -top-20 h-60 w-60 rounded-full bg-white/10 blur-3xl" />
               <div className="absolute -bottom-20 -right-20 h-60 w-60 rounded-full bg-white/10 blur-3xl" />
             </div>
             <div className="relative">
-              <h2 className="text-3xl font-display font-bold text-white sm:text-4xl">
+              <h2 className="text-2xl sm:text-3xl font-display font-bold text-white md:text-4xl">
                 Ready to transform your wardrobe?
               </h2>
-              <p className="mx-auto mt-3 max-w-md text-base text-white/80 font-body">
+              <p className="mx-auto mt-3 max-w-md text-sm sm:text-base text-white/80 font-body">
                 Join thousands of style-savvy users who let AI handle their outfit decisions.
               </p>
               <motion.button
                 whileTap={{ scale: 0.96 }}
                 onClick={() => openAuth("signup")}
-                className="mt-8 inline-flex items-center gap-2 rounded-2xl bg-white px-8 py-4 text-base font-display font-semibold text-foreground shadow-xl transition-all hover:shadow-2xl"
+                className="mt-6 sm:mt-8 inline-flex items-center gap-2 rounded-2xl bg-white px-6 py-3.5 sm:px-8 sm:py-4 text-sm sm:text-base font-display font-semibold text-foreground shadow-xl transition-all hover:shadow-2xl"
               >
                 Get Started for Free
                 <ArrowRight className="h-4 w-4" />
@@ -499,23 +448,23 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* ─── Footer ─── */}
-      <footer className="border-t border-border py-12">
-        <div className="mx-auto max-w-6xl px-5">
-          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
-            <div>
+      {/+ ─── Footer ─── */}
+      <footer className="border-t border-border py-10 sm:py-12">
+        <div className="mx-auto max-w-6xl px-4 sm:px-5">
+          <div className="grid gap-8 grid-cols-2 lg:grid-cols-4">
+            <div className="col-span-2 lg:col-span-1">
               <div className="flex items-center gap-2">
                 <Logo className="h-7 w-7" />
                 <span className="text-base font-display font-bold text-foreground">StyleVault</span>
               </div>
-              <p className="mt-3 text-sm text-muted-foreground font-body leading-relaxed">
+              <p className="mt-3 text-sm text-muted-foreground font-body leading-relaxed max-w-xs">
                 Your AI-powered digital wardrobe manager. Dress smarter, shop less, style more.
               </p>
             </div>
             <div>
               <h4 className="text-sm font-display font-semibold text-foreground">Product</h4>
               <ul className="mt-3 space-y-2">
-                {["Features", "Pricing", "How It Works", "FAQ"].map((item) => (
+                {["Features", "How It Works", "FAQ"].map((item) => (
                   <li key={item}>
                     <a href="#" className="text-sm font-body text-muted-foreground transition-colors hover:text-foreground">{item}</a>
                   </li>
