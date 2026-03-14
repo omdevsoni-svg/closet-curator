@@ -418,20 +418,25 @@ const ToggleRow = ({
   value: boolean;
   onChange: (v: boolean) => void;
 }) => (
-  <div className="flex items-center justify-between">
-    <div>
-      <p className="text-sm font-body font-medium text-foreground">{label}</p>
-      <p className="text-xs font-body text-muted-foreground">{desc}</p>
+  <div className="flex items-center justify-between py-3">
+    <div className="flex-1 pr-4">
+      <span className="text-sm font-body font-medium text-foreground">{label}</span>
+      {desc && <p className="text-xs font-body text-muted-foreground mt-0.5">{desc}</p>}
     </div>
     <button
+      type="button"
+      role="switch"
+      aria-checked={value}
       onClick={() => onChange(!value)}
-      className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
-        value ? "bg-primary" : "bg-border"
+      className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full border-2 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+        value
+          ? "bg-gradient-to-r from-[hsl(38,90%,50%)] to-[hsl(350,80%,58%)] border-[hsl(38,90%,50%)]"
+          : "bg-muted border-muted"
       }`}
     >
       <span
-        className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
-          value ? "translate-x-5" : "translate-x-0.5"
+        className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-md ring-0 transition-transform duration-200 ${
+          value ? "translate-x-[22px]" : "translate-x-[2px]"
         }`}
       />
     </button>
