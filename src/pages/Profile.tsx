@@ -79,6 +79,8 @@ const bodyTypeOptions = ["rectangle", "hourglass", "inverted_triangle", "pear"];
 /*  Main Profile component                                             */
 /* ------------------------------------------------------------------ */
 const Profile = () => {
+  const closetCount = (() => { try { return JSON.parse(localStorage.getItem("sv_closet_items") || "[]").length; } catch { return 0; } })();
+
   const { theme, toggleTheme } = useTheme();
   const userName = localStorage.getItem("sv_user_name") || "Style Enthusiast";
   const [bodyType, setBodyType] = useState("rectangle");
@@ -124,7 +126,7 @@ const Profile = () => {
             <h2 className="text-base font-display font-semibold text-foreground">
               {userName}
             </h2>
-            <p className="text-xs text-muted-foreground font-body">6 items in closet</p>
+            <p className="text-xs text-muted-foreground font-body">{closetCount} {closetCount === 1 ? "item" : "items"} in closet</p>
           </div>
         </div>
         <button className="flex h-8 w-8 items-center justify-center rounded-full bg-background text-muted-foreground hover:text-foreground">
