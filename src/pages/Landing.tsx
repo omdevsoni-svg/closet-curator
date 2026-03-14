@@ -2,9 +2,20 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Sparkles, Camera, HeartPulse, ShoppingBag, Shirt, Zap,
-  Star, ArrowRight, ChevronRight, Instagram, Twitter, Github,
-  Menu, X,
+  Sparkles,
+  Camera,
+  HeartPulse,
+  ShoppingBag,
+  Shirt,
+  Zap,
+  Star,
+  ArrowRight,
+  ChevronRight,
+  Instagram,
+  Twitter,
+  Github,
+  Menu,
+  X,
 } from "lucide-react";
 import Logo from "@/components/Logo";
 import AuthModal from "@/components/AuthModal";
@@ -34,26 +45,24 @@ const Landing = () => {
 
   const handleAuthSuccess = () => {
     setAuthOpen(false);
-    navigate("/closet");
+    navigate("/home");
   };
 
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
-      {/* ─── Navbar ─── */}
+      {/* âââ Navbar âââ */}
       <nav className="fixed top-0 z-40 w-full border-b border-white/10 bg-background/60 backdrop-blur-xl">
         <div className="mx-auto flex h-14 sm:h-16 max-w-6xl items-center justify-between px-4 sm:px-5">
           <div className="flex items-center gap-2">
             <Logo className="h-7 w-7 sm:h-8 sm:w-8" />
             <span className="text-base sm:text-lg font-display font-bold tracking-tight text-foreground">
-              Vastrika AI
+              StyleVault
             </span>
           </div>
-
           <div className="hidden items-center gap-8 md:flex">
             <a href="#features" className="text-sm font-body font-medium text-muted-foreground transition-colors hover:text-foreground">Features</a>
             <a href="#how-it-works" className="text-sm font-body font-medium text-muted-foreground transition-colors hover:text-foreground">How It Works</a>
           </div>
-
           <div className="flex items-center gap-2 sm:gap-3">
             <button
               onClick={() => openAuth("login")}
@@ -64,7 +73,7 @@ const Landing = () => {
             <motion.button
               whileTap={{ scale: 0.96 }}
               onClick={() => openAuth("signup")}
-              className="rounded-xl bg-gradient-to-r from-[hsl(35,80%,50%)] to-[hsl(350,70%,45%)] px-4 py-2 sm:px-5 sm:py-2.5 text-xs sm:text-sm font-display font-semibold text-white shadow-lg shadow-accent/20 transition-all hover:shadow-xl hover:shadow-accent/30"
+              className="rounded-xl bg-gradient-to-r from-[hsl(263,70%,66%)] to-[hsl(280,80%,75%)] px-4 py-2 sm:px-5 sm:py-2.5 text-xs sm:text-sm font-display font-semibold text-white shadow-lg shadow-accent/20 transition-all hover:shadow-xl hover:shadow-accent/30"
             >
               Get Started
             </motion.button>
@@ -89,10 +98,18 @@ const Landing = () => {
               className="overflow-hidden border-t border-white/10 bg-background/80 backdrop-blur-xl md:hidden"
             >
               <div className="flex flex-col gap-1 px-4 py-3">
-                <a href="#features" onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-3 py-2.5 text-sm font-body font-medium text-muted-foreground transition-colors hover:bg-white/50 hover:text-foreground">
+                <a
+                  href="#features"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="rounded-xl px-3 py-2.5 text-sm font-body font-medium text-muted-foreground transition-colors hover:bg-white/50 hover:text-foreground"
+                >
                   Features
                 </a>
-                <a href="#how-it-works" onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-3 py-2.5 text-sm font-body font-medium text-muted-foreground transition-colors hover:bg-white/50 hover:text-foreground">
+                <a
+                  href="#how-it-works"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="rounded-xl px-3 py-2.5 text-sm font-body font-medium text-muted-foreground transition-colors hover:bg-white/50 hover:text-foreground"
+                >
                   How It Works
                 </a>
                 <button
@@ -107,12 +124,12 @@ const Landing = () => {
         </AnimatePresence>
       </nav>
 
-      {/* ─── Hero ─── */}
+      {/* âââ Hero âââ */}
       <section className="relative pt-24 pb-14 sm:pt-32 sm:pb-20 md:pt-44 md:pb-32">
         {/* Background gradient orbs */}
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
           <div className="absolute -left-32 top-20 h-[300px] w-[300px] sm:h-[500px] sm:w-[500px] rounded-full bg-accent/10 blur-[120px]" />
-          <div className="absolute -right-32 top-40 h-[250px] w-[250px] sm:h-[400px] sm:w-[400px] rounded-full bg-[hsl(350,70%,45%)]/10 blur-[100px]" />
+          <div className="absolute -right-32 top-40 h-[250px] w-[250px] sm:h-[400px] sm:w-[400px] rounded-full bg-[hsl(280,80%,75%)]/10 blur-[100px]" />
         </div>
 
         <div className="relative mx-auto max-w-6xl px-5">
@@ -141,9 +158,10 @@ const Landing = () => {
               <motion.button
                 whileTap={{ scale: 0.96 }}
                 onClick={() => openAuth("signup")}
-                className="flex w-full sm:w-auto items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[hsl(35,80%,50%)] to-[hsl(350,70%,45%)] px-6 py-3.5 sm:px-8 sm:py-4 text-sm sm:text-base font-display font-semibold text-white shadow-xl shadow-accent/25 transition-all hover:shadow-2xl hover:shadow-accent/30"
+                className="flex w-full sm:w-auto items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[hsl(263,70%,66%)] to-[hsl(280,80%,75%)] px-6 py-3.5 sm:px-8 sm:py-4 text-sm sm:text-base font-display font-semibold text-white shadow-xl shadow-accent/25 transition-all hover:shadow-2xl hover:shadow-accent/30"
               >
-                Start For Free <ArrowRight className="h-4 w-4" />
+                Start For Free
+                <ArrowRight className="h-4 w-4" />
               </motion.button>
               <button
                 onClick={() => {
@@ -152,7 +170,8 @@ const Landing = () => {
                 }}
                 className="flex w-full sm:w-auto items-center justify-center gap-2 rounded-2xl border border-black/10 bg-white/50 px-6 py-3.5 sm:px-8 sm:py-4 text-sm sm:text-base font-display font-medium text-foreground backdrop-blur-sm transition-all hover:bg-white/70"
               >
-                See How It Works <ChevronRight className="h-4 w-4" />
+                See How It Works
+                <ChevronRight className="h-4 w-4" />
               </button>
             </div>
           </motion.div>
@@ -168,12 +187,12 @@ const Landing = () => {
               <div className="rounded-2xl bg-gradient-to-br from-background to-card p-6 sm:p-10">
                 <div className="grid grid-cols-3 gap-4 sm:grid-cols-6">
                   {[
-                    { name: "Blazer", color: "bg-blue-900/10", emoji: "🧥" },
-                    { name: "T-Shirt", color: "bg-gray-100", emoji: "👕" },
-                    { name: "Jeans", color: "bg-indigo-100", emoji: "👖" },
-                    { name: "Sneakers", color: "bg-orange-100", emoji: "👟" },
-                    { name: "Dress", color: "bg-pink-100", emoji: "👗" },
-                    { name: "Watch", color: "bg-amber-100", emoji: "⌚" },
+                    { name: "Blazer", color: "bg-blue-900/10", emoji: "ð§¥" },
+                    { name: "T-Shirt", color: "bg-gray-100", emoji: "ð" },
+                    { name: "Jeans", color: "bg-indigo-100", emoji: "ð" },
+                    { name: "Sneakers", color: "bg-orange-100", emoji: "ð" },
+                    { name: "Dress", color: "bg-pink-100", emoji: "ð" },
+                    { name: "Watch", color: "bg-amber-100", emoji: "â" },
                   ].map((item, i) => (
                     <motion.div
                       key={item.name}
@@ -182,7 +201,7 @@ const Landing = () => {
                       transition={{ delay: 0.4 + i * 0.08 }}
                       className={`flex aspect-square flex-col items-center justify-center rounded-2xl ${item.color} border border-white/30 backdrop-blur-sm`}
                     >
-                      <span className="text-3xl sm:text-4xl font-emoji">{item.emoji}</span>
+                      <span className="text-3xl sm:text-4xl">{item.emoji}</span>
                       <span className="mt-1 text-[10px] font-body font-medium text-muted-foreground">{item.name}</span>
                     </motion.div>
                   ))}
@@ -197,7 +216,7 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* ─── Features ─── */}
+      {/* âââ Features âââ */}
       <section id="features" className="py-14 sm:py-20 md:py-28">
         <div className="mx-auto max-w-6xl px-5">
           <motion.div {...fadeUp} className="mx-auto max-w-2xl text-center">
@@ -216,13 +235,13 @@ const Landing = () => {
                 icon: Camera,
                 title: "Smart Upload",
                 description: "Snap a photo and AI removes backgrounds, categorizes items, and detects colors automatically.",
-                gradient: "from-amber-500/10 to-amber-600/5",
-                iconColor: "text-amber-500",
+                gradient: "from-purple-500/10 to-purple-600/5",
+                iconColor: "text-purple-500",
               },
               {
                 icon: Sparkles,
                 title: "AI Stylist",
-                description: "Get personalized outfit recommendations for any occasion — date night, office, weekend, or party.",
+                description: "Get personalized outfit recommendations for any occasion â date night, office, weekend, or party.",
                 gradient: "from-blue-500/10 to-blue-600/5",
                 iconColor: "text-blue-500",
               },
@@ -236,7 +255,7 @@ const Landing = () => {
               {
                 icon: ShoppingBag,
                 title: "Smart Shopping",
-                description: "Get recommendations for pieces that fill your wardrobe gaps — only buy what you actually need.",
+                description: "Get recommendations for pieces that fill your wardrobe gaps â only buy what you actually need.",
                 gradient: "from-amber-500/10 to-amber-600/5",
                 iconColor: "text-amber-600",
               },
@@ -280,12 +299,11 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* ─── How It Works ─── */}
+      {/* âââ How It Works âââ */}
       <section id="how-it-works" className="relative py-14 sm:py-20 md:py-28">
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
           <div className="absolute left-1/2 top-0 h-[600px] w-[600px] -translate-x-1/2 rounded-full bg-accent/5 blur-[120px]" />
         </div>
-
         <div className="relative mx-auto max-w-6xl px-5">
           <motion.div {...fadeUp} className="mx-auto max-w-2xl text-center">
             <span className="text-xs font-body font-semibold uppercase tracking-widest text-accent">How It Works</span>
@@ -300,19 +318,19 @@ const Landing = () => {
                 step: "01",
                 title: "Upload Your Clothes",
                 description: "Take photos of your clothing items. Our AI instantly removes backgrounds and categorizes each piece.",
-                emoji: "📸",
+                emoji: "ð¸",
               },
               {
                 step: "02",
                 title: "Get Styled by AI",
                 description: "Tell us the occasion and our AI creates the perfect outfit from your existing wardrobe.",
-                emoji: "✨",
+                emoji: "â¨",
               },
               {
                 step: "03",
                 title: "Optimize & Shop Smart",
-                description: "See your wardrobe health score and get recommendations to fill gaps — only buy what you need.",
-                emoji: "🎯",
+                description: "See your wardrobe health score and get recommendations to fill gaps â only buy what you need.",
+                emoji: "ð¯",
               },
             ].map((item, i) => (
               <motion.div
@@ -323,7 +341,7 @@ const Landing = () => {
                 transition={{ delay: i * 0.15, duration: 0.5 }}
                 className="relative text-center"
               >
-                <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl border border-white/20 bg-white/60 text-4xl font-emoji shadow-lg backdrop-blur-xl">
+                <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl border border-white/20 bg-white/60 text-4xl shadow-lg backdrop-blur-xl">
                   {item.emoji}
                 </div>
                 <span className="mt-4 block text-xs font-body font-bold uppercase tracking-widest text-accent">
@@ -337,7 +355,7 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* ─── Testimonials ─── */}
+      {/* âââ Testimonials âââ */}
       <section className="py-14 sm:py-20 md:py-28">
         <div className="mx-auto max-w-6xl px-4 sm:px-5">
           <motion.div {...fadeUp} className="mx-auto max-w-2xl text-center">
@@ -352,7 +370,7 @@ const Landing = () => {
               {
                 name: "Priya Sharma",
                 role: "Fashion Blogger",
-                text: "Vastrika AI completely changed how I plan outfits. The AI recommendations are surprisingly spot-on for Indian occasions.",
+                text: "StyleVault completely changed how I plan outfits. The AI recommendations are surprisingly spot-on for Indian occasions.",
                 rating: 5,
               },
               {
@@ -385,7 +403,7 @@ const Landing = () => {
                   "{testimonial.text}"
                 </p>
                 <div className="mt-5 flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-accent to-[hsl(350,70%,45%)] text-sm font-display font-bold text-white">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-accent to-[hsl(280,80%,75%)] text-sm font-display font-bold text-white">
                     {testimonial.name[0]}
                   </div>
                   <div>
@@ -399,12 +417,12 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* ─── CTA Banner ─── */}
+      {/* âââ CTA Banner âââ */}
       <section className="py-14 sm:py-20">
         <div className="mx-auto max-w-6xl px-4 sm:px-5">
           <motion.div
             {...fadeUp}
-            className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-r from-[hsl(35,80%,50%)] to-[hsl(350,70%,45%)] p-7 text-center sm:p-10 md:p-16"
+            className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-r from-[hsl(263,70%,66%)] to-[hsl(280,80%,75%)] p-7 text-center sm:p-10 md:p-16"
           >
             <div className="pointer-events-none absolute inset-0">
               <div className="absolute -left-20 -top-20 h-60 w-60 rounded-full bg-white/10 blur-3xl" />
@@ -422,21 +440,22 @@ const Landing = () => {
                 onClick={() => openAuth("signup")}
                 className="mt-6 sm:mt-8 inline-flex items-center gap-2 rounded-2xl bg-white px-6 py-3.5 sm:px-8 sm:py-4 text-sm sm:text-base font-display font-semibold text-foreground shadow-xl transition-all hover:shadow-2xl"
               >
-                Get Started for Free <ArrowRight className="h-4 w-4" />
+                Get Started for Free
+                <ArrowRight className="h-4 w-4" />
               </motion.button>
             </div>
           </motion.div>
         </div>
       </section>
 
-      {/* ─── Footer ─── */}
+      {/* âââ Footer âââ */}
       <footer className="border-t border-border py-10 sm:py-12">
         <div className="mx-auto max-w-6xl px-4 sm:px-5">
           <div className="grid gap-8 grid-cols-2 lg:grid-cols-4">
             <div className="col-span-2 lg:col-span-1">
               <div className="flex items-center gap-2">
                 <Logo className="h-7 w-7" />
-                <span className="text-base font-display font-bold text-foreground">Vastrika AI</span>
+                <span className="text-base font-display font-bold text-foreground">StyleVault</span>
               </div>
               <p className="mt-3 text-sm text-muted-foreground font-body leading-relaxed max-w-xs">
                 Your AI-powered digital wardrobe manager. Dress smarter, shop less, style more.
@@ -475,7 +494,7 @@ const Landing = () => {
           </div>
           <div className="mt-10 flex flex-col items-center justify-between gap-4 border-t border-border pt-8 sm:flex-row">
             <p className="text-xs text-muted-foreground font-body">
-              &copy; {new Date().getFullYear()} Vastrika AI. All rights reserved.
+              &copy; {new Date().getFullYear()} StyleVault. All rights reserved.
             </p>
             <div className="flex gap-4">
               <a href="#" className="text-muted-foreground transition-colors hover:text-foreground">
