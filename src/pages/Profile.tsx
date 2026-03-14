@@ -112,7 +112,7 @@ const Profile = () => {
         className="mt-5 flex items-center justify-between rounded-2xl bg-card p-5"
       >
         <div className="flex items-center gap-4">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-[hsl(263,70%,66%)] to-[hsl(280,80%,75%)] text-white font-display font-bold text-lg">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-[hsl(38,90%,50%)] to-[hsl(350,80%,58%)] text-white font-display font-bold text-lg">
             {userName
               .split(" ")
               .map((n) => n[0])
