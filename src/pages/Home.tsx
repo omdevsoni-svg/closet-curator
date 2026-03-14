@@ -170,7 +170,7 @@ const Home = () => {
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, height: 0, marginBottom: 0 }}
-            className="relative mb-5 overflow-hidden rounded-2xl bg-gradient-to-r from-[hsl(263,70%,66%)] to-[hsl(280,80%,75%)] p-5 text-white"
+            className="relative mb-5 overflow-hidden rounded-2xl bg-gradient-to-r from-[hsl(38,90%,50%)] to-[hsl(350,80%,58%)] p-5 text-white"
           >
             <button
               onClick={() => setShowWelcome(false)}
