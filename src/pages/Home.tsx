@@ -14,6 +14,15 @@ import {
   Star,
   ShoppingBag,
   X,
+  Sun,
+  Cloud,
+  CloudDrizzle,
+  CloudRain,
+  CloudRainWind,
+  CloudFog,
+  CloudLightning,
+  Snowflake,
+  type LucideIcon,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import mockBlazer from "@/assets/mock-blazer.png";
@@ -64,17 +73,7 @@ const useWeather = (): WeatherData | null => {
   const [weather, setWeather] = useState<WeatherData | null>(null);
 
   useEffect(() => {
-    const fetchWeather = async () => {
-    try {
-      const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 10000,
-        })
-      );
-      const { latitude: lat, longitude: lon } = pos.coords;
-
-      // Fetch weather and city name in parallel
+    const fetchWeatherForCoords = async (lat: number, lon: number) => {
       const [weatherRes, geoRes] = await Promise.all([
         fetch(
           `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&hourly=relative_humidity_2m&timezone=auto`
@@ -115,9 +114,9 @@ const useWeather = (): WeatherData | null => {
         95: { condition: "Thunderstorm", icon: "CloudLightning" },
       };
 
-      const code = cw.weathercode ?? cw.weather_code ?? 0;
-      const mapped = wmoMap[code] || { condition: "Unknown", icon: "Cloud" };
-      const humidity = weatherData.hourly?.relative_humidity_2m?.[0] ?? 0;
+      const code = cw.weathercode as number;
+      const mapped = wmoMap[code] || { condition: "Unknown", icon: "CloudSun" };
+      const humidity = weatherData.hourly?.relative_humidity_2m?.[0] ?? 50;
 
       const tips: Record<string, string> = {
         Sun: "Perfect for light, breathable fabrics",
@@ -140,21 +139,61 @@ const useWeather = (): WeatherData | null => {
         icon: mapped.icon,
         tip: tips[mapped.icon] || "Dress for comfort today",
       });
-    } catch {
-      setWeather({
-        temp: 28,
-        condition: "Partly Cloudy",
-        humidity: 65,
-        windSpeed: 12,
-        city: "Your Location",
-        icon: "CloudSun",
-        tip: "Layer up — it could go either way",
-      });
-    }
-  };
+    };
+
+    const fetchWeather = async () => {
+      try {
+        // Try browser geolocation first
+        const pos = await new Promise<GeolocationPosition>((res, rej) =>
+          navigator.geolocation.getCurrentPosition(res, rej, {
+            enableHighAccuracy: false,
+            timeout: 5000,
+          })
+        );
+        await fetchWeatherForCoords(pos.coords.latitude, pos.coords.longitude);
+      } catch {
+        try {
+          // Fallback: IP-based geolocation (no permission needed)
+          const ipRes = await fetch("https://ipapi.co/json/");
+          const ipData = await ipRes.json();
+          if (ipData.latitude && ipData.longitude) {
+            await fetchWeatherForCoords(ipData.latitude, ipData.longitude);
+          } else {
+            throw new Error("No coords from IP");
+          }
+        } catch {
+          // Final fallback: default values
+          setWeather({
+            temp: 28,
+            condition: "Partly Cloudy",
+            humidity: 65,
+            windSpeed: 12,
+            city: "Your Location",
+            icon: "CloudSun",
+            tip: "Layer up — it could go either way",
+          });
+        }
+      }
+    };
     fetchWeather();
   }, []);
   return weather;
+};
+const weatherIconMap: Record<string, LucideIcon> = {
+  Sun,
+  CloudSun,
+  Cloud,
+  CloudFog,
+  CloudDrizzle,
+  CloudRain,
+  CloudRainWind,
+  Snowflake,
+  CloudLightning,
+};
+
+const WeatherIcon = ({ name }: { name: string }) => {
+  const Icon = weatherIconMap[name] || CloudSun;
+  return <Icon className="h-8 w-8 text-amber-500" />;
 };
 
 const featureCards = [
@@ -298,7 +337,7 @@ const Home = () => {
             {/* Weather info row */}
             <div className="flex items-center justify-between border-b border-border/50 px-4 py-3">
               <div className="flex items-center gap-3">
-                <span className="text-3xl font-emoji">{weather.icon}</span>
+                <WeatherIcon name={weather.icon} />
                 <div>
                   <span className="text-2xl font-display font-bold text-foreground">
                     {weather.temp}°C
