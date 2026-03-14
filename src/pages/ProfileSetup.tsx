@@ -67,7 +67,10 @@ const ProfileSetup = () => {
           </div>
 
           <Button
-            onClick={() => navigate("/closet")}
+            onClick={() => {
+              if (name.trim()) localStorage.setItem("sv_user_name", name.trim());
+              navigate("/home");
+            }}
             disabled={!isComplete}
             className="h-14 w-full rounded-2xl bg-primary text-primary-foreground font-display text-base font-semibold tracking-wide transition-all hover:opacity-90 disabled:opacity-40"
           >
