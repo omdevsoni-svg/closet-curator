@@ -164,6 +164,13 @@ const featureCards = [
   { icon: Star, label: "Profile", path: "/profile", c: "bg-purple-100 text-purple-600" },
 ];
 
+const mockOutfit = [
+  { name: "Blazer", image: mockBlazer },
+  { name: "T-Shirt", image: mockTshirt },
+  { name: "Jeans", image: mockJeans },
+  { name: "Sneakers", image: mockSneakers },
+];
+
 const Home = () => {
   const navigate = useNavigate();
   const weather = useWeather();
