@@ -22,7 +22,7 @@ import mockJeans from "@/assets/mock-jeans.png";
 import mockSneakers from "@/assets/mock-sneakers.png";
 
 /* ------------------------------------------------------------------ */
-/*  Weather hook â uses OpenMeteo (free, no key needed)                */
+/*  Weather hook — uses OpenMeteo (free, no key needed)                */
 /* ------------------------------------------------------------------ */
 interface WeatherData {
   temp: number;
@@ -36,8 +36,8 @@ interface WeatherData {
 
 const weatherTips: Record<string, string> = {
   hot: "Opt for light fabrics, breathable cotton, and open footwear.",
-  warm: "Go with light layers â a tee with optional light jacket works great.",
-  mild: "Perfect layering weather â try a shirt with a light blazer.",
+  warm: "Go with light layers — a tee with optional light jacket works great.",
+  mild: "Perfect layering weather — try a shirt with a light blazer.",
   cool: "Add a structured jacket or sweater over your outfit.",
   cold: "Bundle up with coats, scarves, and warm boots.",
 };
@@ -86,7 +86,7 @@ const useWeather = (): WeatherData | null => {
           humidity: current.relative_humidity_2m,
           windSpeed: Math.round(current.wind_speed_10m),
           city: "Your Location",
-          icon: current.weather_code <= 1 ? "âï¸" : current.weather_code <= 3 ? "â" : "ð§ï¸",
+          icon: current.weather_code <= 1 ? "☀️" : current.weather_code <= 3 ? "⛅" : "🌧️",
           tip: weatherTips[cat],
         });
       } catch {
@@ -97,7 +97,7 @@ const useWeather = (): WeatherData | null => {
           humidity: 65,
           windSpeed: 12,
           city: "Your Location",
-          icon: "â",
+          icon: "⛅",
           tip: weatherTips.warm,
         });
       }
@@ -181,7 +181,7 @@ const Home = () => {
             <div className="flex items-center gap-2">
               <Sparkles className="h-5 w-5" />
               <h2 className="text-lg font-display font-bold">
-                Welcome, {userName}! <span className="font-emoji">ð</span>
+                Welcome, {userName}! <span className="font-emoji">👋</span>
               </h2>
             </div>
             <p className="mt-1 text-sm font-body text-white/80">
@@ -282,10 +282,10 @@ const Home = () => {
                 <span className="text-3xl font-emoji">{weather.icon}</span>
                 <div>
                   <span className="text-2xl font-display font-bold text-foreground">
-                    {weather.temp}Â°C
+                    {weather.temp}°C
                   </span>
                   <p className="text-xs font-body text-muted-foreground">
-                    {weather.condition} Â· {weather.city}
+                    {weather.condition} · {weather.city}
                   </p>
                 </div>
               </div>
