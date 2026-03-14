@@ -11,12 +11,7 @@ import {
   Upload,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import mockBlazer from "@/assets/mock-blazer.png";
-import mockSneakers from "@/assets/mock-sneakers.png";
-import mockJeans from "@/assets/mock-jeans.png";
-import mockTshirt from "@/assets/mock-tshirt.png";
-import mockDressShirt from "@/assets/mock-dress-shirt.png";
-import mockChinos from "@/assets/mock-chinos.png";
+
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -33,15 +28,7 @@ type ClothingItem = {
   gender: "women" | "men" | "unisex";
 };
 
-const mockItems: ClothingItem[] = [
-  { id: "1", name: "Navy Blazer", category: "Outerwear", color: "Navy", tags: ["formal", "winter"], purchaseType: "new", price: 4999, image: mockBlazer, gender: "men" },
-  { id: "2", name: "White Sneakers", category: "Footwear", color: "White", tags: ["casual", "everyday"], purchaseType: "new", price: 2499, image: mockSneakers, gender: "unisex" },
-  { id: "3", name: "Blue Denim Jeans", category: "Bottoms", color: "Blue", tags: ["casual", "everyday"], purchaseType: "new", price: 1999, image: mockJeans, gender: "men" },
-  { id: "4", name: "White T-Shirt", category: "Tops", color: "White", tags: ["casual", "summer"], purchaseType: "new", price: 599, image: mockTshirt, gender: "unisex" },
-  { id: "5", name: "Black Dress Shirt", category: "Tops", color: "Black", tags: ["formal", "office"], purchaseType: "new", price: 1299, image: mockDressShirt, gender: "men" },
-  { id: "6", name: "Beige Chinos", category: "Bottoms", color: "Beige", tags: ["smart-casual", "office"], purchaseType: "new", price: 1499, image: mockChinos, gender: "men" },
-];
-
+// Items are loaded from localStorage in the component
 const categories = ["All", "Tops", "Bottoms", "Outerwear", "Footwear", "Dresses", "Accessories"];
 const colorOptions = ["Black", "White", "Navy", "Blue", "Red", "Green", "Beige", "Grey", "Pink", "Brown"];
 const categoryOptions = ["Tops", "Bottoms", "Outerwear", "Footwear", "Dresses", "Accessories", "Activewear"];
@@ -52,9 +39,10 @@ const categoryOptions = ["Tops", "Bottoms", "Outerwear", "Footwear", "Dresses", 
 interface AddItemModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onAdd: (item: Omit<ClothingItem, "id">) => void;
 }
 
-const AddItemModal = ({ isOpen, onClose }: AddItemModalProps) => {
+const AddItemModal = ({ isOpen, onClose, onAdd }: AddItemModalProps) => {
   const [itemName, setItemName] = useState("");
   const [category, setCategory] = useState("");
   const [gender, setGender] = useState<"women" | "men" | "unisex">("unisex");
@@ -71,7 +59,17 @@ const AddItemModal = ({ isOpen, onClose }: AddItemModalProps) => {
   };
 
   const handleSubmit = () => {
-    // Would save to store/firebase
+    if (!name.trim()) return;
+    onAdd({
+      name: name.trim(),
+      category,
+      color,
+      tags: tags.split(",").map((t: string) => t.trim()).filter(Boolean),
+      purchaseType,
+      price: price ? Number(price) : undefined,
+      image: imagePreview || "",
+      gender,
+    });
     onClose();
   };
 
@@ -314,6 +312,24 @@ const AddItemModal = ({ isOpen, onClose }: AddItemModalProps) => {
 /*  Main Closet component                                              */
 /* ------------------------------------------------------------------ */
 const DigitalCloset = () => {
+  const [items, setItems] = useState<ClothingItem[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("sv_closet_items") || "[]");
+    } catch {
+      return [];
+    }
+  });
+
+  const saveItems = (newItems: ClothingItem[]) => {
+    setItems(newItems);
+    localStorage.setItem("sv_closet_items", JSON.stringify(newItems));
+  };
+
+  const addItem = (item: Omit<ClothingItem, "id">) => {
+    const newItem = { ...item, id: Date.now().toString() };
+    saveItems([...items, newItem as ClothingItem]);
+  };
+
   const [activeCategory, setActiveCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [isListening, setIsListening] = useState(false);
@@ -350,7 +366,7 @@ const DigitalCloset = () => {
   };
 
   // Filter items by category + search
-  const filtered = mockItems.filter((item) => {
+  const filtered = items.filter((item) => {
     const matchesCategory =
       activeCategory === "All" || item.category === activeCategory;
     const matchesSearch =
@@ -369,7 +385,7 @@ const DigitalCloset = () => {
             My Closet
           </h1>
           <p className="text-sm text-muted-foreground font-body">
-            {mockItems.length} items
+            {items.length} items
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -446,8 +462,22 @@ const DigitalCloset = () => {
       </div>
 
       {/* Clothing grid */}
-      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {filtered.map((item, i) => (
+      {items.length === 0 ? (
+        <div className="mt-12 flex flex-col items-center justify-center text-center">
+          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-gray-100">
+            <Plus className="h-8 w-8 text-gray-400" />
+          </div>
+          <h3 className="mt-4 text-base font-semibold text-gray-700">Your closet is empty</h3>
+          <p className="mt-1 text-sm text-gray-400">Tap the + button to add your first item</p>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="mt-12 flex flex-col items-center text-center">
+          <Search className="h-10 w-10 text-gray-300" />
+          <p className="mt-3 text-sm text-gray-400">No items match your search</p>
+        </div>
+      ) : (
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {filtered.map((item, i) => (
           <motion.div
             key={item.id}
             initial={{ opacity: 0, scale: 0.95 }}
@@ -457,11 +487,17 @@ const DigitalCloset = () => {
           >
             <div className="overflow-hidden rounded-2xl bg-card p-3">
               <div className="aspect-square overflow-hidden rounded-xl">
-                <img
-                  src={item.image}
-                  alt={item.name}
-                  className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-105"
-                />
+                {item.image ? (
+                  <img
+                    src={item.image}
+                    alt={item.name}
+                    className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-105"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center bg-gray-50">
+                    <ImageIcon className="h-8 w-8 text-gray-300" />
+                  </div>
+                )}
               </div>
               <div className="mt-2">
                 <p className="text-xs font-medium font-body text-foreground truncate">
@@ -495,19 +531,10 @@ const DigitalCloset = () => {
         ))}
       </div>
 
-      {/* Empty state */}
-      {filtered.length === 0 && (
-        <div className="mt-16 flex flex-col items-center text-center">
-          <Search className="h-12 w-12 text-muted-foreground/30" />
-          <p className="mt-3 text-sm font-body font-medium text-foreground">No items found</p>
-          <p className="mt-1 text-xs font-body text-muted-foreground">
-            Try a different search or category
-          </p>
-        </div>
       )}
 
       {/* Add Item Modal */}
-      <AddItemModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} />
+      <AddItemModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} onAdd={addItem} />
     </div>
   );
 };
