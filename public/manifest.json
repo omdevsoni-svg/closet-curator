@@ -2,7 +2,7 @@
         "name": "Vastrika AI",
         "short_name": "Vastrika AI",
         "description": "Your AI-powered digital wardrobe manager. Upload clothes, get styled by AI, and discover what your closet needs.",
-        "start_url": ".",
+        "start_url": "/",
         "scope": "/",
         "id": "/",
         "display": "standalone",
