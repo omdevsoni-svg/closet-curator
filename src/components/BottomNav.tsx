@@ -67,7 +67,7 @@ const BottomNav = () => {
             onClick={() => navigate("/stylist")}
             className={`flex h-14 w-14 items-center justify-center rounded-2xl shadow-lg transition-all ${
               isStylistActive
-                ? "bg-gradient-to-br from-[hsl(263,70%,66%)] to-[hsl(280,80%,75%)] text-white shadow-ai/30"
+                ? "bg-gradient-to-br from-[hsl(38,90%,50%)] to-[hsl(350,80%,58%)] text-white shadow-ai/30"
                 : "bg-card text-muted-foreground shadow-black/10 hover:text-foreground dark:shadow-black/30"
             }`}
           >
