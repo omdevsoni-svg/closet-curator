@@ -18,8 +18,6 @@ import {
   X,
 } from "lucide-react";
 import Logo from "@/components/Logo";
-import AuthModal from "@/components/AuthModal";
-
 const fadeUp = {
   initial: { opacity: 0, y: 24 },
   whileInView: { opacity: 1, y: 0 },
@@ -34,13 +32,12 @@ const staggerContainer = {
 
 const Landing = () => {
   const navigate = useNavigate();
-  const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "signup">("signup");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const openAuth = (mode: "login" | "signup") => {
     setAuthMode(mode);
-    setAuthOpen(true);
+    navigate("/setup");
   };
 
   const handleAuthSuccess = () => {
@@ -512,12 +509,7 @@ const Landing = () => {
       </footer>
 
       {/* Auth Modal */}
-      <AuthModal
-        isOpen={authOpen}
-        onClose={() => setAuthOpen(false)}
-        initialMode={authMode}
-        onSuccess={handleAuthSuccess}
-      />
+      
     </div>
   );
 };
