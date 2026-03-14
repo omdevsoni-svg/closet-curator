@@ -157,6 +157,13 @@ const useWeather = (): WeatherData | null => {
   return weather;
 };
 
+const featureCards = [
+  { icon: Shirt, label: "Closet", path: "/closet", c: "bg-amber-100 text-amber-600" },
+  { icon: Sparkles, label: "Stylist", path: "/stylist", c: "bg-pink-100 text-pink-600" },
+  { icon: HeartPulse, label: "Health", path: "/health", c: "bg-green-100 text-green-600" },
+  { icon: Star, label: "Profile", path: "/profile", c: "bg-purple-100 text-purple-600" },
+];
+
 const Home = () => {
   const navigate = useNavigate();
   const weather = useWeather();
