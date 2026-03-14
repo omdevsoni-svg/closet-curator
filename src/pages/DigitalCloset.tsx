@@ -282,7 +282,7 @@ const AddItemModal = ({ isOpen, onClose }: AddItemModalProps) => {
                 Purchase Price <span className="normal-case text-muted-foreground/60">(optional)</span>
               </label>
               <div className="relative mt-1.5">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">â¹</span>
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">₹</span>
                 <input
                   type="number"
                   value={price}
@@ -473,7 +473,7 @@ const DigitalCloset = () => {
                   </p>
                   {item.price && (
                     <p className="text-[10px] font-semibold text-ai font-body">
-                      â¹{item.price.toLocaleString("en-IN")}
+                      ₹{item.price.toLocaleString("en-IN")}
                     </p>
                   )}
                 </div>
