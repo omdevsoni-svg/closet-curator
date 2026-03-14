@@ -64,95 +64,94 @@ const useWeather = (): WeatherData | null => {
   const [weather, setWeather] = useState<WeatherData | null>(null);
 
   useEffect(() => {
-    const fetchWeather = async (lat: number, lon: number) => {
-      try {
-        // Reverse geocode for city name
-        const geoRes = await fetch(
-          `https://geocoding-api.open-meteo.com/v1/search?name=&latitude=${lat}&longitude=${lon}&count=1`
-        );
-
-        // Weather data
-        const res = await fetch(
-          `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&timezone=auto`
-        );
-        const data = await res.json();
-        const current = data.current;
-        const temp = Math.round(current.temperature_2m);
-        const cat = getWeatherCategory(temp);
-
-        setWeather({
-          temp,
-          condition: conditionFromCode(current.weather_code),
-          humidity: current.relative_humidity_2m,
-          windSpeed: Math.round(current.wind_speed_10m),
-          city: "Your Location",
-          icon: current.weather_code <= 1 ? "☀️" : current.weather_code <= 3 ? "⛅" : "🌧️",
-          tip: weatherTips[cat],
-        });
-      } catch {
-        // Fallback static weather
-        setWeather({
-          temp: 28,
-          condition: "Partly Cloudy",
-          humidity: 65,
-          windSpeed: 12,
-          city: "Your Location",
-          icon: "⛅",
-          tip: weatherTips.warm,
-        });
-      }
-    };
-
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => fetchWeather(pos.coords.latitude, pos.coords.longitude),
-        () => fetchWeather(28.6139, 77.209) // Default: New Delhi
+    const fetchWeather = async () => {
+    try {
+      const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+        })
       );
-    } else {
-      fetchWeather(28.6139, 77.209);
+      const { latitude: lat, longitude: lon } = pos.coords;
+
+      // Fetch weather and city name in parallel
+      const [weatherRes, geoRes] = await Promise.all([
+        fetch(
+          `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&hourly=relative_humidity_2m&timezone=auto`
+        ),
+        fetch(
+          `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`
+        ),
+      ]);
+
+      const weatherData = await weatherRes.json();
+      const geoData = await geoRes.json();
+
+      const cw = weatherData.current_weather;
+      const cityName =
+        geoData.city ||
+        geoData.locality ||
+        geoData.principalSubdivision ||
+        "Your Location";
+
+      const wmoMap: Record<number, { condition: string; icon: string }> = {
+        0: { condition: "Clear Sky", icon: "Sun" },
+        1: { condition: "Mainly Clear", icon: "Sun" },
+        2: { condition: "Partly Cloudy", icon: "CloudSun" },
+        3: { condition: "Overcast", icon: "Cloud" },
+        45: { condition: "Foggy", icon: "CloudFog" },
+        48: { condition: "Rime Fog", icon: "CloudFog" },
+        51: { condition: "Light Drizzle", icon: "CloudDrizzle" },
+        53: { condition: "Drizzle", icon: "CloudDrizzle" },
+        55: { condition: "Heavy Drizzle", icon: "CloudDrizzle" },
+        61: { condition: "Light Rain", icon: "CloudRain" },
+        63: { condition: "Rain", icon: "CloudRain" },
+        65: { condition: "Heavy Rain", icon: "CloudRainWind" },
+        71: { condition: "Light Snow", icon: "Snowflake" },
+        73: { condition: "Snow", icon: "Snowflake" },
+        75: { condition: "Heavy Snow", icon: "Snowflake" },
+        80: { condition: "Rain Showers", icon: "CloudRain" },
+        81: { condition: "Heavy Showers", icon: "CloudRainWind" },
+        95: { condition: "Thunderstorm", icon: "CloudLightning" },
+      };
+
+      const code = cw.weathercode ?? cw.weather_code ?? 0;
+      const mapped = wmoMap[code] || { condition: "Unknown", icon: "Cloud" };
+      const humidity = weatherData.hourly?.relative_humidity_2m?.[0] ?? 0;
+
+      const tips: Record<string, string> = {
+        Sun: "Perfect for light, breathable fabrics",
+        CloudSun: "Layer up — it could go either way",
+        Cloud: "A light jacket would be smart today",
+        CloudFog: "Wear visible colors in low visibility",
+        CloudDrizzle: "Grab a water-resistant layer",
+        CloudRain: "Waterproof jacket and boots recommended",
+        CloudRainWind: "Heavy rain gear essential today",
+        Snowflake: "Bundle up with insulated layers",
+        CloudLightning: "Stay indoors if possible, dress warm",
+      };
+
+      setWeather({
+        temp: Math.round(cw.temperature),
+        condition: mapped.condition,
+        humidity,
+        windSpeed: Math.round(cw.windspeed),
+        city: cityName,
+        icon: mapped.icon,
+        tip: tips[mapped.icon] || "Dress for comfort today",
+      });
+    } catch {
+      setWeather({
+        temp: 28,
+        condition: "Partly Cloudy",
+        humidity: 65,
+        windSpeed: 12,
+        city: "Your Location",
+        icon: "CloudSun",
+        tip: "Layer up — it could go either way",
+      });
     }
-  }, []);
-
-  return weather;
-};
-
-/* ------------------------------------------------------------------ */
-/*  Main Home component                                                */
-/* ------------------------------------------------------------------ */
-const featureCards = [
-  {
-    label: "My Closet",
-    icon: Shirt,
-    path: "/closet",
-    color: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-  },
-  {
-    label: "AI Stylist",
-    icon: Sparkles,
-    path: "/stylist",
-    color: "bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400",
-  },
-  {
-    label: "Closet Health",
-    icon: HeartPulse,
-    path: "/health",
-    color: "bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400",
-  },
-  {
-    label: "OOTD",
-    icon: Calendar,
-    path: "/stylist",
-    color: "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400",
-  },
-];
-
-const mockOutfit = [
-  { name: "White T-Shirt", image: mockTshirt },
-  { name: "Blue Denim Jeans", image: mockJeans },
-  { name: "White Sneakers", image: mockSneakers },
-];
-
-const Home = () => {
+  };
   const navigate = useNavigate();
   const weather = useWeather();
   const [showWelcome, setShowWelcome] = useState(true);
