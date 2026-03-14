@@ -56,7 +56,7 @@ const Landing = () => {
           <div className="flex items-center gap-2">
             <Logo className="h-7 w-7 sm:h-8 sm:w-8" />
             <span className="text-base sm:text-lg font-display font-bold tracking-tight text-foreground">
-              StyleVault
+              Vastrika AI
             </span>
           </div>
           <div className="hidden items-center gap-8 md:flex">
@@ -370,7 +370,7 @@ const Landing = () => {
               {
                 name: "Priya Sharma",
                 role: "Fashion Blogger",
-                text: "StyleVault completely changed how I plan outfits. The AI recommendations are surprisingly spot-on for Indian occasions.",
+                text: "Vastrika AI completely changed how I plan outfits. The AI recommendations are surprisingly spot-on for Indian occasions.",
                 rating: 5,
               },
               {
@@ -455,7 +455,7 @@ const Landing = () => {
             <div className="col-span-2 lg:col-span-1">
               <div className="flex items-center gap-2">
                 <Logo className="h-7 w-7" />
-                <span className="text-base font-display font-bold text-foreground">StyleVault</span>
+                <span className="text-base font-display font-bold text-foreground">Vastrika AI</span>
               </div>
               <p className="mt-3 text-sm text-muted-foreground font-body leading-relaxed max-w-xs">
                 Your AI-powered digital wardrobe manager. Dress smarter, shop less, style more.
@@ -494,7 +494,7 @@ const Landing = () => {
           </div>
           <div className="mt-10 flex flex-col items-center justify-between gap-4 border-t border-border pt-8 sm:flex-row">
             <p className="text-xs text-muted-foreground font-body">
-              &copy; {new Date().getFullYear()} StyleVault. All rights reserved.
+              &copy; {new Date().getFullYear()} Vastrika AI. All rights reserved.
             </p>
             <div className="flex gap-4">
               <a href="#" className="text-muted-foreground transition-colors hover:text-foreground">
