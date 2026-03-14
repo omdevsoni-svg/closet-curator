@@ -24,7 +24,7 @@
     --muted: 220 14% 96%;
     --muted-foreground: 0 0% 45%;
 
-    --accent: 35 80% 50%
+    --accent: 35 80% 50%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84.2% 60.2%;
@@ -69,6 +69,10 @@
 @layer utilities {
   .text-gradient-ai {
     @apply bg-clip-text text-transparent;
-        background-image: linear-gradient(135deg, hsl(var(--ai-accent)), hsl(350 70% 45%));
+    background-image: linear-gradient(135deg, hsl(var(--ai-accent)), hsl(350 70% 45%));
+  }
+
+  .font-emoji {
+    font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', 'Twemoji Mozilla', 'Android Emoji', sans-serif;
   }
 }
