@@ -154,6 +154,10 @@ const useWeather = (): WeatherData | null => {
   };
     fetchWeather();
   }, []);
+  return weather;
+};
+
+const Home = () => {
   const navigate = useNavigate();
   const weather = useWeather();
   const [showWelcome, setShowWelcome] = useState(true);
