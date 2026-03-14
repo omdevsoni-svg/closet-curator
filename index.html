@@ -1,39 +1,40 @@
 <!doctype html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 
-        <title>Vastrika AI</title>
-        <meta name="description" content="Your AI-powered digital wardrobe manager. Upload clothes, get styled by AI, and discover what your closet needs." />
-        <meta name="author" content="Vastrika AI" />
+    <title>StyleVault – AI Digital Closet</title>
+    <meta name="description" content="Your AI-powered digital wardrobe manager. Upload clothes, get styled by AI, and discover what your closet needs." />
+    <meta name="author" content="StyleVault" />
 
-        <!-- PWA -->
-        <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#D4A017" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="Vastrika AI" />
-        <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#7c5cfc" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="StyleVault" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
 
-        <!-- OG -->
-        <meta property="og:title" content="Vastrika AI" />
-        <meta property="og:description" content="Your AI-powered digital wardrobe manager. Upload clothes, get styled by AI, and discover what your closet needs." />
-        <meta property="og:type" content="website" />
-        <meta property="og:image" content="/icons/icon-512.png" />
+    <!-- OG -->
+    <meta property="og:title" content="StyleVault – AI Digital Closet" />
+    <meta property="og:description" content="Your AI-powered digital wardrobe manager. Upload clothes, get styled by AI, and discover what your closet needs." />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="/icons/icon-512.png" />
 
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:image" content="/icons/icon-512.png" />
-    </head>
-    <body>
-        <div id="root"></div>
-        <script type="module" src="/src/main.tsx"></script>
-        <script>
-            if ('serviceWorker' in navigator) {
-                window.addEventListener('load', () => {
-                    navigator.serviceWorker.register('/sw.js').catch(() => {});
-                });
-            }
-        </script>
-    </body>
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="/icons/icon-512.png" />
+  </head>
+
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch(() => {});
+        });
+      }
+    </script>
+  </body>
 </html>

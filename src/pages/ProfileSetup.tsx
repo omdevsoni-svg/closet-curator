@@ -2,35 +2,20 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { User, Mail, Lock, ArrowRight, Eye, EyeOff } from "lucide-react";
-
-interface StoredUser {
-  name: string;
-  email: string;
-  password: string;
-}
-
-function getUsers(): StoredUser[] {
-  try {
-    return JSON.parse(localStorage.getItem("sv_users") || "[]");
-  } catch {
-    return [];
-  }
-}
-
-function saveUsers(users: StoredUser[]) {
-  localStorage.setItem("sv_users", JSON.stringify(users));
-}
+import { useAuth } from "@/contexts/AuthContext";
 
 const ProfileSetup = () => {
   const navigate = useNavigate();
+  const { signUp, signIn } = useAuth();
   const [mode, setMode] = useState<"signup" | "login">("signup");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setError("");
     const trimEmail = email.trim().toLowerCase();
     const trimPassword = password.trim();
@@ -44,149 +29,164 @@ const ProfileSetup = () => {
       return;
     }
 
-    const users = getUsers();
+    setLoading(true);
 
     if (mode === "signup") {
       const trimName = name.trim();
       if (!trimName) {
         setError("Please enter your name");
+        setLoading(false);
         return;
       }
-      if (users.find((u) => u.email === trimEmail)) {
-        setError("An account with this email already exists. Please log in.");
+      const { error: signUpError } = await signUp(trimEmail, trimPassword, trimName);
+      if (signUpError) {
+        setError(signUpError);
+        setLoading(false);
         return;
       }
-      users.push({ name: trimName, email: trimEmail, password: trimPassword });
-      saveUsers(users);
-      localStorage.setItem("sv_user_name", trimName);
-      localStorage.setItem("sv_user_email", trimEmail);
       navigate("/home");
     } else {
-      const user = users.find(
-        (u) => u.email === trimEmail && u.password === trimPassword
-      );
-      if (!user) {
-        setError("Invalid email or password");
+      const { error: signInError } = await signIn(trimEmail, trimPassword);
+      if (signInError) {
+        setError(signInError);
+        setLoading(false);
         return;
       }
-      localStorage.setItem("sv_user_name", user.name);
-      localStorage.setItem("sv_user_email", user.email);
       navigate("/home");
     }
+    setLoading(false);
   };
 
   return (
-    <div className="min-h-screen bg-[#faf9f7] flex items-center justify-center px-5 py-8">
+    <div className="min-h-screen bg-background flex items-center justify-center px-5 py-8">
       <motion.div
-        initial={{ opacity: 0, y: 24 }}
+        initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="w-full max-w-md space-y-7"
+        className="w-full max-w-md"
       >
-        <div className="text-center space-y-2">
-          <div
-            className="mx-auto w-16 h-16 rounded-2xl flex items-center justify-center text-white text-2xl font-bold"
-            style={{
-              background: "linear-gradient(135deg, hsl(38,90%,50%), hsl(350,80%,58%))",
-            }}
-          >
-            V
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            {mode === "signup" ? "Create your account" : "Welcome back"}
+        {/* Logo */}
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-display font-bold tracking-tight bg-gradient-to-r from-[hsl(38,90%,50%)] to-[hsl(350,80%,58%)] bg-clip-text text-transparent">
+            Vastrika AI
           </h1>
-          <p className="text-sm text-gray-500">
+          <p className="mt-2 text-sm text-muted-foreground font-body">
             {mode === "signup"
-              ? "Sign up to get your personalised style"
-              : "Log in to continue your style journey"}
+              ? "Create your account to get started"
+              : "Welcome back! Sign in to continue"}
           </p>
         </div>
 
+        {/* Mode toggle */}
+        <div className="flex rounded-2xl bg-card p-1 mb-6">
+          <button
+            onClick={() => { setMode("signup"); setError(""); }}
+            className={`flex-1 rounded-xl py-2.5 text-sm font-body font-medium transition-all ${
+              mode === "signup"
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Sign Up
+          </button>
+          <button
+            onClick={() => { setMode("login"); setError(""); }}
+            className={`flex-1 rounded-xl py-2.5 text-sm font-body font-medium transition-all ${
+              mode === "login"
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Log In
+          </button>
+        </div>
+
+        {/* Error message */}
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-4 rounded-xl bg-destructive/10 px-4 py-3 text-sm text-destructive font-body"
+          >
+            {error}
+          </motion.div>
+        )}
+
+        {/* Form */}
         <div className="space-y-4">
           {mode === "signup" && (
             <div className="relative">
-              <User size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <User className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <input
-                type="text"
-                placeholder="Your name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400/60 transition"
+                placeholder="Full Name"
+                className="h-12 w-full rounded-xl border border-border bg-card pl-11 pr-4 text-sm font-body text-foreground placeholder:text-muted-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
               />
             </div>
           )}
 
           <div className="relative">
-            <Mail size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input
               type="email"
-              placeholder="Email address"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400/60 transition"
+              placeholder="Email Address"
+              className="h-12 w-full rounded-xl border border-border bg-card pl-11 pr-4 text-sm font-body text-foreground placeholder:text-muted-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
             />
           </div>
 
           <div className="relative">
-            <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input
               type={showPassword ? "text" : "password"}
-              placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full pl-10 pr-11 py-3 rounded-xl border border-gray-200 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400/60 transition"
+              placeholder="Password"
+              onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+              className="h-12 w-full rounded-xl border border-border bg-card pl-11 pr-11 text-sm font-body text-foreground placeholder:text-muted-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
             />
             <button
-              type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
             >
-              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
+
+          <motion.button
+            whileTap={{ scale: 0.98 }}
+            onClick={handleSubmit}
+            disabled={loading}
+            className="h-12 w-full rounded-xl bg-gradient-to-r from-[hsl(38,90%,50%)] to-[hsl(350,80%,58%)] text-white font-display font-semibold text-sm transition-all hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {loading ? (
+              <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+            ) : (
+              <>
+                {mode === "signup" ? "Create Account" : "Sign In"}
+                <ArrowRight className="h-4 w-4" />
+              </>
+            )}
+          </motion.button>
         </div>
 
-        {error && (
-          <p className="text-sm text-red-500 text-center -mt-2">{error}</p>
-        )}
-
-        <button
-          onClick={handleSubmit}
-          className="w-full py-3.5 rounded-xl text-white font-semibold flex items-center justify-center gap-2 shadow-lg active:scale-[0.98] transition-transform"
-          style={{
-            background: "linear-gradient(135deg, hsl(38,90%,50%), hsl(350,80%,58%))",
-          }}
-        >
-          {mode === "signup" ? "Create Account" : "Log In"}
-          <ArrowRight size={18} />
-        </button>
-
-        <p className="text-center text-sm text-gray-500">
+        <p className="mt-6 text-center text-xs text-muted-foreground font-body">
           {mode === "signup" ? (
             <>
               Already have an account?{" "}
-              <button
-                onClick={() => { setMode("login"); setError(""); }}
-                className="font-semibold text-amber-600 hover:underline"
-              >
+              <button onClick={() => { setMode("login"); setError(""); }} className="text-primary font-medium">
                 Log in
               </button>
             </>
           ) : (
             <>
-              Don&apos;t have an account?{" "}
-              <button
-                onClick={() => { setMode("signup"); setError(""); }}
-                className="font-semibold text-amber-600 hover:underline"
-              >
+              Don't have an account?{" "}
+              <button onClick={() => { setMode("signup"); setError(""); }} className="text-primary font-medium">
                 Sign up
               </button>
             </>
           )}
-        </p>
-
-        <p className="text-center text-xs text-gray-400">
-          By continuing you agree to our Terms &amp; Privacy Policy
         </p>
       </motion.div>
     </div>

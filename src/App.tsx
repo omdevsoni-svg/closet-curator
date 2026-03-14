@@ -5,6 +5,8 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "./hooks/useTheme";
+import { AuthProvider } from "./contexts/AuthContext";
+import ProtectedRoute from "./components/ProtectedRoute";
 import SplashScreen from "./components/SplashScreen";
 import AppLayout from "./components/AppLayout";
 import Landing from "./pages/Landing";
@@ -30,29 +32,37 @@ const App = () => {
   }, []);
 
   return (
-    <ThemeProvider>
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          {showSplash && <SplashScreen onFinish={handleSplashFinish} />}
-          <BrowserRouter>
-            <Routes>
-              <Route path="/" element={<Landing />} />
-              <Route path="/setup" element={<ProfileSetup />} />
-              <Route element={<AppLayout />}>
-                <Route path="/home" element={<Home />} />
-                <Route path="/closet" element={<DigitalCloset />} />
-                <Route path="/stylist" element={<AiStylist />} />
-                <Route path="/health" element={<ClosetHealth />} />
-                <Route path="/profile" element={<Profile />} />
-              </Route>
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
-        </TooltipProvider>
-      </QueryClientProvider>
-    </ThemeProvider>
+    <AuthProvider>
+      <ThemeProvider>
+        <QueryClientProvider client={queryClient}>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            {showSplash && <SplashScreen onFinish={handleSplashFinish} />}
+            <BrowserRouter>
+              <Routes>
+                <Route path="/" element={<Landing />} />
+                <Route path="/setup" element={<ProfileSetup />} />
+                <Route
+                  element={
+                    <ProtectedRoute>
+                      <AppLayout />
+                    </ProtectedRoute>
+                  }
+                >
+                  <Route path="/home" element={<Home />} />
+                  <Route path="/closet" element={<DigitalCloset />} />
+                  <Route path="/stylist" element={<AiStylist />} />
+                  <Route path="/health" element={<ClosetHealth />} />
+                  <Route path="/profile" element={<Profile />} />
+                </Route>
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </BrowserRouter>
+          </TooltipProvider>
+        </QueryClientProvider>
+      </ThemeProvider>
+    </AuthProvider>
   );
 };
 

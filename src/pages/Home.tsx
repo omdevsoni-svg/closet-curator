@@ -12,23 +12,16 @@ import {
   Heart,
   ChevronRight,
   Star,
-  ShoppingBag,
   X,
-  Sun,
-  Cloud,
-  CloudDrizzle,
-  CloudRain,
-  CloudRainWind,
-  CloudFog,
-  CloudLightning,
-  Snowflake,
-  type LucideIcon,
+  ImageIcon,
+  Loader2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-
+import { useAuth } from "@/contexts/AuthContext";
+import { getClosetStats, getProfile } from "@/lib/database";
 
 /* ------------------------------------------------------------------ */
-/*  Weather hook — uses OpenMeteo (free, no key needed)                */
+/*  Weather hook                                                       */
 /* ------------------------------------------------------------------ */
 interface WeatherData {
   temp: number;
@@ -42,8 +35,8 @@ interface WeatherData {
 
 const weatherTips: Record<string, string> = {
   hot: "Opt for light fabrics, breathable cotton, and open footwear.",
-  warm: "Go with light layers — a tee with optional light jacket works great.",
-  mild: "Perfect layering weather — try a shirt with a light blazer.",
+  warm: "Go with light layers \u2014 a tee with optional light jacket works great.",
+  mild: "Perfect layering weather \u2014 try a shirt with a light blazer.",
   cool: "Add a structured jacket or sweater over your outfit.",
   cold: "Bundle up with coats, scarves, and warm boots.",
 };
@@ -71,76 +64,48 @@ const useWeather = (): WeatherData | null => {
 
   useEffect(() => {
     const fetchWeatherForCoords = async (lat: number, lon: number) => {
-      const [weatherRes, geoRes] = await Promise.all([
-        fetch(
-          `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&hourly=relative_humidity_2m&timezone=auto`
-        ),
-        fetch(
-          `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`
-        ),
-      ]);
+      try {
+        let city = "Your Location";
+        try {
+          const geoRes = await fetch(
+            `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`
+          );
+          const geoData = await geoRes.json();
+          city = geoData.city || geoData.locality || "Your Location";
+        } catch {}
 
-      const weatherData = await weatherRes.json();
-      const geoData = await geoRes.json();
+        const res = await fetch(
+          `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&timezone=auto`
+        );
+        const data = await res.json();
+        const current = data.current;
+        const temp = Math.round(current.temperature_2m);
+        const cat = getWeatherCategory(temp);
 
-      const cw = weatherData.current_weather;
-      const cityName =
-        geoData.city ||
-        geoData.locality ||
-        geoData.principalSubdivision ||
-        "Your Location";
-
-      const wmoMap: Record<number, { condition: string; icon: string }> = {
-        0: { condition: "Clear Sky", icon: "Sun" },
-        1: { condition: "Mainly Clear", icon: "Sun" },
-        2: { condition: "Partly Cloudy", icon: "CloudSun" },
-        3: { condition: "Overcast", icon: "Cloud" },
-        45: { condition: "Foggy", icon: "CloudFog" },
-        48: { condition: "Rime Fog", icon: "CloudFog" },
-        51: { condition: "Light Drizzle", icon: "CloudDrizzle" },
-        53: { condition: "Drizzle", icon: "CloudDrizzle" },
-        55: { condition: "Heavy Drizzle", icon: "CloudDrizzle" },
-        61: { condition: "Light Rain", icon: "CloudRain" },
-        63: { condition: "Rain", icon: "CloudRain" },
-        65: { condition: "Heavy Rain", icon: "CloudRainWind" },
-        71: { condition: "Light Snow", icon: "Snowflake" },
-        73: { condition: "Snow", icon: "Snowflake" },
-        75: { condition: "Heavy Snow", icon: "Snowflake" },
-        80: { condition: "Rain Showers", icon: "CloudRain" },
-        81: { condition: "Heavy Showers", icon: "CloudRainWind" },
-        95: { condition: "Thunderstorm", icon: "CloudLightning" },
-      };
-
-      const code = cw.weathercode as number;
-      const mapped = wmoMap[code] || { condition: "Unknown", icon: "CloudSun" };
-      const humidity = weatherData.hourly?.relative_humidity_2m?.[0] ?? 50;
-
-      const tips: Record<string, string> = {
-        Sun: "Perfect for light, breathable fabrics",
-        CloudSun: "Layer up — it could go either way",
-        Cloud: "A light jacket would be smart today",
-        CloudFog: "Wear visible colors in low visibility",
-        CloudDrizzle: "Grab a water-resistant layer",
-        CloudRain: "Waterproof jacket and boots recommended",
-        CloudRainWind: "Heavy rain gear essential today",
-        Snowflake: "Bundle up with insulated layers",
-        CloudLightning: "Stay indoors if possible, dress warm",
-      };
-
-      setWeather({
-        temp: Math.round(cw.temperature),
-        condition: mapped.condition,
-        humidity,
-        windSpeed: Math.round(cw.windspeed),
-        city: cityName,
-        icon: mapped.icon,
-        tip: tips[mapped.icon] || "Dress for comfort today",
-      });
+        setWeather({
+          temp,
+          condition: conditionFromCode(current.weather_code),
+          humidity: current.relative_humidity_2m,
+          windSpeed: Math.round(current.wind_speed_10m),
+          city,
+          icon: current.weather_code <= 1 ? "\u2600\uFE0F" : current.weather_code <= 3 ? "\u26C5" : "\uD83C\uDF27\uFE0F",
+          tip: weatherTips[cat],
+        });
+      } catch {
+        setWeather({
+          temp: 28,
+          condition: "Partly Cloudy",
+          humidity: 65,
+          windSpeed: 12,
+          city: "Your Location",
+          icon: "\u26C5",
+          tip: weatherTips.warm,
+        });
+      }
     };
 
     const fetchWeather = async () => {
       try {
-        // Try browser geolocation first
         const pos = await new Promise<GeolocationPosition>((res, rej) =>
           navigator.geolocation.getCurrentPosition(res, rej, {
             enableHighAccuracy: false,
@@ -150,68 +115,87 @@ const useWeather = (): WeatherData | null => {
         await fetchWeatherForCoords(pos.coords.latitude, pos.coords.longitude);
       } catch {
         try {
-          // Fallback: IP-based geolocation (no permission needed)
           const ipRes = await fetch("https://ipapi.co/json/");
           const ipData = await ipRes.json();
           if (ipData.latitude && ipData.longitude) {
             await fetchWeatherForCoords(ipData.latitude, ipData.longitude);
           } else {
-            throw new Error("No coords from IP");
+            throw new Error("No coords");
           }
         } catch {
-          // Final fallback: default values
           setWeather({
             temp: 28,
             condition: "Partly Cloudy",
             humidity: 65,
             windSpeed: 12,
             city: "Your Location",
-            icon: "CloudSun",
-            tip: "Layer up — it could go either way",
+            icon: "\u26C5",
+            tip: weatherTips.warm,
           });
         }
       }
     };
+
     fetchWeather();
   }, []);
+
   return weather;
 };
-const weatherIconMap: Record<string, LucideIcon> = {
-  Sun,
-  CloudSun,
-  Cloud,
-  CloudFog,
-  CloudDrizzle,
-  CloudRain,
-  CloudRainWind,
-  Snowflake,
-  CloudLightning,
-};
-
-const WeatherIcon = ({ name }: { name: string }) => {
-  const Icon = weatherIconMap[name] || CloudSun;
-  return <Icon className="h-8 w-8 text-amber-500" />;
-};
-
+/* ------------------------------------------------------------------ */
+/*  Feature cards                                                      */
+/* ------------------------------------------------------------------ */
 const featureCards = [
-  { icon: Shirt, label: "Closet", path: "/closet", c: "bg-amber-100 text-amber-600" },
-  { icon: Sparkles, label: "Stylist", path: "/stylist", c: "bg-pink-100 text-pink-600" },
-  { icon: HeartPulse, label: "Health", path: "/health", c: "bg-green-100 text-green-600" },
-  { icon: Star, label: "Profile", path: "/profile", c: "bg-purple-100 text-purple-600" },
+  {
+    label: "My Closet",
+    icon: Shirt,
+    path: "/closet",
+    color: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+  },
+  {
+    label: "AI Stylist",
+    icon: Sparkles,
+    path: "/stylist",
+    color: "bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400",
+  },
+  {
+    label: "Closet Health",
+    icon: HeartPulse,
+    path: "/health",
+    color: "bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400",
+  },
+  {
+    label: "OOTD",
+    icon: Calendar,
+    path: "/stylist",
+    color: "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400",
+  },
 ];
 
-
-
+/* ------------------------------------------------------------------ */
+/*  Home component                                                     */
+/* ------------------------------------------------------------------ */
 const Home = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const weather = useWeather();
   const [showWelcome, setShowWelcome] = useState(true);
+  const [userName, setUserName] = useState("Style Enthusiast");
+  const [stats, setStats] = useState({ totalItems: 0, favorites: 0, styleScore: 0, items: [] as any[] });
+  const [loadingStats, setLoadingStats] = useState(true);
 
-  // Get stored name from profile setup
-  const userName = localStorage.getItem("sv_user_name") || "Style Enthusiast";
-  const closetItems = JSON.parse(localStorage.getItem("sv_closet_items") || "[]");
-  const itemCount = closetItems.length;
-  const favCount = closetItems.filter((i: { favorite?: boolean }) => i.favorite).length;
+  useEffect(() => {
+    if (!user) return;
+
+    const load = async () => {
+      const profile = await getProfile(user.id);
+      if (profile?.name) setUserName(profile.name);
+
+      const s = await getClosetStats(user.id);
+      setStats(s);
+      setLoadingStats(false);
+    };
+    load();
+  }, [user]);
 
   return (
     <div className="px-5 pt-6 pb-4">
@@ -222,7 +206,7 @@ const Home = () => {
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, height: 0, marginBottom: 0 }}
-            className="relative mb-5 overflow-hidden rounded-2xl bg-gradient-to-r from-[hsl(38,90%,50%)] to-[hsl(350,80%,58%)] p-5 text-white"
+            className="relative mb-5 overflow-hidden rounded-2xl bg-gradient-to-r from-[hsl(263,70%,66%)] to-[hsl(280,80%,75%)] p-5 text-white"
           >
             <button
               onClick={() => setShowWelcome(false)}
@@ -233,7 +217,7 @@ const Home = () => {
             <div className="flex items-center gap-2">
               <Sparkles className="h-5 w-5" />
               <h2 className="text-lg font-display font-bold">
-                Welcome, {userName}! <span className="font-emoji">👋</span>
+                Welcome, {userName}!
               </h2>
             </div>
             <p className="mt-1 text-sm font-body text-white/80">
@@ -252,38 +236,22 @@ const Home = () => {
 
       {/* Wardrobe stats */}
       <div className="mb-5 grid grid-cols-3 gap-3">
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.05 }}
-          className="flex flex-col items-center rounded-2xl bg-card p-4"
-        >
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="flex flex-col items-center rounded-2xl bg-card p-4">
           <Shirt className="h-5 w-5 text-ai" />
-          <span className="mt-1.5 text-xl font-display font-bold text-foreground">{itemCount}</span>
+          <span className="mt-1.5 text-xl font-display font-bold text-foreground">{loadingStats ? "\u2014" : stats.totalItems}</span>
           <span className="text-[10px] font-body text-muted-foreground">Total Items</span>
         </motion.div>
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="flex flex-col items-center rounded-2xl bg-card p-4"
-        >
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="flex flex-col items-center rounded-2xl bg-card p-4">
           <Heart className="h-5 w-5 text-rose-500" />
-          <span className="mt-1.5 text-xl font-display font-bold text-foreground">{favCount}</span>
+          <span className="mt-1.5 text-xl font-display font-bold text-foreground">{loadingStats ? "\u2014" : stats.favorites}</span>
           <span className="text-[10px] font-body text-muted-foreground">Favorites</span>
         </motion.div>
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
-          className="flex flex-col items-center rounded-2xl bg-card p-4"
-        >
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="flex flex-col items-center rounded-2xl bg-card p-4">
           <Star className="h-5 w-5 text-amber-500" />
-          <span className="mt-1.5 text-xl font-display font-bold text-foreground">{itemCount > 0 ? Math.min(100, itemCount * 12) : "—"}</span>
+          <span className="mt-1.5 text-xl font-display font-bold text-foreground">{loadingStats ? "\u2014" : stats.styleScore || "\u2014"}</span>
           <span className="text-[10px] font-body text-muted-foreground">Style Score</span>
         </motion.div>
       </div>
-
       {/* Explore Features */}
       <h2 className="text-base font-display font-semibold text-foreground">
         Explore Features
@@ -328,16 +296,15 @@ const Home = () => {
           </h2>
 
           <div className="mt-3 overflow-hidden rounded-2xl bg-card">
-            {/* Weather info row */}
             <div className="flex items-center justify-between border-b border-border/50 px-4 py-3">
               <div className="flex items-center gap-3">
-                <WeatherIcon name={weather.icon} />
+                <span className="text-3xl font-emoji">{weather.icon}</span>
                 <div>
                   <span className="text-2xl font-display font-bold text-foreground">
-                    {weather.temp}°C
+                    {weather.temp}\u00B0C
                   </span>
                   <p className="text-xs font-body text-muted-foreground">
-                    {weather.condition} · {weather.city}
+                    {weather.condition} \u00B7 {weather.city}
                   </p>
                 </div>
               </div>
@@ -351,7 +318,6 @@ const Home = () => {
               </div>
             </div>
 
-            {/* Styling tip */}
             <div className="px-4 py-3">
               <p className="text-xs font-body text-ai font-medium">
                 <Sparkles className="mr-1 inline h-3 w-3" />
@@ -362,27 +328,31 @@ const Home = () => {
               </p>
             </div>
 
-            {/* Suggested outfit */}
-            {itemCount > 0 ? (
+            {/* Show closet items if available */}
+            {stats.items.length > 0 ? (
               <div className="flex gap-3 overflow-x-auto px-4 pb-4 scrollbar-none">
-                {closetItems.slice(0, 4).map((item: { name: string; image?: string }, i: number) => (
+                {stats.items.slice(0, 4).map((item: any, i: number) => (
                   <motion.div
-                    key={item.name + i}
+                    key={item.id}
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.4 + i * 0.1 }}
                     className="shrink-0"
                   >
                     <div className="h-28 w-24 overflow-hidden rounded-xl bg-background p-2">
-                      {item.image ? (
-                        <img src={item.image} alt={item.name} className="h-full w-full object-contain" />
+                      {item.image_url ? (
+                        <img
+                          src={item.image_url}
+                          alt={item.name}
+                          className="h-full w-full object-contain"
+                        />
                       ) : (
-                        <div className="flex h-full w-full items-center justify-center rounded-lg bg-gray-100">
-                          <Shirt className="h-6 w-6 text-gray-400" />
+                        <div className="flex h-full w-full items-center justify-center">
+                          <ImageIcon className="h-6 w-6 text-muted-foreground/30" />
                         </div>
                       )}
                     </div>
-                    <p className="mt-1 text-center text-[10px] font-body font-medium text-foreground">
+                    <p className="mt-1 text-center text-[10px] font-body font-medium text-foreground truncate w-24">
                       {item.name}
                     </p>
                   </motion.div>
@@ -392,7 +362,7 @@ const Home = () => {
               <div className="px-4 pb-4">
                 <button
                   onClick={() => navigate("/closet")}
-                  className="w-full rounded-xl border-2 border-dashed border-gray-200 py-4 text-sm text-gray-400 hover:border-amber-300 hover:text-amber-600 transition"
+                  className="w-full rounded-xl border-2 border-dashed border-border py-4 text-xs font-body text-muted-foreground hover:border-muted-foreground transition-colors"
                 >
                   Add items to your closet to see outfit suggestions
                 </button>

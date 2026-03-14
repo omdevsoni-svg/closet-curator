@@ -24,7 +24,7 @@
     --muted: 220 14% 96%;
     --muted-foreground: 0 0% 45%;
 
-    --accent: 38 90% 50%;
+    --accent: 263 70% 66%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84.2% 60.2%;
@@ -32,11 +32,11 @@
 
     --border: 220 13% 91%;
     --input: 220 13% 91%;
-    --ring: 38 90% 50%;
+    --ring: 263 70% 66%;
 
     --radius: 1rem;
 
-    --ai-accent: 38 90% 50%;
+    --ai-accent: 263 70% 66%;
     --ai-accent-foreground: 0 0% 100%;
     --shop-accent: 224 82% 51%;
     --shop-accent-foreground: 0 0% 100%;
@@ -70,7 +70,7 @@
     --muted: 240 4% 18%;
     --muted-foreground: 0 0% 55%;
 
-    --accent: 38 90% 50%;
+    --accent: 263 70% 66%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 62% 55%;
@@ -78,9 +78,9 @@
 
     --border: 240 4% 20%;
     --input: 240 4% 20%;
-    --ring: 38 90% 50%;
+    --ring: 263 70% 66%;
 
-    --ai-accent: 38 90% 55%;
+    --ai-accent: 263 70% 70%;
     --ai-accent-foreground: 0 0% 100%;
     --shop-accent: 224 82% 60%;
     --shop-accent-foreground: 0 0% 100%;
@@ -92,7 +92,7 @@
     --sidebar-accent: 240 4% 18%;
     --sidebar-accent-foreground: 0 0% 95%;
     --sidebar-border: 240 4% 20%;
-    --sidebar-ring: 38 90% 50%;
+    --sidebar-ring: 263 70% 66%;
   }
 }
 
@@ -114,7 +114,7 @@
 @layer utilities {
   .text-gradient-ai {
     @apply bg-clip-text text-transparent;
-    background-image: linear-gradient(135deg, hsl(var(--ai-accent)), hsl(350 80% 58%));
+    background-image: linear-gradient(135deg, hsl(var(--ai-accent)), hsl(280 80% 75%));
   }
 
   .font-emoji {

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   User,
   Settings,
@@ -8,16 +9,22 @@ import {
   ImageIcon,
   Sparkles,
   Check,
-  Moon,
-  Sun,
   Bell,
-  BellOff,
   Shield,
   Trash2,
   Pencil,
+  Loader2,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useTheme } from "@/hooks/useTheme";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  getProfile,
+  updateProfile,
+  getClosetItems,
+  uploadImage,
+  type Profile as ProfileType,
+} from "@/lib/database";
 
 /* ------------------------------------------------------------------ */
 /*  Body type data                                                     */
@@ -79,10 +86,14 @@ const bodyTypeOptions = ["rectangle", "hourglass", "inverted_triangle", "pear"];
 /*  Main Profile component                                             */
 /* ------------------------------------------------------------------ */
 const Profile = () => {
-  const closetCount = (() => { try { return JSON.parse(localStorage.getItem("sv_closet_items") || "[]").length; } catch { return 0; } })();
+  const { theme } = useTheme();
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
 
-  const { theme, toggleTheme } = useTheme();
-  const userName = localStorage.getItem("sv_user_name") || "Style Enthusiast";
+  const [profile, setProfile] = useState<ProfileType | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [closetCount, setClosetCount] = useState(0);
+
   const [bodyType, setBodyType] = useState("rectangle");
   const [skinTone, setSkinTone] = useState("Medium");
   const [modelGender, setModelGender] = useState<"women" | "men" | "neutral">("neutral");
@@ -90,13 +101,69 @@ const Profile = () => {
   const [notifOutfits, setNotifOutfits] = useState(true);
   const [notifGaps, setNotifGaps] = useState(true);
   const [personalization, setPersonalization] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    const load = async () => {
+      const [p, items] = await Promise.all([
+        getProfile(user.id),
+        getClosetItems(user.id),
+      ]);
+      if (p) {
+        setProfile(p);
+        setBodyType(p.body_type || "rectangle");
+        setSkinTone(p.skin_tone || "Medium");
+        setModelGender((p.model_gender as any) || "neutral");
+        setBodyPhoto(p.body_image_url || null);
+        setNotifOutfits(p.notif_outfits);
+        setNotifGaps(p.notif_gaps);
+        setPersonalization(p.personalization);
+      }
+      setClosetCount(items.length);
+      setLoading(false);
+    };
+    load();
+  }, [user]);
+
+  const savePreferences = async (updates: Record<string, any>) => {
+    if (!user) return;
+    setSaving(true);
+    await updateProfile(user.id, updates);
+    setSaving(false);
+  };
+
+  const handleBodyPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    const url = await uploadImage("profile-images", user.id, file);
+    if (url) {
+      setBodyPhoto(url);
+      await savePreferences({ body_image_url: url });
+    }
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/setup");
+  };
+
+  const handleDeleteAllData = async () => {
+    // For safety, just sign out. Full data deletion would need a server function.
+    await signOut();
+    navigate("/setup");
+  };
 
   const currentBody = bodyTypeData[bodyType];
+  const userName = profile?.name || user?.user_metadata?.name || "Style Enthusiast";
 
-  const handleBodyPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) setBodyPhoto(URL.createObjectURL(file));
-  };
+  if (loading) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="px-5 pt-5 pb-4">
@@ -114,7 +181,7 @@ const Profile = () => {
         className="mt-5 flex items-center justify-between rounded-2xl bg-card p-5"
       >
         <div className="flex items-center gap-4">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-[hsl(38,90%,50%)] to-[hsl(350,80%,58%)] text-white font-display font-bold text-lg">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-[hsl(263,70%,66%)] to-[hsl(280,80%,75%)] text-white font-display font-bold text-lg">
             {userName
               .split(" ")
               .map((n) => n[0])
@@ -126,7 +193,9 @@ const Profile = () => {
             <h2 className="text-base font-display font-semibold text-foreground">
               {userName}
             </h2>
-            <p className="text-xs text-muted-foreground font-body">{closetCount} {closetCount === 1 ? "item" : "items"} in closet</p>
+            <p className="text-xs text-muted-foreground font-body">
+              {closetCount} {closetCount === 1 ? "item" : "items"} in closet
+            </p>
           </div>
         </div>
         <button className="flex h-8 w-8 items-center justify-center rounded-full bg-background text-muted-foreground hover:text-foreground">
@@ -257,27 +326,22 @@ const Profile = () => {
         transition={{ delay: 0.2 }}
         className="mt-4 rounded-2xl bg-card p-5"
       >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Settings className="h-4 w-4 text-muted-foreground" />
-            <h3 className="text-sm font-display font-semibold text-foreground">
-              Style Preferences
-            </h3>
-          </div>
-          <button className="flex items-center gap-1 rounded-lg bg-ai/10 px-2.5 py-1 text-[10px] font-body font-medium text-ai">
-            <Sparkles className="h-3 w-3" />
-            Detect from Photo
-          </button>
+        <div className="flex items-center gap-2">
+          <Settings className="h-4 w-4 text-muted-foreground" />
+          <h3 className="text-sm font-display font-semibold text-foreground">
+            Style Preferences
+          </h3>
         </div>
 
         {/* Skin Tone */}
         <div className="mt-4">
-          <label className="text-xs font-body text-muted-foreground">
-            Skin Tone
-          </label>
+          <label className="text-xs font-body text-muted-foreground">Skin Tone</label>
           <select
             value={skinTone}
-            onChange={(e) => setSkinTone(e.target.value)}
+            onChange={(e) => {
+              setSkinTone(e.target.value);
+              savePreferences({ skin_tone: e.target.value });
+            }}
             className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm font-body text-foreground outline-none appearance-none"
           >
             {skinToneOptions.map((t) => (
@@ -288,12 +352,13 @@ const Profile = () => {
 
         {/* Body Type */}
         <div className="mt-3">
-          <label className="text-xs font-body text-muted-foreground">
-            Body Type
-          </label>
+          <label className="text-xs font-body text-muted-foreground">Body Type</label>
           <select
             value={bodyType}
-            onChange={(e) => setBodyType(e.target.value)}
+            onChange={(e) => {
+              setBodyType(e.target.value);
+              savePreferences({ body_type: e.target.value });
+            }}
             className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm font-body text-foreground outline-none appearance-none capitalize"
           >
             {bodyTypeOptions.map((t) => (
@@ -306,14 +371,15 @@ const Profile = () => {
 
         {/* Default Model Gender */}
         <div className="mt-4">
-          <label className="text-xs font-body text-muted-foreground">
-            Default Model Gender
-          </label>
+          <label className="text-xs font-body text-muted-foreground">Default Model Gender</label>
           <div className="mt-1.5 grid grid-cols-3 gap-2">
             {(["women", "men", "neutral"] as const).map((g) => (
               <button
                 key={g}
-                onClick={() => setModelGender(g)}
+                onClick={() => {
+                  setModelGender(g);
+                  savePreferences({ model_gender: g });
+                }}
                 className={`flex items-center justify-center gap-1 rounded-xl py-2 text-xs font-body font-medium capitalize transition-all ${
                   modelGender === g
                     ? "bg-primary text-primary-foreground"
@@ -337,23 +403,26 @@ const Profile = () => {
       >
         <div className="flex items-center gap-2">
           <Bell className="h-4 w-4 text-muted-foreground" />
-          <h3 className="text-sm font-display font-semibold text-foreground">
-            Notifications
-          </h3>
+          <h3 className="text-sm font-display font-semibold text-foreground">Notifications</h3>
         </div>
-
         <div className="mt-3 space-y-3">
           <ToggleRow
             label="Outfit suggestions"
             desc="Get notified for new outfit ideas"
             value={notifOutfits}
-            onChange={setNotifOutfits}
+            onChange={(v) => {
+              setNotifOutfits(v);
+              savePreferences({ notif_outfits: v });
+            }}
           />
           <ToggleRow
             label="Gap recommendations"
             desc="Alerts for wardrobe gaps"
             value={notifGaps}
-            onChange={setNotifGaps}
+            onChange={(v) => {
+              setNotifGaps(v);
+              savePreferences({ notif_gaps: v });
+            }}
           />
         </div>
       </motion.div>
@@ -367,16 +436,17 @@ const Profile = () => {
       >
         <div className="flex items-center gap-2">
           <Shield className="h-4 w-4 text-muted-foreground" />
-          <h3 className="text-sm font-display font-semibold text-foreground">
-            Privacy
-          </h3>
+          <h3 className="text-sm font-display font-semibold text-foreground">Privacy</h3>
         </div>
         <div className="mt-3">
           <ToggleRow
             label="Personalization"
             desc="Allow AI to learn preferences"
             value={personalization}
-            onChange={setPersonalization}
+            onChange={(v) => {
+              setPersonalization(v);
+              savePreferences({ personalization: v });
+            }}
           />
         </div>
       </motion.div>
@@ -386,6 +456,7 @@ const Profile = () => {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.35 }}
+        onClick={handleDeleteAllData}
         className="mt-4 flex w-full items-center justify-between rounded-2xl bg-card p-5 text-destructive transition-colors hover:bg-destructive/5"
       >
         <span className="text-sm font-body font-medium">Delete All Data</span>
@@ -397,6 +468,7 @@ const Profile = () => {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.4 }}
+        onClick={handleSignOut}
         className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-card p-4 text-muted-foreground transition-colors hover:text-foreground"
       >
         <LogOut className="h-4 w-4" />
@@ -420,25 +492,20 @@ const ToggleRow = ({
   value: boolean;
   onChange: (v: boolean) => void;
 }) => (
-  <div className="flex items-center justify-between py-3">
-    <div className="flex-1 pr-4">
-      <span className="text-sm font-body font-medium text-foreground">{label}</span>
-      {desc && <p className="text-xs font-body text-muted-foreground mt-0.5">{desc}</p>}
+  <div className="flex items-center justify-between">
+    <div>
+      <p className="text-sm font-body font-medium text-foreground">{label}</p>
+      <p className="text-xs font-body text-muted-foreground">{desc}</p>
     </div>
     <button
-      type="button"
-      role="switch"
-      aria-checked={value}
       onClick={() => onChange(!value)}
-      className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full border-2 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-        value
-          ? "bg-gradient-to-r from-[hsl(38,90%,50%)] to-[hsl(350,80%,58%)] border-[hsl(38,90%,50%)]"
-          : "bg-muted border-muted"
+      className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+        value ? "bg-primary" : "bg-border"
       }`}
     >
       <span
-        className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-md ring-0 transition-transform duration-200 ${
-          value ? "translate-x-[22px]" : "translate-x-[2px]"
+        className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+          value ? "translate-x-5" : "translate-x-0.5"
         }`}
       />
     </button>
