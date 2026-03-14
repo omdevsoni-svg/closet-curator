@@ -32,18 +32,9 @@ const staggerContainer = {
 
 const Landing = () => {
   const navigate = useNavigate();
-  const [authMode, setAuthMode] = useState<"login" | "signup">("signup");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const openAuth = (mode: "login" | "signup") => {
-    setAuthMode(mode);
-    navigate("/setup");
-  };
-
-  const handleAuthSuccess = () => {
-    setAuthOpen(false);
-    navigate("/home");
-  };
+  const openAuth = () => navigate("/setup");
 
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
@@ -62,14 +53,14 @@ const Landing = () => {
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
             <button
-              onClick={() => openAuth("login")}
+              onClick={() => openAuth()}
               className="hidden sm:inline-flex text-sm font-body font-medium text-foreground transition-colors hover:text-accent"
             >
               Log In
             </button>
             <motion.button
               whileTap={{ scale: 0.96 }}
-              onClick={() => openAuth("signup")}
+              onClick={() => openAuth()}
               className="rounded-xl bg-gradient-to-r from-[hsl(38,90%,50%)] to-[hsl(350,80%,58%)] px-4 py-2 sm:px-5 sm:py-2.5 text-xs sm:text-sm font-display font-semibold text-white shadow-lg shadow-accent/20 transition-all hover:shadow-xl hover:shadow-accent/30"
             >
               Get Started
@@ -110,7 +101,7 @@ const Landing = () => {
                   How It Works
                 </a>
                 <button
-                  onClick={() => { setMobileMenuOpen(false); openAuth("login"); }}
+                  onClick={() => { setMobileMenuOpen(false); openAuth(); }}
                   className="rounded-xl px-3 py-2.5 text-left text-sm font-body font-medium text-muted-foreground transition-colors hover:bg-white/50 hover:text-foreground sm:hidden"
                 >
                   Log In
@@ -154,7 +145,7 @@ const Landing = () => {
             <div className="mt-8 sm:mt-10 flex flex-col items-center gap-3 sm:gap-4 sm:flex-row sm:justify-center">
               <motion.button
                 whileTap={{ scale: 0.96 }}
-                onClick={() => openAuth("signup")}
+                onClick={() => openAuth()}
                 className="flex w-full sm:w-auto items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[hsl(38,90%,50%)] to-[hsl(350,80%,58%)] px-6 py-3.5 sm:px-8 sm:py-4 text-sm sm:text-base font-display font-semibold text-white shadow-xl shadow-accent/25 transition-all hover:shadow-2xl hover:shadow-accent/30"
               >
                 Start For Free
@@ -434,7 +425,7 @@ const Landing = () => {
               </p>
               <motion.button
                 whileTap={{ scale: 0.96 }}
-                onClick={() => openAuth("signup")}
+                onClick={() => openAuth()}
                 className="mt-6 sm:mt-8 inline-flex items-center gap-2 rounded-2xl bg-white px-6 py-3.5 sm:px-8 sm:py-4 text-sm sm:text-base font-display font-semibold text-foreground shadow-xl transition-all hover:shadow-2xl"
               >
                 Get Started for Free
