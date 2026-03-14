@@ -6,7 +6,7 @@ import { User, Mail, ArrowRight } from "lucide-react";
 /* ------------------------------------------------------------------ */
 /*  Google Identity Services                                           */
 /* ------------------------------------------------------------------ */
-const GOOGLE_CLIENT_ID = "447102577651-dcg76ksa2gi14rhf7l5ohsqu6ca6uvcj.apps.googleusercontent.com";
+const GOOGLE_CLIENT_ID = "474112118872-53t324ard828u4ubvit68toe7j0mmgp7.apps.googleusercontent.com";
 
 declare global {
   interface Window {
