@@ -24,7 +24,7 @@
     --muted: 220 14% 96%;
     --muted-foreground: 0 0% 45%;
 
-    --accent: 35 80% 50%;
+    --accent: 263 70% 66%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84.2% 60.2%;
@@ -32,11 +32,11 @@
 
     --border: 220 13% 91%;
     --input: 220 13% 91%;
-    --ring: 35 80% 50%;
+    --ring: 263 70% 66%;
 
     --radius: 1rem;
 
-    --ai-accent: 35 80% 50%;
+    --ai-accent: 263 70% 66%;
     --ai-accent-foreground: 0 0% 100%;
     --shop-accent: 224 82% 51%;
     --shop-accent-foreground: 0 0% 100%;
@@ -50,6 +50,50 @@
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
+
+  .dark {
+    --background: 240 6% 10%;
+    --foreground: 0 0% 95%;
+
+    --card: 240 5% 14%;
+    --card-foreground: 0 0% 95%;
+
+    --popover: 240 5% 14%;
+    --popover-foreground: 0 0% 95%;
+
+    --primary: 0 0% 95%;
+    --primary-foreground: 240 6% 10%;
+
+    --secondary: 240 4% 18%;
+    --secondary-foreground: 0 0% 95%;
+
+    --muted: 240 4% 18%;
+    --muted-foreground: 0 0% 55%;
+
+    --accent: 263 70% 66%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 62% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 240 4% 20%;
+    --input: 240 4% 20%;
+    --ring: 263 70% 66%;
+
+    --ai-accent: 263 70% 70%;
+    --ai-accent-foreground: 0 0% 100%;
+    --shop-accent: 224 82% 60%;
+    --shop-accent-foreground: 0 0% 100%;
+
+    --sidebar-background: 240 6% 10%;
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 0 0% 95%;
+    --sidebar-primary-foreground: 240 6% 10%;
+    --sidebar-accent: 240 4% 18%;
+    --sidebar-accent-foreground: 0 0% 95%;
+    --sidebar-border: 240 4% 20%;
+    --sidebar-ring: 263 70% 66%;
+  }
 }
 
 @layer base {
@@ -59,6 +103,7 @@
 
   body {
     @apply bg-background text-foreground font-body antialiased;
+    transition: background-color 0.3s ease, color 0.3s ease;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -69,7 +114,7 @@
 @layer utilities {
   .text-gradient-ai {
     @apply bg-clip-text text-transparent;
-    background-image: linear-gradient(135deg, hsl(var(--ai-accent)), hsl(350 70% 45%));
+    background-image: linear-gradient(135deg, hsl(var(--ai-accent)), hsl(280 80% 75%));
   }
 
   .font-emoji {
