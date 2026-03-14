@@ -6,7 +6,7 @@ import { User, Mail, ArrowRight } from "lucide-react";
 /* ------------------------------------------------------------------ */
 /*  Google Identity Services                                           */
 /* ------------------------------------------------------------------ */
-const GOOGLE_CLIENT_ID = "YOUR_GOOGLE_CLIENT_ID";
+const GOOGLE_CLIENT_ID = "YOUR_GOOGLE_CLINT_ID";
 
 declare global {
   interface Window {
@@ -43,7 +43,7 @@ const ProfileSetup = () => {
 
   /* --- load Google Sign-In button --- */
   useEffect(() => {
-    if (GOOGLE_CLIENT_ID === "YOUR_GOOGLE_CLIENT_ID") return; // not configured
+    if (GOOGLE_CLIENT_ID === "447102577651-dcg76ksa2gi14rhf7l5ohsqu6ca6uvcj.apps.googleusercontent.com") return; // not configured
 
     const script = document.createElement("script");
     script.src = "https://accounts.google.com/gsi/client";
