@@ -25,10 +25,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import mockBlazer from "@/assets/mock-blazer.png";
-import mockTshirt from "@/assets/mock-tshirt.png";
-import mockJeans from "@/assets/mock-jeans.png";
-import mockSneakers from "@/assets/mock-sneakers.png";
+
 
 /* ------------------------------------------------------------------ */
 /*  Weather hook — uses OpenMeteo (free, no key needed)                */
@@ -203,12 +200,7 @@ const featureCards = [
   { icon: Star, label: "Profile", path: "/profile", c: "bg-purple-100 text-purple-600" },
 ];
 
-const mockOutfit = [
-  { name: "Blazer", image: mockBlazer },
-  { name: "T-Shirt", image: mockTshirt },
-  { name: "Jeans", image: mockJeans },
-  { name: "Sneakers", image: mockSneakers },
-];
+
 
 const Home = () => {
   const navigate = useNavigate();
@@ -217,7 +209,9 @@ const Home = () => {
 
   // Get stored name from profile setup
   const userName = localStorage.getItem("sv_user_name") || "Style Enthusiast";
-  const itemCount = 6; // Would come from store
+  const closetItems = JSON.parse(localStorage.getItem("sv_closet_items") || "[]");
+  const itemCount = closetItems.length;
+  const favCount = closetItems.filter((i: { favorite?: boolean }) => i.favorite).length;
 
   return (
     <div className="px-5 pt-6 pb-4">
@@ -275,7 +269,7 @@ const Home = () => {
           className="flex flex-col items-center rounded-2xl bg-card p-4"
         >
           <Heart className="h-5 w-5 text-rose-500" />
-          <span className="mt-1.5 text-xl font-display font-bold text-foreground">2</span>
+          <span className="mt-1.5 text-xl font-display font-bold text-foreground">{favCount}</span>
           <span className="text-[10px] font-body text-muted-foreground">Favorites</span>
         </motion.div>
         <motion.div
@@ -285,7 +279,7 @@ const Home = () => {
           className="flex flex-col items-center rounded-2xl bg-card p-4"
         >
           <Star className="h-5 w-5 text-amber-500" />
-          <span className="mt-1.5 text-xl font-display font-bold text-foreground">72</span>
+          <span className="mt-1.5 text-xl font-display font-bold text-foreground">{itemCount > 0 ? Math.min(100, itemCount * 12) : "—"}</span>
           <span className="text-[10px] font-body text-muted-foreground">Style Score</span>
         </motion.div>
       </div>
@@ -369,28 +363,41 @@ const Home = () => {
             </div>
 
             {/* Suggested outfit */}
-            <div className="flex gap-3 overflow-x-auto px-4 pb-4 scrollbar-none">
-              {mockOutfit.map((item, i) => (
-                <motion.div
-                  key={item.name}
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.4 + i * 0.1 }}
-                  className="shrink-0"
+            {itemCount > 0 ? (
+              <div className="flex gap-3 overflow-x-auto px-4 pb-4 scrollbar-none">
+                {closetItems.slice(0, 4).map((item: { name: string; image?: string }, i: number) => (
+                  <motion.div
+                    key={item.name + i}
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.4 + i * 0.1 }}
+                    className="shrink-0"
+                  >
+                    <div className="h-28 w-24 overflow-hidden rounded-xl bg-background p-2">
+                      {item.image ? (
+                        <img src={item.image} alt={item.name} className="h-full w-full object-contain" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center rounded-lg bg-gray-100">
+                          <Shirt className="h-6 w-6 text-gray-400" />
+                        </div>
+                      )}
+                    </div>
+                    <p className="mt-1 text-center text-[10px] font-body font-medium text-foreground">
+                      {item.name}
+                    </p>
+                  </motion.div>
+                ))}
+              </div>
+            ) : (
+              <div className="px-4 pb-4">
+                <button
+                  onClick={() => navigate("/closet")}
+                  className="w-full rounded-xl border-2 border-dashed border-gray-200 py-4 text-sm text-gray-400 hover:border-amber-300 hover:text-amber-600 transition"
                 >
-                  <div className="h-28 w-24 overflow-hidden rounded-xl bg-background p-2">
-                    <img
-                      src={item.image}
-                      alt={item.name}
-                      className="h-full w-full object-contain"
-                    />
-                  </div>
-                  <p className="mt-1 text-center text-[10px] font-body font-medium text-foreground">
-                    {item.name}
-                  </p>
-                </motion.div>
-              ))}
-            </div>
+                  Add items to your closet to see outfit suggestions
+                </button>
+              </div>
+            )}
           </div>
         </motion.div>
       )}
