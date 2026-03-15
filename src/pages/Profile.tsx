@@ -24,7 +24,7 @@ import {
   getClosetItems,
   uploadImage,
   type Profile as ProfileType,
-} from "A/lib/database";
+} from "@/lib/database";
 
 /* ------------------------------------------------------------------ */
 /*  Body type data                                                     */
