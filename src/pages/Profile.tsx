@@ -97,6 +97,7 @@ const Profile = () => {
   const [bodyType, setBodyType] = useState("rectangle");
   const [skinTone, setSkinTone] = useState("Medium");
   const [modelGender, setModelGender] = useState<"women" | "men" | "neutral">("neutral");
+  const [facePhoto, setFacePhoto] = useState<string | null>(null);
   const [bodyPhoto, setBodyPhoto] = useState<string | null>(null);
   const [notifOutfits, setNotifOutfits] = useState(true);
   const [notifGaps, setNotifGaps] = useState(true);
@@ -115,6 +116,7 @@ const Profile = () => {
         setBodyType(p.body_type || "rectangle");
         setSkinTone(p.skin_tone || "Medium");
         setModelGender((p.model_gender as any) || "neutral");
+        setFacePhoto(p.face_image_url || null);
         setBodyPhoto(p.body_image_url || null);
         setNotifOutfits(p.notif_outfits);
         setNotifGaps(p.notif_gaps);
@@ -131,6 +133,16 @@ const Profile = () => {
     setSaving(true);
     await updateProfile(user.id, updates);
     setSaving(false);
+  };
+
+  const handleFacePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    const url = await uploadImage("profile-images", user.id, file);
+    if (url) {
+      setFacePhoto(url);
+      await savePreferences({ face_image_url: url });
+    }
   };
 
   const handleBodyPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -203,11 +215,65 @@ const Profile = () => {
         </button>
       </motion.div>
 
-      {/* Body Type Photo */}
+      {/* Face Image */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
+        className="mt-4 rounded-2xl bg-card p-5"
+      >
+        <div className="flex items-center gap-2">
+          <Camera className="h-4 w-4 text-muted-foreground" />
+          <div>
+            <h3 className="text-sm font-display font-semibold text-foreground">
+              Face Image
+            </h3>
+            <p className="text-xs text-muted-foreground font-body">
+              Clear face photo for virtual try-on
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4 flex items-start gap-4">
+          {facePhoto ? (
+            <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-full bg-background ring-2 ring-[hsl(38,75%,52%)]/20">
+              <img
+                src={facePhoto}
+                alt="Face photo"
+                className="h-full w-full object-cover"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+              />
+            </div>
+          ) : (
+            <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full bg-background ring-2 ring-border">
+              <User className="h-8 w-8 text-muted-foreground/30" />
+            </div>
+          )}
+          <div className="flex-1">
+            <p className="text-xs text-muted-foreground font-body">
+              Upload a clear, front-facing photo. Used for AI virtual try-on and personalized style previews.
+            </p>
+            <div className="mt-2 flex gap-2">
+              <label className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-background px-3 py-1.5 text-xs font-body font-medium text-muted-foreground transition-colors hover:text-foreground">
+                <input type="file" accept="image/*" capture="user" className="hidden" onChange={handleFacePhotoUpload} />
+                <Camera className="h-3.5 w-3.5" />
+                Camera
+              </label>
+              <label className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-background px-3 py-1.5 text-xs font-body font-medium text-muted-foreground transition-colors hover:text-foreground">
+                <input type="file" accept="image/*" className="hidden" onChange={handleFacePhotoUpload} />
+                <ImageIcon className="h-3.5 w-3.5" />
+                Gallery
+              </label>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Full-Body Image */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.15 }}
         className="mt-4 rounded-2xl bg-card p-5"
       >
         <div className="flex items-center justify-between">
@@ -215,10 +281,10 @@ const Profile = () => {
             <User className="h-4 w-4 text-muted-foreground" />
             <div>
               <h3 className="text-sm font-display font-semibold text-foreground">
-                Body Type Photo
+                Full-Body Image
               </h3>
               <p className="text-xs text-muted-foreground font-body">
-                Full-body photo for accurate detection
+                Full-body photo for body type detection
               </p>
             </div>
           </div>
@@ -229,22 +295,22 @@ const Profile = () => {
 
         <div className="mt-4 flex items-start gap-4">
           {bodyPhoto ? (
-            <div className="relative h-24 w-20 shrink-0 overflow-hidden rounded-xl bg-background">
+            <div className="relative h-28 w-20 shrink-0 overflow-hidden rounded-xl bg-background ring-2 ring-[hsl(38,75%,52%)]/20">
               <img
                 src={bodyPhoto}
-                alt="Body type"
+                alt="Full body"
                 className="h-full w-full object-cover"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
               />
             </div>
           ) : (
-            <div className="flex h-24 w-20 shrink-0 items-center justify-center rounded-xl bg-background">
+            <div className="flex h-28 w-20 shrink-0 items-center justify-center rounded-xl bg-background ring-2 ring-border">
               <User className="h-8 w-8 text-muted-foreground/30" />
             </div>
           )}
-          <div>
+          <div className="flex-1">
             <p className="text-xs text-muted-foreground font-body">
-              Upload a full-body photo for better body type detection. Use a well-lit photo in
-              fitted clothing.
+              Upload a full-body photo in fitted clothing for accurate body type detection. Use a well-lit environment.
             </p>
             <div className="mt-2 flex gap-2">
               <label className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-background px-3 py-1.5 text-xs font-body font-medium text-muted-foreground transition-colors hover:text-foreground">
@@ -266,7 +332,7 @@ const Profile = () => {
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.15 }}
+        transition={{ delay: 0.2 }}
         className="mt-4 rounded-2xl bg-card p-5"
       >
         <div className="flex items-center gap-2">
@@ -323,7 +389,7 @@ const Profile = () => {
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
+        transition={{ delay: 0.25 }}
         className="mt-4 rounded-2xl bg-card p-5"
       >
         <div className="flex items-center gap-2">
@@ -398,7 +464,7 @@ const Profile = () => {
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.25 }}
+        transition={{ delay: 0.3 }}
         className="mt-4 rounded-2xl bg-card p-5"
       >
         <div className="flex items-center gap-2">
@@ -431,7 +497,7 @@ const Profile = () => {
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
+        transition={{ delay: 0.35 }}
         className="mt-4 rounded-2xl bg-card p-5"
       >
         <div className="flex items-center gap-2">
@@ -455,7 +521,7 @@ const Profile = () => {
       <motion.button
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.35 }}
+        transition={{ delay: 0.4 }}
         onClick={handleDeleteAllData}
         className="mt-4 flex w-full items-center justify-between rounded-2xl bg-card p-5 text-destructive transition-colors hover:bg-destructive/5"
       >
@@ -467,7 +533,7 @@ const Profile = () => {
       <motion.button
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
+        transition={{ delay: 0.45 }}
         onClick={handleSignOut}
         className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-card p-4 text-muted-foreground transition-colors hover:text-foreground"
       >
