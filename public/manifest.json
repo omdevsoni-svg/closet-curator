@@ -1,11 +1,11 @@
 {
-  "name": "StyleVault – AI Digital Closet",
-  "short_name": "StyleVault",
+  "name": "Vastrika AI – AI Digital Closet",
+  "short_name": "Vastrika AI",
   "description": "Your AI-powered digital wardrobe manager. Upload clothes, get styled by AI, and discover what your closet needs.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f0a1a",
-  "theme_color": "#7c5cfc",
+  "theme_color": "#CC9A2E",
   "orientation": "portrait",
   "icons": [
     {
