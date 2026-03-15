@@ -14,8 +14,9 @@ import {
   Trash2,
   Pencil,
   Loader2,
+  AlertCircle,
 } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -25,6 +26,39 @@ import {
   uploadImage,
   type Profile as ProfileType,
 } from "@/lib/database";
+
+/* ------------------------------------------------------------------ */
+/*  Toast notification component                                       */
+/* ------------------------------------------------------------------ */
+interface ToastProps {
+  message: string;
+  type: "success" | "error";
+  visible: boolean;
+}
+
+const Toast = ({ message, type, visible }: ToastProps) => (
+  <AnimatePresence>
+    {visible && (
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -20 }}
+        className={`fixed top-4 left-1/2 z-50 -translate-x-1/2 rounded-xl px-4 py-2.5 shadow-lg text-xs font-body font-medium flex items-center gap-2 ${
+          type === "success"
+            ? "bg-green-500/90 text-white"
+            : "bg-destructive/90 text-white"
+        }`}
+      >
+        {type === "success" ? (
+          <Check className="h-3.5 w-3.5" />
+        ) : (
+          <AlertCircle className="h-3.5 w-3.5" />
+        )}
+        {message}
+      </motion.div>
+    )}
+  </AnimatePresence>
+);
 
 /* ------------------------------------------------------------------ */
 /*  Body type data                                                     */
@@ -93,7 +127,6 @@ const Profile = () => {
   const [profile, setProfile] = useState<ProfileType | null>(null);
   const [loading, setLoading] = useState(true);
   const [closetCount, setClosetCount] = useState(0);
-
   const [bodyType, setBodyType] = useState("rectangle");
   const [skinTone, setSkinTone] = useState("Medium");
   const [modelGender, setModelGender] = useState<"women" | "men" | "neutral">("neutral");
@@ -103,6 +136,22 @@ const Profile = () => {
   const [notifGaps, setNotifGaps] = useState(true);
   const [personalization, setPersonalization] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  // Upload loading states
+  const [faceUploading, setFaceUploading] = useState(false);
+  const [bodyUploading, setBodyUploading] = useState(false);
+
+  // Instant preview URLs (local blob URLs shown before upload completes)
+  const [facePreview, setFacePreview] = useState<string | null>(null);
+  const [bodyPreview, setBodyPreview] = useState<string | null>(null);
+
+  // Toast state
+  const [toast, setToast] = useState<ToastProps>({ message: "", type: "success", visible: false });
+
+  const showToast = (message: string, type: "success" | "error") => {
+    setToast({ message, type, visible: true });
+    setTimeout(() => setToast((t) => ({ ...t, visible: false })), 3000);
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -138,20 +187,59 @@ const Profile = () => {
   const handleFacePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
-    const url = await uploadImage("profile-images", user.id, file);
-    if (url) {
-      setFacePhoto(url);
-      await savePreferences({ face_image_url: url });
+
+    // Show instant local preview
+    const localUrl = URL.createObjectURL(file);
+    setFacePreview(localUrl);
+    setFaceUploading(true);
+
+    try {
+      const url = await uploadImage("profile-images", user.id, file);
+      if (url) {
+        setFacePhoto(url);
+        await savePreferences({ face_image_url: url });
+        showToast("Face image uploaded successfully", "success");
+      } else {
+        showToast("Failed to upload face image. Please try again.", "error");
+      }
+    } catch (err) {
+      console.error("Face upload error:", err);
+      showToast("Upload failed. Please try a different image.", "error");
+    } finally {
+      setFaceUploading(false);
+      URL.revokeObjectURL(localUrl);
+      setFacePreview(null);
+      // Reset input so the same file can be re-selected
+      e.target.value = "";
     }
   };
 
   const handleBodyPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
-    const url = await uploadImage("profile-images", user.id, file);
-    if (url) {
-      setBodyPhoto(url);
-      await savePreferences({ body_image_url: url });
+
+    // Show instant local preview
+    const localUrl = URL.createObjectURL(file);
+    setBodyPreview(localUrl);
+    setBodyUploading(true);
+
+    try {
+      const url = await uploadImage("profile-images", user.id, file);
+      if (url) {
+        setBodyPhoto(url);
+        await savePreferences({ body_image_url: url });
+        showToast("Full-body image uploaded successfully", "success");
+      } else {
+        showToast("Failed to upload body image. Please try again.", "error");
+      }
+    } catch (err) {
+      console.error("Body upload error:", err);
+      showToast("Upload failed. Please try a different image.", "error");
+    } finally {
+      setBodyUploading(false);
+      URL.revokeObjectURL(localUrl);
+      setBodyPreview(null);
+      e.target.value = "";
     }
   };
 
@@ -167,7 +255,12 @@ const Profile = () => {
   };
 
   const currentBody = bodyTypeData[bodyType];
-  const userName = profile?.name || user?.user_metadata?.name || "Style Enthusiast";
+  const userName =
+    profile?.name || user?.user_metadata?.name || "Style Enthusiast";
+
+  // Decide which image src to show (local preview during upload, or saved URL)
+  const faceImageSrc = facePreview || facePhoto;
+  const bodyImageSrc = bodyPreview || bodyPhoto;
 
   if (loading) {
     return (
@@ -179,6 +272,9 @@ const Profile = () => {
 
   return (
     <div className="px-5 pt-5 pb-4">
+      {/* Toast notifications */}
+      <Toast {...toast} />
+
       <h1 className="text-2xl font-display font-bold tracking-tight text-foreground">
         Settings
       </h1>
@@ -233,34 +329,52 @@ const Profile = () => {
             </p>
           </div>
         </div>
-
         <div className="mt-4 flex items-start gap-4">
-          {facePhoto ? (
-            <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-full bg-background ring-2 ring-[hsl(38,75%,52%)]/20">
+          <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-full bg-background ring-2 ring-border">
+            {faceImageSrc ? (
               <img
-                src={facePhoto}
+                src={faceImageSrc}
                 alt="Face photo"
                 className="h-full w-full object-cover"
-                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
               />
-            </div>
-          ) : (
-            <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full bg-background ring-2 ring-border">
-              <User className="h-8 w-8 text-muted-foreground/30" />
-            </div>
-          )}
+            ) : (
+              <div className="flex h-full w-full items-center justify-center">
+                <User className="h-8 w-8 text-muted-foreground/30" />
+              </div>
+            )}
+            {faceUploading && (
+              <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40">
+                <Loader2 className="h-6 w-6 animate-spin text-white" />
+              </div>
+            )}
+          </div>
+
           <div className="flex-1">
             <p className="text-xs text-muted-foreground font-body">
-              Upload a clear, front-facing photo. Used for AI virtual try-on and personalized style previews.
+              Upload a clear, front-facing photo. Used for AI virtual try-on and
+              personalized style previews.
             </p>
             <div className="mt-2 flex gap-2">
-              <label className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-background px-3 py-1.5 text-xs font-body font-medium text-muted-foreground transition-colors hover:text-foreground">
-                <input type="file" accept="image/*" capture="user" className="hidden" onChange={handleFacePhotoUpload} />
+              <label className={`flex cursor-pointer items-center gap-1.5 rounded-lg bg-background px-3 py-1.5 text-xs font-body font-medium text-muted-foreground transition-colors hover:text-foreground ${faceUploading ? "pointer-events-none opacity-50" : ""}`}>
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="user"
+                  className="hidden"
+                  onChange={handleFacePhotoUpload}
+                  disabled={faceUploading}
+                />
                 <Camera className="h-3.5 w-3.5" />
                 Camera
               </label>
-              <label className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-background px-3 py-1.5 text-xs font-body font-medium text-muted-foreground transition-colors hover:text-foreground">
-                <input type="file" accept="image/*" className="hidden" onChange={handleFacePhotoUpload} />
+              <label className={`flex cursor-pointer items-center gap-1.5 rounded-lg bg-background px-3 py-1.5 text-xs font-body font-medium text-muted-foreground transition-colors hover:text-foreground ${faceUploading ? "pointer-events-none opacity-50" : ""}`}>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleFacePhotoUpload}
+                  disabled={faceUploading}
+                />
                 <ImageIcon className="h-3.5 w-3.5" />
                 Gallery
               </label>
@@ -292,34 +406,52 @@ const Profile = () => {
             {currentBody.type}
           </span>
         </div>
-
         <div className="mt-4 flex items-start gap-4">
-          {bodyPhoto ? (
-            <div className="relative h-28 w-20 shrink-0 overflow-hidden rounded-xl bg-background ring-2 ring-[hsl(38,75%,52%)]/20">
+          <div className="relative h-28 w-20 shrink-0 overflow-hidden rounded-xl bg-background ring-2 ring-border">
+            {bodyImageSrc ? (
               <img
-                src={bodyPhoto}
+                src={bodyImageSrc}
                 alt="Full body"
                 className="h-full w-full object-cover"
-                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
               />
-            </div>
-          ) : (
-            <div className="flex h-28 w-20 shrink-0 items-center justify-center rounded-xl bg-background ring-2 ring-border">
-              <User className="h-8 w-8 text-muted-foreground/30" />
-            </div>
-          )}
+            ) : (
+              <div className="flex h-full w-full items-center justify-center">
+                <User className="h-8 w-8 text-muted-foreground/30" />
+              </div>
+            )}
+            {bodyUploading && (
+              <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/40">
+                <Loader2 className="h-6 w-6 animate-spin text-white" />
+              </div>
+            )}
+          </div>
+
           <div className="flex-1">
             <p className="text-xs text-muted-foreground font-body">
-              Upload a full-body photo in fitted clothing for accurate body type detection. Use a well-lit environment.
+              Upload a full-body photo in fitted clothing for accurate body type
+              detection. Use a well-lit environment.
             </p>
             <div className="mt-2 flex gap-2">
-              <label className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-background px-3 py-1.5 text-xs font-body font-medium text-muted-foreground transition-colors hover:text-foreground">
-                <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleBodyPhotoUpload} />
+              <label className={`flex cursor-pointer items-center gap-1.5 rounded-lg bg-background px-3 py-1.5 text-xs font-body font-medium text-muted-foreground transition-colors hover:text-foreground ${bodyUploading ? "pointer-events-none opacity-50" : ""}`}>
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={handleBodyPhotoUpload}
+                  disabled={bodyUploading}
+                />
                 <Camera className="h-3.5 w-3.5" />
                 Camera
               </label>
-              <label className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-background px-3 py-1.5 text-xs font-body font-medium text-muted-foreground transition-colors hover:text-foreground">
-                <input type="file" accept="image/*" className="hidden" onChange={handleBodyPhotoUpload} />
+              <label className={`flex cursor-pointer items-center gap-1.5 rounded-lg bg-background px-3 py-1.5 text-xs font-body font-medium text-muted-foreground transition-colors hover:text-foreground ${bodyUploading ? "pointer-events-none opacity-50" : ""}`}>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleBodyPhotoUpload}
+                  disabled={bodyUploading}
+                />
                 <ImageIcon className="h-3.5 w-3.5" />
                 Gallery
               </label>
@@ -341,7 +473,6 @@ const Profile = () => {
             Styling Tips for {currentBody.type} Body Type
           </h3>
         </div>
-
         <div className="mt-3 space-y-2">
           {currentBody.tips.map((tip) => (
             <div key={tip} className="flex items-start gap-2">
@@ -350,7 +481,6 @@ const Profile = () => {
             </div>
           ))}
         </div>
-
         <div className="mt-4">
           <p className="text-xs font-body font-semibold text-foreground">
             Best Silhouettes
@@ -366,7 +496,6 @@ const Profile = () => {
             ))}
           </div>
         </div>
-
         <div className="mt-3">
           <p className="text-xs font-body text-muted-foreground flex items-center gap-1">
             <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/50" />
