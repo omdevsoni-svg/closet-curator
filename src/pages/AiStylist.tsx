@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Sparkles,
   Send,
@@ -11,11 +11,16 @@ import {
   ImageIcon,
   Loader2,
   Shirt,
+  Camera,
+  X,
+  ArrowRight,
+  Check,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { getClosetItems, type ClothingItem } from "@/lib/database";
+import { virtualTryOn, fileToBase64, urlToBase64 } from "@/lib/ai-service";
 
 const occasions = [
   { label: "Date Night", icon: Heart, color: "bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400" },
@@ -34,7 +39,6 @@ type OutfitRecommendation = {
 
 /* ------------------------------------------------------------------ */
 /*  Simple outfit recommendation logic                                 */
-/*  (picks items from the user's real closet based on occasion tags)   */
 /* ------------------------------------------------------------------ */
 const occasionKeywords: Record<string, string[]> = {
   "Date Night": ["formal", "date", "elegant", "evening", "dress"],
@@ -48,7 +52,7 @@ const occasionKeywords: Record<string, string[]> = {
 const tips: Record<string, string> = {
   "Date Night": "Keep it classy with a polished look. Minimal accessories add elegance.",
   Office: "Smart casual balances professionalism with comfort. Layer for versatility.",
-  Casual: "Comfort is key \u2014 classic combos never go out of style.",
+  Casual: "Comfort is key — classic combos never go out of style.",
   Party: "Go bold with colors or statement pieces. Confidence is your best accessory.",
   Workout: "Prioritize breathable, stretchy fabrics for maximum performance.",
   Formal: "Clean lines and well-fitted pieces create a commanding presence.",
@@ -106,6 +110,290 @@ const generateRecommendation = (
 };
 
 /* ------------------------------------------------------------------ */
+/*  Virtual Try-On Modal                                               */
+/* ------------------------------------------------------------------ */
+interface TryOnModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  closetItems: ClothingItem[];
+}
+
+const TryOnModal = ({ isOpen, onClose, closetItems }: TryOnModalProps) => {
+  const [step, setStep] = useState<"photo" | "select" | "generating" | "result">("photo");
+  const [personPhoto, setPersonPhoto] = useState<string | null>(null);
+  const [personPhotoBase64, setPersonPhotoBase64] = useState<string | null>(null);
+  const [selectedItem, setSelectedItem] = useState<ClothingItem | null>(null);
+  const [resultImage, setResultImage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handlePersonPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPersonPhoto(URL.createObjectURL(file));
+    const base64 = await fileToBase64(file);
+    setPersonPhotoBase64(base64);
+    setStep("select");
+  };
+
+  const handleTryOn = async () => {
+    if (!personPhotoBase64 || !selectedItem) return;
+    setStep("generating");
+    setError(null);
+
+    try {
+      // Get the clothing item image as base64
+      let productBase64: string;
+      if (selectedItem.image_url) {
+        productBase64 = await urlToBase64(selectedItem.image_url);
+      } else {
+        setError("Selected item has no image. Please choose an item with a photo.");
+        setStep("select");
+        return;
+      }
+
+      const results = await virtualTryOn(personPhotoBase64, productBase64, 1);
+
+      if (results.length > 0) {
+        setResultImage(`data:${results[0].mimeType};base64,${results[0].base64}`);
+        setStep("result");
+      } else {
+        setError("Couldn't generate try-on. The model may not support this image combination. Try a different photo.");
+        setStep("select");
+      }
+    } catch (err) {
+      console.error("Try-on error:", err);
+      setError("Something went wrong. Please try again.");
+      setStep("select");
+    }
+  };
+
+  const reset = () => {
+    setStep("photo");
+    setPersonPhoto(null);
+    setPersonPhotoBase64(null);
+    setSelectedItem(null);
+    setResultImage(null);
+    setError(null);
+  };
+
+  const clothingWithImages = closetItems.filter((item) => item.image_url);
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-end justify-center sm:items-center"
+        >
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+          />
+          <motion.div
+            initial={{ y: "100%", opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: "100%", opacity: 0 }}
+            transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
+            className="relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-background p-6 sm:rounded-3xl"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-ai" />
+                <h2 className="text-lg font-display font-bold text-foreground">
+                  Virtual Try-On
+                </h2>
+              </div>
+              <button
+                onClick={onClose}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-card text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Step 1: Upload person photo */}
+            {step === "photo" && (
+              <div className="mt-6">
+                <p className="text-sm font-body text-muted-foreground">
+                  Upload a full-body photo of yourself to try on clothes from your closet.
+                </p>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handlePersonPhoto}
+                />
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border bg-card py-8 text-sm font-body text-muted-foreground transition-colors hover:border-ai">
+                    <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePersonPhoto} />
+                    <Camera className="h-5 w-5" />
+                    Camera
+                  </label>
+                  <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border bg-card py-8 text-sm font-body text-muted-foreground transition-colors hover:border-ai">
+                    <input type="file" accept="image/*" className="hidden" onChange={handlePersonPhoto} />
+                    <ImageIcon className="h-5 w-5" />
+                    Gallery
+                  </label>
+                </div>
+                <p className="mt-3 text-center text-[11px] font-body text-muted-foreground/70">
+                  For best results, use a well-lit full-body photo with a plain background.
+                </p>
+              </div>
+            )}
+
+            {/* Step 2: Select clothing item */}
+            {step === "select" && (
+              <div className="mt-4">
+                {/* Person photo preview */}
+                <div className="flex items-center gap-3 rounded-xl bg-card p-3">
+                  <div className="h-16 w-12 shrink-0 overflow-hidden rounded-lg">
+                    <img src={personPhoto!} alt="You" className="h-full w-full object-cover" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs font-body font-medium text-foreground">Your photo</p>
+                    <p className="text-[11px] font-body text-muted-foreground">
+                      Tap on an item below to try it on
+                    </p>
+                  </div>
+                  <button
+                    onClick={reset}
+                    className="text-xs font-body text-ai underline"
+                  >
+                    Change
+                  </button>
+                </div>
+
+                {error && (
+                  <div className="mt-3 rounded-xl bg-red-500/10 px-4 py-2.5">
+                    <p className="text-xs font-body text-red-600 dark:text-red-400">{error}</p>
+                  </div>
+                )}
+
+                {/* Clothing items grid */}
+                <div className="mt-4">
+                  <p className="text-xs font-medium font-body uppercase tracking-wider text-muted-foreground">
+                    Select an item ({clothingWithImages.length} available)
+                  </p>
+                  <div className="mt-2 grid grid-cols-3 gap-2 max-h-[40vh] overflow-y-auto">
+                    {clothingWithImages.map((item) => (
+                      <button
+                        key={item.id}
+                        onClick={() => setSelectedItem(item)}
+                        className={`rounded-xl p-2 transition-all ${
+                          selectedItem?.id === item.id
+                            ? "ring-2 ring-ai bg-ai/5"
+                            : "bg-card hover:bg-card/80"
+                        }`}
+                      >
+                        <div className="aspect-square overflow-hidden rounded-lg bg-background">
+                          <img
+                            src={item.image_url}
+                            alt={item.name}
+                            className="h-full w-full object-contain"
+                          />
+                        </div>
+                        <p className="mt-1 text-[10px] font-body font-medium text-foreground truncate">
+                          {item.name}
+                        </p>
+                        {selectedItem?.id === item.id && (
+                          <div className="mt-1 flex items-center justify-center">
+                            <Check className="h-3 w-3 text-ai" />
+                          </div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Try-on button */}
+                <motion.button
+                  whileTap={{ scale: 0.98 }}
+                  onClick={handleTryOn}
+                  disabled={!selectedItem}
+                  className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-ai text-ai-foreground font-display font-semibold transition-all disabled:opacity-40"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Try It On
+                </motion.button>
+              </div>
+            )}
+
+            {/* Step 3: Generating */}
+            {step === "generating" && (
+              <div className="mt-8 flex flex-col items-center py-8">
+                <div className="relative">
+                  <Loader2 className="h-10 w-10 animate-spin text-ai" />
+                </div>
+                <p className="mt-4 text-sm font-body font-medium text-foreground">
+                  Creating your look...
+                </p>
+                <p className="mt-1 text-xs font-body text-muted-foreground">
+                  This may take 15-30 seconds
+                </p>
+                <div className="mt-4 flex items-center gap-3">
+                  <div className="h-16 w-12 overflow-hidden rounded-lg">
+                    <img src={personPhoto!} alt="You" className="h-full w-full object-cover" />
+                  </div>
+                  <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                  <div className="h-16 w-12 overflow-hidden rounded-lg bg-card">
+                    <img src={selectedItem?.image_url} alt={selectedItem?.name} className="h-full w-full object-contain" />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Step 4: Result */}
+            {step === "result" && resultImage && (
+              <div className="mt-4">
+                <div className="overflow-hidden rounded-2xl bg-card">
+                  <img
+                    src={resultImage}
+                    alt="Virtual Try-On Result"
+                    className="w-full object-contain"
+                  />
+                </div>
+                <div className="mt-3 flex items-center gap-2 rounded-xl bg-ai/10 px-4 py-2.5">
+                  <Sparkles className="h-4 w-4 text-ai" />
+                  <span className="text-xs font-body text-ai font-medium">
+                    AI-generated preview — {selectedItem?.name}
+                  </span>
+                </div>
+                <div className="mt-4 flex gap-2">
+                  <button
+                    onClick={reset}
+                    className="flex-1 rounded-xl bg-card py-3 text-sm font-body font-medium text-foreground"
+                  >
+                    Try Another
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSelectedItem(null);
+                      setResultImage(null);
+                      setStep("select");
+                    }}
+                    className="flex-1 rounded-xl bg-ai py-3 text-sm font-body font-medium text-ai-foreground"
+                  >
+                    Try Different Item
+                  </button>
+                </div>
+              </div>
+            )}
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+};
+
+/* ------------------------------------------------------------------ */
 /*  AI Stylist component                                               */
 /* ------------------------------------------------------------------ */
 const AiStylist = () => {
@@ -117,6 +405,7 @@ const AiStylist = () => {
   const [prompt, setPrompt] = useState("");
   const [recommendation, setRecommendation] = useState<OutfitRecommendation | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [showTryOn, setShowTryOn] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -131,6 +420,7 @@ const AiStylist = () => {
   const handleOccasionSelect = (label: string) => {
     setSelectedOccasion(label);
     setGenerating(true);
+
     setTimeout(() => {
       const rec = generateRecommendation(label, closetItems);
       setRecommendation(rec);
@@ -142,6 +432,7 @@ const AiStylist = () => {
     if (prompt.trim()) {
       setSelectedOccasion(prompt.trim());
       setGenerating(true);
+
       setTimeout(() => {
         const rec = generateRecommendation("Casual", closetItems);
         if (rec) rec.occasion = prompt.trim();
@@ -159,6 +450,7 @@ const AiStylist = () => {
       </div>
     );
   }
+
   if (closetItems.length === 0) {
     return (
       <div className="px-5 pt-8">
@@ -192,13 +484,25 @@ const AiStylist = () => {
 
   return (
     <div className="px-5 pt-8">
-      <div className="flex items-center gap-2">
-        <Sparkles className="h-5 w-5 text-ai" />
-        <h1 className="text-2xl font-display font-bold tracking-tight">AI Stylist</h1>
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-ai" />
+            <h1 className="text-2xl font-display font-bold tracking-tight">AI Stylist</h1>
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground font-body">
+            Select an occasion or describe your vibe ({closetItems.length} items)
+          </p>
+        </div>
+        <motion.button
+          whileTap={{ scale: 0.95 }}
+          onClick={() => setShowTryOn(true)}
+          className="flex items-center gap-1.5 rounded-xl bg-ai/10 px-3 py-2 text-xs font-body font-medium text-ai"
+        >
+          <Camera className="h-3.5 w-3.5" />
+          Try On
+        </motion.button>
       </div>
-      <p className="mt-1 text-sm text-muted-foreground font-body">
-        Select an occasion or describe your vibe ({closetItems.length} items available)
-      </p>
 
       {/* Occasion presets */}
       <div className="mt-6 grid grid-cols-3 gap-2">
@@ -261,11 +565,19 @@ const AiStylist = () => {
             exit={{ opacity: 0, y: -20 }}
             className="mt-6"
           >
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-ai" />
-              <h2 className="text-lg font-display font-semibold">
-                {recommendation.occasion} Look
-              </h2>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-ai" />
+                <h2 className="text-lg font-display font-semibold">
+                  {recommendation.occasion} Look
+                </h2>
+              </div>
+              <button
+                onClick={() => setShowTryOn(true)}
+                className="text-xs font-body text-ai underline"
+              >
+                Try on look
+              </button>
             </div>
 
             <div className="mt-3 flex gap-3 overflow-x-auto pb-2 scrollbar-none">
@@ -316,11 +628,18 @@ const AiStylist = () => {
       {!generating && recommendation === null && selectedOccasion && (
         <div className="mt-8 text-center">
           <p className="text-sm font-body text-muted-foreground">
-            Couldn't find a good match for \"{selectedOccasion}\" with your current items.
+            Couldn't find a good match for "{selectedOccasion}" with your current items.
             Try adding more items with relevant tags.
           </p>
         </div>
       )}
+
+      {/* Virtual Try-On Modal */}
+      <TryOnModal
+        isOpen={showTryOn}
+        onClose={() => setShowTryOn(false)}
+        closetItems={closetItems}
+      />
     </div>
   );
 };
