@@ -126,6 +126,33 @@ export const toggleFavorite = async (itemId: string, favorite: boolean) => {
 };
 
 /* ------------------------------------------------------------------ */
+/*  Helper: convert any image file to a web-friendly JPEG via canvas   */
+/* ------------------------------------------------------------------ */
+const toJpegBlob = (file: File): Promise<Blob> =>
+  new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { reject(new Error("Canvas not supported")); return; }
+      ctx.drawImage(img, 0, 0);
+      canvas.toBlob(
+        (blob) => {
+          URL.revokeObjectURL(url);
+          blob ? resolve(blob) : reject(new Error("toBlob failed"));
+        },
+        "image/jpeg",
+        0.9
+      );
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Image load failed")); };
+    img.src = url;
+  });
+
+/* ------------------------------------------------------------------ */
 /*  Image upload to Supabase Storage                                   */
 /* ------------------------------------------------------------------ */
 export const uploadImage = async (
@@ -133,12 +160,28 @@ export const uploadImage = async (
   userId: string,
   file: File
 ): Promise<string | null> => {
-  const ext = file.name.split(".").pop() || "jpg";
+  // Convert non-web-friendly formats (HEIC, HEIF, TIFF, etc.) to JPEG
+  const webFriendly = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/svg+xml"];
+  let uploadFile: File | Blob = file;
+  let ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+
+  if (!webFriendly.includes(file.type) || ["heic", "heif", "tiff", "tif"].includes(ext)) {
+    try {
+      uploadFile = await toJpegBlob(file);
+      ext = "jpg";
+    } catch (err) {
+      console.error("Image conversion failed, uploading original:", err);
+    }
+  }
+
   const fileName = `${userId}/${Date.now()}.${ext}`;
 
   const { error } = await supabase.storage
     .from(bucket)
-    .upload(fileName, file, { upsert: true });
+    .upload(fileName, uploadFile, {
+      upsert: true,
+      contentType: uploadFile instanceof Blob && uploadFile !== file ? "image/jpeg" : file.type,
+    });
 
   if (error) {
     console.error("uploadImage error:", error);
