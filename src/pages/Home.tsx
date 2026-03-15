@@ -35,8 +35,8 @@ interface WeatherData {
 
 const weatherTips: Record<string, string> = {
   hot: "Opt for light fabrics, breathable cotton, and open footwear.",
-  warm: "Go with light layers \u2014 a tee with optional light jacket works great.",
-  mild: "Perfect layering weather \u2014 try a shirt with a light blazer.",
+  warm: "Go with light layers — a tee with optional light jacket works great.",
+  mild: "Perfect layering weather — try a shirt with a light blazer.",
   cool: "Add a structured jacket or sweater over your outfit.",
   cold: "Bundle up with coats, scarves, and warm boots.",
 };
@@ -65,6 +65,7 @@ const useWeather = (): WeatherData | null => {
   useEffect(() => {
     const fetchWeatherForCoords = async (lat: number, lon: number) => {
       try {
+        // Reverse geocode
         let city = "Your Location";
         try {
           const geoRes = await fetch(
@@ -88,7 +89,7 @@ const useWeather = (): WeatherData | null => {
           humidity: current.relative_humidity_2m,
           windSpeed: Math.round(current.wind_speed_10m),
           city,
-          icon: current.weather_code <= 1 ? "\u2600\uFE0F" : current.weather_code <= 3 ? "\u26C5" : "\uD83C\uDF27\uFE0F",
+          icon: current.weather_code <= 1 ? "☀️" : current.weather_code <= 3 ? "⛅" : "🌧️",
           tip: weatherTips[cat],
         });
       } catch {
@@ -98,7 +99,7 @@ const useWeather = (): WeatherData | null => {
           humidity: 65,
           windSpeed: 12,
           city: "Your Location",
-          icon: "\u26C5",
+          icon: "⛅",
           tip: weatherTips.warm,
         });
       }
@@ -129,7 +130,7 @@ const useWeather = (): WeatherData | null => {
             humidity: 65,
             windSpeed: 12,
             city: "Your Location",
-            icon: "\u26C5",
+            icon: "⛅",
             tip: weatherTips.warm,
           });
         }
@@ -141,6 +142,7 @@ const useWeather = (): WeatherData | null => {
 
   return weather;
 };
+
 /* ------------------------------------------------------------------ */
 /*  Feature cards                                                      */
 /* ------------------------------------------------------------------ */
@@ -171,25 +173,10 @@ const featureCards = [
   },
 ];
 
-/* ------------------------------------------------------------------ */
-/*  Home component                                                     */
-/* ------------------------------------------------------------------ */
-const Home = () => {
-  const navigate = useNavigate();
-  const { user } = useAuth();
-  const weather = useWeather();
-  const [showWelcome, setShowWelcome] = useState(true);
-  const [userName, setUserName] = useState("Style Enthusiast");
-  const [stats, setStats] = useState({ totalItems: 0, favorites: 0, styleScore: 0, items: [] as any[] });
-  const [loadingStats, setLoadingStats] = useState(true);
-
-  useEffect(() => {
-    if (!user) return;
-
-    const load = async () => {
-      const profile = await getProfile(user.id);
+/e = await getProfile(user.id);
       if (profile?.name) setUserName(profile.name);
 
+      // Load closet stats
       const s = await getClosetStats(user.id);
       setStats(s);
       setLoadingStats(false);
@@ -206,7 +193,7 @@ const Home = () => {
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, height: 0, marginBottom: 0 }}
-            className="relative mb-5 overflow-hidden rounded-2xl bg-gradient-to-r from-[hsl(263,70%,66%)] to-[hsl(280,80%,75%)] p-5 text-white"
+            className="relative mb-5 overflow-hidden rounded-2xl bg-gradient-to-r from-[hsl(38,75%,52%)] to-[hsl(345,65%,55%)] p-5 text-white"
           >
             <button
               onClick={() => setShowWelcome(false)}
@@ -236,22 +223,44 @@ const Home = () => {
 
       {/* Wardrobe stats */}
       <div className="mb-5 grid grid-cols-3 gap-3">
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="flex flex-col items-center rounded-2xl bg-card p-4">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+          className="flex flex-col items-center rounded-2xl bg-card p-4"
+        >
           <Shirt className="h-5 w-5 text-ai" />
-          <span className="mt-1.5 text-xl font-display font-bold text-foreground">{loadingStats ? "\u2014" : stats.totalItems}</span>
+          <span className="mt-1.5 text-xl font-display font-bold text-foreground">
+            {loadingStats ? "—" : stats.totalItems}
+          </span>
           <span className="text-[10px] font-body text-muted-foreground">Total Items</span>
         </motion.div>
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="flex flex-col items-center rounded-2xl bg-card p-4">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="flex flex-col items-center rounded-2xl bg-card p-4"
+        >
           <Heart className="h-5 w-5 text-rose-500" />
-          <span className="mt-1.5 text-xl font-display font-bold text-foreground">{loadingStats ? "\u2014" : stats.favorites}</span>
+          <span className="mt-1.5 text-xl font-display font-bold text-foreground">
+            {loadingStats ? "—" : stats.favorites}
+          </span>
           <span className="text-[10px] font-body text-muted-foreground">Favorites</span>
         </motion.div>
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="flex flex-col items-center rounded-2xl bg-card p-4">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="flex flex-col items-center rounded-2xl bg-card p-4"
+        >
           <Star className="h-5 w-5 text-amber-500" />
-          <span className="mt-1.5 text-xl font-display font-bold text-foreground">{loadingStats ? "\u2014" : stats.styleScore || "\u2014"}</span>
+          <span className="mt-1.5 text-xl font-display font-bold text-foreground">
+            {loadingStats ? "—" : stats.styleScore || "—"}
+          </span>
           <span className="text-[10px] font-body text-muted-foreground">Style Score</span>
         </motion.div>
       </div>
+
       {/* Explore Features */}
       <h2 className="text-base font-display font-semibold text-foreground">
         Explore Features
@@ -301,10 +310,10 @@ const Home = () => {
                 <span className="text-3xl font-emoji">{weather.icon}</span>
                 <div>
                   <span className="text-2xl font-display font-bold text-foreground">
-                    {weather.temp}\u00B0C
+                    {weather.temp}°C
                   </span>
                   <p className="text-xs font-body text-muted-foreground">
-                    {weather.condition} \u00B7 {weather.city}
+                    {weather.condition} · {weather.city}
                   </p>
                 </div>
               </div>
