@@ -31,7 +31,7 @@ const SplashScreen = ({ onFinish }: SplashScreenProps) => {
         animate={phase === "exit" ? { opacity: 0 } : { opacity: 1 }}
         transition={{ duration: 0.5 }}
         className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden"
-        style={{ background: "linear-gradient(135deg, #0f0a1a 0%, #1a1030 50%, #0f0a1a 100%)" }}
+        style={{ background: "linear-gradient(135deg, #1a0f0a 0%, #2a1510 50%, #1a0f0a 100%)" }}
       >
         {/* Animated gradient orbs */}
         <motion.div
@@ -39,14 +39,14 @@ const SplashScreen = ({ onFinish }: SplashScreenProps) => {
           animate={{ scale: 1, opacity: 0.4 }}
           transition={{ duration: 1.2, ease: "easeOut" }}
           className="pointer-events-none absolute -left-20 -top-20 h-[400px] w-[400px] rounded-full blur-[120px]"
-          style={{ background: "hsl(263, 70%, 66%)" }}
+          style={{ background: "hsl(38, 75%, 52%)" }}
         />
         <motion.div
           initial={{ scale: 0, opacity: 0 }}
           animate={{ scale: 1, opacity: 0.3 }}
           transition={{ duration: 1.2, delay: 0.2, ease: "easeOut" }}
           className="pointer-events-none absolute -bottom-20 -right-20 h-[350px] w-[350px] rounded-full blur-[100px]"
-          style={{ background: "hsl(280, 80%, 75%)" }}
+          style={{ background: "hsl(345, 65%, 55%)" }}
         />
 
         {/* Glassmorphism card */}
@@ -83,7 +83,7 @@ const SplashScreen = ({ onFinish }: SplashScreenProps) => {
             transition={{ duration: 0.5, delay: 0.8 }}
             className="text-2xl font-display font-extrabold tracking-tight text-white sm:text-3xl"
           >
-            StyleVault
+            Vastrika AI
           </motion.h1>
 
           {/* Tagline */}
@@ -93,7 +93,7 @@ const SplashScreen = ({ onFinish }: SplashScreenProps) => {
             transition={{ duration: 0.4, delay: 1.1 }}
             className="flex items-center gap-2"
           >
-            <Sparkles className="h-3.5 w-3.5 text-[hsl(263,70%,76%)]" />
+            <Sparkles className="h-3.5 w-3.5 text-[hsl(38,75%,62%)]" />
             <span className="text-xs font-body font-medium tracking-wider text-white/50 uppercase">
               AI Digital Closet
             </span>
@@ -112,7 +112,7 @@ const SplashScreen = ({ onFinish }: SplashScreenProps) => {
                 animate={{ opacity: [0.3, 1, 0.3] }}
                 transition={{ duration: 1, delay: 1.5 + i * 0.15, repeat: Infinity }}
                 className="h-1.5 w-1.5 rounded-full"
-                style={{ background: "hsl(263, 70%, 66%)" }}
+                style={{ background: "hsl(38, 75%, 52%)" }}
               />
             ))}
           </motion.div>
