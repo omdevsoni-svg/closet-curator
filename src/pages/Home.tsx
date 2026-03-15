@@ -173,7 +173,24 @@ const featureCards = [
   },
 ];
 
-/e = await getProfile(user.id);
+/* ------------------------------------------------------------------ */
+/*  Home component                                                     */
+/* ------------------------------------------------------------------ */
+const Home = () => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const weather = useWeather();
+  const [showWelcome, setShowWelcome] = useState(true);
+  const [userName, setUserName] = useState("Style Enthusiast");
+  const [stats, setStats] = useState({ totalItems: 0, favorites: 0, styleScore: 0, items: [] as any[] });
+  const [loadingStats, setLoadingStats] = useState(true);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const load = async () => {
+      // Load profile name
+      const profile = await getProfile(user.id);
       if (profile?.name) setUserName(profile.name);
 
       // Load closet stats
