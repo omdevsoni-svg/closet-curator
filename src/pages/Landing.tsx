@@ -181,7 +181,7 @@ const Landing = () => {
             initial={{ opacity: 0, y: 48 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.2 }}
-            className="mx-auto mt-12 sm:mt-16 max-w-2xl">         className="mx-auto mt-10 sm:mt-16 max-w-4xl"
+            className="mx-auto mt-10 sm:mt-16 max-w-4xl"
           >
             <div className="overflow-hidden rounded-3xl border border-white/20 bg-white/40 p-2 shadow-2xl backdrop-blur-xl">
               <div className="rounded-2xl bg-gradient-to-br from-background to-card p-6 sm:p-10">
