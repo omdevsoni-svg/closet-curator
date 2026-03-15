@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import heic2any from "heic2any";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -126,9 +127,32 @@ export const toggleFavorite = async (itemId: string, favorite: boolean) => {
 };
 
 /* ------------------------------------------------------------------ */
-/*  Helper: convert any image file to a web-friendly JPEG via canvas   */
+/*  Helper: detect if a file is HEIC/HEIF format                       */
 /* ------------------------------------------------------------------ */
-const toJpegBlob = (file: File): Promise<Blob> =>
+const isHeicFile = (file: File): boolean => {
+  const ext = file.name.split(".").pop()?.toLowerCase() || "";
+  const heicTypes = ["image/heic", "image/heif", "image/heic-sequence", "image/heif-sequence"];
+  return heicTypes.includes(file.type) || ["heic", "heif"].includes(ext);
+};
+
+/* ------------------------------------------------------------------ */
+/*  Helper: convert HEIC/HEIF to JPEG using heic2any library           */
+/*  (browsers cannot natively decode Apple's HEIC format)              */
+/* ------------------------------------------------------------------ */
+const convertHeicToJpeg = async (file: File): Promise<Blob> => {
+  const result = await heic2any({
+    blob: file,
+    toType: "image/jpeg",
+    quality: 0.9,
+  });
+  // heic2any can return a single Blob or an array
+  return Array.isArray(result) ? result[0] : result;
+};
+
+/* ------------------------------------------------------------------ */
+/*  Helper: convert any browser-supported image to JPEG via canvas     */
+/* ------------------------------------------------------------------ */
+const toJpegViaCanvas = (file: File): Promise<Blob> =>
   new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
@@ -137,7 +161,7 @@ const toJpegBlob = (file: File): Promise<Blob> =>
       canvas.width = img.naturalWidth;
       canvas.height = img.naturalHeight;
       const ctx = canvas.getContext("2d");
-      if (!ctx) { reject(new Error("Canvas not supported")); return; }
+      if (!ctx) { URL.revokeObjectURL(url); reject(new Error("Canvas not supported")); return; }
       ctx.drawImage(img, 0, 0);
       canvas.toBlob(
         (blob) => {
@@ -160,27 +184,35 @@ export const uploadImage = async (
   userId: string,
   file: File
 ): Promise<string | null> => {
-  // Convert non-web-friendly formats (HEIC, HEIF, TIFF, etc.) to JPEG
   const webFriendly = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/svg+xml"];
-  let uploadFile: File | Blob = file;
+  let uploadBlob: File | Blob = file;
   let ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+  let contentType = file.type || "application/octet-stream";
 
-  if (!webFriendly.includes(file.type) || ["heic", "heif", "tiff", "tif"].includes(ext)) {
-    try {
-      uploadFile = await toJpegBlob(file);
+  try {
+    if (isHeicFile(file)) {
+      // HEIC/HEIF: browsers cannot decode these — use heic2any JS decoder
+      uploadBlob = await convertHeicToJpeg(file);
       ext = "jpg";
-    } catch (err) {
-      console.error("Image conversion failed, uploading original:", err);
+      contentType = "image/jpeg";
+    } else if (!webFriendly.includes(file.type)) {
+      // Other non-standard formats: try canvas conversion
+      uploadBlob = await toJpegViaCanvas(file);
+      ext = "jpg";
+      contentType = "image/jpeg";
     }
+  } catch (err) {
+    console.error("Image conversion failed, uploading original:", err);
+    // If conversion fails, we still try to upload the original
   }
 
   const fileName = `${userId}/${Date.now()}.${ext}`;
 
   const { error } = await supabase.storage
     .from(bucket)
-    .upload(fileName, uploadFile, {
+    .upload(fileName, uploadBlob, {
       upsert: true,
-      contentType: uploadFile instanceof Blob && uploadFile !== file ? "image/jpeg" : file.type,
+      contentType,
     });
 
   if (error) {
