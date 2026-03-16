@@ -52,7 +52,7 @@ const occasionKeywords: Record<string, string[]> = {
 const tips: Record<string, string> = {
   "Date Night": "Keep it classy with a polished look. Minimal accessories add elegance.",
   Office: "Smart casual balances professionalism with comfort. Layer for versatility.",
-  Casual: "Comfort is key â classic combos never go out of style.",
+  Casual: "Comfort is key Ã¢ÂÂ classic combos never go out of style.",
   Party: "Go bold with colors or statement pieces. Confidence is your best accessory.",
   Workout: "Prioritize breathable, stretchy fabrics for maximum performance.",
   Formal: "Clean lines and well-fitted pieces create a commanding presence.",
@@ -123,37 +123,51 @@ const TryOnModal = ({ isOpen, onClose, closetItems, userId }: TryOnModalProps) =
   const navigate = useNavigate();
   const [step, setStep] = useState<"loading" | "no-photo" | "select" | "generating" | "result">("loading");
   const [personPhoto, setPersonPhoto] = useState<string | null>(null);
-  const [personPhotoBase64, setPersonPhotoBase64] = useState<string | null>(null);
+  const [bodyPhotoBase64, setBodyPhotoBase64] = useState<string | null>(null);
+  const [facePhotoBase64, setFacePhotoBase64] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<ClothingItem | null>(null);
   const [resultImage, setResultImage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Auto-load body image from profile when modal opens
+  // Auto-load face + body images from profile when modal opens
   useEffect(() => {
     if (!isOpen || !userId) return;
-    const loadProfilePhoto = async () => {
+    const loadProfilePhotos = async () => {
       setStep("loading");
       try {
         const profile = await getProfile(userId);
-        const photoUrl = profile?.body_image_url;
-        if (photoUrl) {
-          setPersonPhoto(photoUrl);
-          const base64 = await urlToBase64(photoUrl);
-          setPersonPhotoBase64(base64);
+        const bodyUrl = profile?.body_image_url;
+        const faceUrl = profile?.face_image_url;
+
+        if (bodyUrl) {
+          setPersonPhoto(bodyUrl);
+          const bodyB64 = await urlToBase64(bodyUrl);
+          setBodyPhotoBase64(bodyB64);
+
+          // Also load face image if available (for facial precision)
+          if (faceUrl) {
+            try {
+              const faceB64 = await urlToBase64(faceUrl);
+              setFacePhotoBase64(faceB64);
+            } catch (e) {
+              console.warn("Could not load face image, proceeding with body only:", e);
+            }
+          }
+
           setStep("select");
         } else {
           setStep("no-photo");
         }
       } catch (err) {
-        console.error("Failed to load profile photo:", err);
+        console.error("Failed to load profile photos:", err);
         setStep("no-photo");
       }
     };
-    loadProfilePhoto();
+    loadProfilePhotos();
   }, [isOpen, userId]);
 
   const handleTryOn = async () => {
-    if (!personPhotoBase64 || !selectedItem) return;
+    if (!bodyPhotoBase64 || !selectedItem) return;
     setStep("generating");
     setError(null);
 
@@ -168,7 +182,8 @@ const TryOnModal = ({ isOpen, onClose, closetItems, userId }: TryOnModalProps) =
         return;
       }
 
-      const results = await virtualTryOn(personPhotoBase64, productBase64, 1);
+      // Pass both body + face images for maximum precision
+      const results = await virtualTryOn(bodyPhotoBase64, productBase64, 1, facePhotoBase64 || undefined);
 
       if (results.length > 0) {
         setResultImage(`data:${results[0].mimeType};base64,${results[0].base64}`);
@@ -188,8 +203,8 @@ const TryOnModal = ({ isOpen, onClose, closetItems, userId }: TryOnModalProps) =
     setSelectedItem(null);
     setResultImage(null);
     setError(null);
-    // Go back to select step since profile photo is already loaded
-    if (personPhotoBase64) {
+    // Go back to select step since profile photos are already loaded
+    if (bodyPhotoBase64) {
       setStep("select");
     } else {
       setStep("no-photo");
@@ -247,17 +262,17 @@ const TryOnModal = ({ isOpen, onClose, closetItems, userId }: TryOnModalProps) =
               </div>
             )}
 
-            {/* No profile photo — redirect to Profile */}
+            {/* No profile photo â redirect to Profile */}
             {step === "no-photo" && (
               <div className="mt-6 flex flex-col items-center text-center">
                 <div className="flex h-16 w-16 items-center justify-center rounded-full bg-card">
                   <Camera className="h-8 w-8 text-muted-foreground/40" />
                 </div>
                 <h3 className="mt-4 text-base font-display font-semibold text-foreground">
-                  Full-body photo needed
+                  Profile photos needed
                 </h3>
                 <p className="mt-1.5 text-sm font-body text-muted-foreground">
-                  Upload a full-body photo in your Profile to use Virtual Try-On. This only needs to be done once.
+                  Upload your face photo and full-body photo in your Profile to use Virtual Try-On. This only needs to be done once — your photos are used to generate precise, realistic try-on images.
                 </p>
                 <button
                   onClick={() => {
@@ -389,7 +404,7 @@ const TryOnModal = ({ isOpen, onClose, closetItems, userId }: TryOnModalProps) =
                 <div className="mt-3 flex items-center gap-2 rounded-xl bg-ai/10 px-4 py-2.5">
                   <Sparkles className="h-4 w-4 text-ai" />
                   <span className="text-xs font-body text-ai font-medium">
-                    AI-generated preview â {selectedItem?.name}
+                    AI-generated preview Ã¢ÂÂ {selectedItem?.name}
                   </span>
                 </div>
                 <div className="mt-4 flex gap-2">
