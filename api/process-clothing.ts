@@ -56,10 +56,9 @@ async function getAccessToken(sa: ServiceAccountKey): Promise<string> {
 
 const CLOTHING_PROMPT = `Analyze this clothing image and return a JSON object with these exact fields:
 - name: a short descriptive name for the clothing item (e.g. "Blue Denim Jacket")
-- category: one of: tops, bottoms, dresses, outerwear, activewear, shoes, accessories
-- color: the primary color
-- material: fabric type if identifiable, or best guess (e.g. cotton, polyester, denim, silk, wool, leather)
-- brand: brand name if visible on the item, otherwise empty string
+- category: EXACTLY one of these values: "Tops", "Bottoms", "Dresses", "Outerwear", "Activewear", "Footwear", "Accessories"
+- color: EXACTLY one of these values: "Black", "White", "Navy", "Blue", "Red", "Green", "Beige", "Grey", "Pink", "Brown"
+- material: fabric type if identifiable, or best guess (e.g. "Cotton", "Polyester", "Denim", "Silk", "Wool", "Leather")
 - tags: array of 2-4 descriptive tags (e.g. ["casual", "summer", "lightweight"])
 - gender: one of: men, women, unisex
 
@@ -145,11 +144,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const attrs = JSON.parse(jsonMatch[0]);
 
-    // Validate and normalize
-    const validCategories = ["tops", "bottoms", "dresses", "outerwear", "activewear", "shoes", "accessories"];
-    if (!validCategories.includes(attrs.category)) attrs.category = "tops";
+    // Validate and normalize category (match exact dropdown values)
+    const validCategories = ["Tops", "Bottoms", "Dresses", "Outerwear", "Activewear", "Footwear", "Accessories"];
+    const categoryMap: Record<string, string> = {
+      tops: "Tops", bottoms: "Bottoms", dresses: "Dresses", outerwear: "Outerwear",
+      activewear: "Activewear", footwear: "Footwear", shoes: "Footwear", accessories: "Accessories",
+    };
+    if (!validCategories.includes(attrs.category)) {
+      attrs.category = categoryMap[attrs.category?.toLowerCase()] || "Tops";
+    }
+
+    // Validate and normalize color (match exact dropdown values)
+    const validColors = ["Black", "White", "Navy", "Blue", "Red", "Green", "Beige", "Grey", "Pink", "Brown"];
+    const colorMap: Record<string, string> = {
+      black: "Black", white: "White", navy: "Navy", blue: "Blue", red: "Red",
+      green: "Green", beige: "Beige", grey: "Grey", gray: "Grey", pink: "Pink", brown: "Brown",
+    };
+    if (!validColors.includes(attrs.color)) {
+      attrs.color = colorMap[attrs.color?.toLowerCase()] || "";
+    }
+
+    // Normalize gender
     if (!["men", "women", "unisex"].includes(attrs.gender)) attrs.gender = "unisex";
     if (!Array.isArray(attrs.tags)) attrs.tags = [];
+
+    // Remove brand — this should be user-provided only
+    delete attrs.brand;
 
     return res.status(200).json({ success: true, attributes: attrs });
   } catch (err: any) {
