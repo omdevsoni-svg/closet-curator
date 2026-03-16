@@ -4,7 +4,7 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 /* ------------------------------------------------------------------ */
-/*  Helper: convert File → base64 string (no data: prefix)            */
+/*  Helper: convert File â base64 string (no data: prefix)            */
 /* ------------------------------------------------------------------ */
 export const fileToBase64 = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -19,7 +19,7 @@ export const fileToBase64 = (file: File): Promise<string> =>
   });
 
 /* ------------------------------------------------------------------ */
-/*  Helper: convert image URL → base64 string                         */
+/*  Helper: convert image URL â base64 string                         */
 /* ------------------------------------------------------------------ */
 export const urlToBase64 = async (url: string): Promise<string> => {
   const res = await fetch(url);
@@ -28,7 +28,7 @@ export const urlToBase64 = async (url: string): Promise<string> => {
 };
 
 /* ------------------------------------------------------------------ */
-/*  AI Attribute Detection — calls Gemini API directly                 */
+/*  AI Attribute Detection â calls Gemini API directly                 */
 /* ------------------------------------------------------------------ */
 export interface DetectedAttributes {
   name: string;
@@ -64,7 +64,7 @@ export const detectClothingAttributes = async (
 };
 
 /* ------------------------------------------------------------------ */
-/*  Virtual Try-On — calls virtual-tryon Edge Function                 */
+/*  Virtual Try-On â calls virtual-tryon Edge Function                 */
 /* ------------------------------------------------------------------ */
 export interface TryOnResult {
   mimeType: string;
@@ -72,18 +72,20 @@ export interface TryOnResult {
 }
 
 export const virtualTryOn = async (
-  personImageBase64: string,
+  bodyImageBase64: string,
   productImageBase64: string,
-  sampleCount = 1
+  sampleCount = 1,
+  faceImageBase64?: string
 ): Promise<TryOnResult[]> => {
   try {
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/virtual-tryon`, {
+    const res = await fetch("/api/virtual-tryon", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: SUPABASE_ANON_KEY,
-      },
-      body: JSON.stringify({ personImageBase64, productImageBase64, sampleCount }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        faceImageBase64: faceImageBase64 || undefined,
+        bodyImageBase64,
+        productImageBase64,
+      }),
     });
 
     const data = await res.json();
