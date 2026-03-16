@@ -28,7 +28,7 @@ export const urlToBase64 = async (url: string): Promise<string> => {
 };
 
 /* ------------------------------------------------------------------ */
-/*  AI Attribute Detection — calls process-clothing Edge Function      */
+/*  AI Attribute Detection — calls Gemini API directly                 */
 /* ------------------------------------------------------------------ */
 export interface DetectedAttributes {
   name: string;
@@ -45,12 +45,10 @@ export const detectClothingAttributes = async (
   mimeType = "image/jpeg"
 ): Promise<DetectedAttributes | null> => {
   try {
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/process-clothing`, {
+    // Call our Vercel serverless function (handles GCP auth + Vertex AI)
+    const res = await fetch("/api/process-clothing", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: SUPABASE_ANON_KEY,
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ imageBase64, mimeType }),
     });
 
@@ -133,4 +131,4 @@ export const uploadTryOnImage = async (
     console.error("uploadTryOnImage error:", err);
     return null;
   }
-};import { supabase } from "./supabase";
+};
