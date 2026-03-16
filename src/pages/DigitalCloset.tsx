@@ -118,7 +118,7 @@ const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => 
         if (attrs.category) setCategory(attrs.category);
         if (attrs.color) setColor(attrs.color);
         if (attrs.gender) setGender(attrs.gender as "women" | "men" | "unisex");
-        // Brand is intentionally NOT set by AI — user must enter it manually
+        // Brand is intentionally NOT set by AI â user must enter it manually
         if (attrs.material) setMaterial(attrs.material);
         if (attrs.tags?.length) setTags(attrs.tags.join(", "));
         setAiDetected(true);
@@ -150,7 +150,7 @@ const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => 
     setAiError(false);
   };
 
-  // Close and reset â prevents stale preview on reopen
+  // Close and reset Ã¢ÂÂ prevents stale preview on reopen
   const handleClose = () => {
     resetForm();
     onClose();
@@ -214,7 +214,7 @@ const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => 
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: "100%", opacity: 0 }}
             transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
-            className="relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-background p-6 sm:rounded-3xl"
+            className="relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-background p-6 pb-24 sm:rounded-3xl sm:pb-6"
           >
             {/* Header */}
             <div className="flex items-center justify-between">
@@ -288,7 +288,7 @@ const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => 
               >
                 <Sparkles className="h-4 w-4 text-green-600 dark:text-green-400" />
                 <span className="text-xs font-body text-green-700 dark:text-green-400 font-medium">
-                  AI auto-filled details â review and adjust below
+                  AI auto-filled details Ã¢ÂÂ review and adjust below
                 </span>
               </motion.div>
             )}
@@ -300,7 +300,7 @@ const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => 
               >
                 <AlertCircle className="h-4 w-4 text-destructive" />
                 <span className="text-xs font-body text-destructive font-medium">
-                  AI detection unavailable â please fill in details manually
+                  AI detection unavailable Ã¢ÂÂ please fill in details manually
                 </span>
               </motion.div>
             )}
@@ -448,7 +448,7 @@ const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => 
                 Purchase Price <span className="normal-case text-muted-foreground/60">(optional)</span>
               </label>
               <div className="relative mt-1.5">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">â¹</span>
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">Ã¢ÂÂ¹</span>
                 <input
                   type="number"
                   value={price}
@@ -695,7 +695,7 @@ const DigitalCloset = () => {
                     </p>
                     {item.price && (
                       <p className="text-[10px] font-semibold text-ai font-body">
-                        â¹{item.price.toLocaleString("en-IN")}
+                        Ã¢ÂÂ¹{item.price.toLocaleString("en-IN")}
                       </p>
                     )}
                   </div>
@@ -718,7 +718,7 @@ const DigitalCloset = () => {
         </div>
       )}
 
-      {/* Empty state â no items at all */}
+      {/* Empty state Ã¢ÂÂ no items at all */}
       {!loadingItems && items.length === 0 && (
         <div className="mt-16 flex flex-col items-center text-center">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-card">
@@ -731,7 +731,7 @@ const DigitalCloset = () => {
         </div>
       )}
 
-      {/* Empty state â no search results */}
+      {/* Empty state Ã¢ÂÂ no search results */}
       {!loadingItems && items.length > 0 && filtered.length === 0 && (
         <div className="mt-16 flex flex-col items-center text-center">
           <Search className="h-12 w-12 text-muted-foreground/30" />
