@@ -35,7 +35,6 @@ export interface DetectedAttributes {
   category: string;
   color: string;
   material: string;
-  brand: string;
   tags: string[];
   gender: "men" | "women" | "unisex";
 }
