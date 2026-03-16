@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import {
   Sparkles,
   Send,
@@ -19,7 +19,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { getClosetItems, type ClothingItem } from "@/lib/database";
+import { getClosetItems, getProfile, type ClothingItem } from "@/lib/database";
 import { virtualTryOn, fileToBase64, urlToBase64 } from "@/lib/ai-service";
 
 const occasions = [
@@ -52,7 +52,7 @@ const occasionKeywords: Record<string, string[]> = {
 const tips: Record<string, string> = {
   "Date Night": "Keep it classy with a polished look. Minimal accessories add elegance.",
   Office: "Smart casual balances professionalism with comfort. Layer for versatility.",
-  Casual: "Comfort is key — classic combos never go out of style.",
+  Casual: "Comfort is key â classic combos never go out of style.",
   Party: "Go bold with colors or statement pieces. Confidence is your best accessory.",
   Workout: "Prioritize breathable, stretchy fabrics for maximum performance.",
   Formal: "Clean lines and well-fitted pieces create a commanding presence.",
@@ -116,25 +116,41 @@ interface TryOnModalProps {
   isOpen: boolean;
   onClose: () => void;
   closetItems: ClothingItem[];
+  userId: string;
 }
 
-const TryOnModal = ({ isOpen, onClose, closetItems }: TryOnModalProps) => {
-  const [step, setStep] = useState<"photo" | "select" | "generating" | "result">("photo");
+const TryOnModal = ({ isOpen, onClose, closetItems, userId }: TryOnModalProps) => {
+  const navigate = useNavigate();
+  const [step, setStep] = useState<"loading" | "no-photo" | "select" | "generating" | "result">("loading");
   const [personPhoto, setPersonPhoto] = useState<string | null>(null);
   const [personPhotoBase64, setPersonPhotoBase64] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<ClothingItem | null>(null);
   const [resultImage, setResultImage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handlePersonPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setPersonPhoto(URL.createObjectURL(file));
-    const base64 = await fileToBase64(file);
-    setPersonPhotoBase64(base64);
-    setStep("select");
-  };
+  // Auto-load body image from profile when modal opens
+  useEffect(() => {
+    if (!isOpen || !userId) return;
+    const loadProfilePhoto = async () => {
+      setStep("loading");
+      try {
+        const profile = await getProfile(userId);
+        const photoUrl = profile?.body_image_url;
+        if (photoUrl) {
+          setPersonPhoto(photoUrl);
+          const base64 = await urlToBase64(photoUrl);
+          setPersonPhotoBase64(base64);
+          setStep("select");
+        } else {
+          setStep("no-photo");
+        }
+      } catch (err) {
+        console.error("Failed to load profile photo:", err);
+        setStep("no-photo");
+      }
+    };
+    loadProfilePhoto();
+  }, [isOpen, userId]);
 
   const handleTryOn = async () => {
     if (!personPhotoBase64 || !selectedItem) return;
@@ -169,12 +185,15 @@ const TryOnModal = ({ isOpen, onClose, closetItems }: TryOnModalProps) => {
   };
 
   const reset = () => {
-    setStep("photo");
-    setPersonPhoto(null);
-    setPersonPhotoBase64(null);
     setSelectedItem(null);
     setResultImage(null);
     setError(null);
+    // Go back to select step since profile photo is already loaded
+    if (personPhotoBase64) {
+      setStep("select");
+    } else {
+      setStep("no-photo");
+    }
   };
 
   const clothingWithImages = closetItems.filter((item) => item.image_url);
@@ -200,7 +219,7 @@ const TryOnModal = ({ isOpen, onClose, closetItems }: TryOnModalProps) => {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: "100%", opacity: 0 }}
             transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
-            className="relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-background p-6 sm:rounded-3xl"
+            className="relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-background p-6 pb-24 sm:rounded-3xl sm:pb-6"
           >
             {/* Header */}
             <div className="flex items-center justify-between">
@@ -218,34 +237,38 @@ const TryOnModal = ({ isOpen, onClose, closetItems }: TryOnModalProps) => {
               </button>
             </div>
 
-            {/* Step 1: Upload person photo */}
-            {step === "photo" && (
-              <div className="mt-6">
-                <p className="text-sm font-body text-muted-foreground">
-                  Upload a full-body photo of yourself to try on clothes from your closet.
+            {/* Loading profile photo */}
+            {step === "loading" && (
+              <div className="mt-8 flex flex-col items-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-ai" />
+                <p className="mt-3 text-sm font-body text-muted-foreground">
+                  Loading your profile photo...
                 </p>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handlePersonPhoto}
-                />
-                <div className="mt-4 grid grid-cols-2 gap-3">
-                  <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border bg-card py-8 text-sm font-body text-muted-foreground transition-colors hover:border-ai">
-                    <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePersonPhoto} />
-                    <Camera className="h-5 w-5" />
-                    Camera
-                  </label>
-                  <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border bg-card py-8 text-sm font-body text-muted-foreground transition-colors hover:border-ai">
-                    <input type="file" accept="image/*" className="hidden" onChange={handlePersonPhoto} />
-                    <ImageIcon className="h-5 w-5" />
-                    Gallery
-                  </label>
+              </div>
+            )}
+
+            {/* No profile photo — redirect to Profile */}
+            {step === "no-photo" && (
+              <div className="mt-6 flex flex-col items-center text-center">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-card">
+                  <Camera className="h-8 w-8 text-muted-foreground/40" />
                 </div>
-                <p className="mt-3 text-center text-[11px] font-body text-muted-foreground/70">
-                  For best results, use a well-lit full-body photo with a plain background.
+                <h3 className="mt-4 text-base font-display font-semibold text-foreground">
+                  Full-body photo needed
+                </h3>
+                <p className="mt-1.5 text-sm font-body text-muted-foreground">
+                  Upload a full-body photo in your Profile to use Virtual Try-On. This only needs to be done once.
                 </p>
+                <button
+                  onClick={() => {
+                    onClose();
+                    navigate("/profile");
+                  }}
+                  className="mt-5 flex items-center gap-2 rounded-xl bg-ai px-6 py-3 text-sm font-display font-semibold text-ai-foreground"
+                >
+                  Go to Profile
+                  <ArrowRight className="h-4 w-4" />
+                </button>
               </div>
             )}
 
@@ -264,7 +287,10 @@ const TryOnModal = ({ isOpen, onClose, closetItems }: TryOnModalProps) => {
                     </p>
                   </div>
                   <button
-                    onClick={reset}
+                    onClick={() => {
+                      onClose();
+                      navigate("/profile");
+                    }}
                     className="text-xs font-body text-ai underline"
                   >
                     Change
@@ -363,7 +389,7 @@ const TryOnModal = ({ isOpen, onClose, closetItems }: TryOnModalProps) => {
                 <div className="mt-3 flex items-center gap-2 rounded-xl bg-ai/10 px-4 py-2.5">
                   <Sparkles className="h-4 w-4 text-ai" />
                   <span className="text-xs font-body text-ai font-medium">
-                    AI-generated preview — {selectedItem?.name}
+                    AI-generated preview â {selectedItem?.name}
                   </span>
                 </div>
                 <div className="mt-4 flex gap-2">
@@ -497,10 +523,10 @@ const AiStylist = () => {
         <motion.button
           whileTap={{ scale: 0.95 }}
           onClick={() => setShowTryOn(true)}
-          className="flex items-center gap-1.5 rounded-xl bg-ai/10 px-3 py-2 text-xs font-body font-medium text-ai"
+          className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-[hsl(38,75%,52%)] to-[hsl(345,65%,55%)] px-4 py-2.5 text-sm font-display font-semibold text-white shadow-lg shadow-ai/20"
         >
-          <Camera className="h-3.5 w-3.5" />
-          Try On
+          <Camera className="h-4 w-4" />
+          Virtual Try-On
         </motion.button>
       </div>
 
@@ -639,6 +665,7 @@ const AiStylist = () => {
         isOpen={showTryOn}
         onClose={() => setShowTryOn(false)}
         closetItems={closetItems}
+        userId={user?.id || ""}
       />
     </div>
   );
