@@ -11,9 +11,9 @@ const SplashScreen = ({ onFinish }: SplashScreenProps) => {
   const [phase, setPhase] = useState<"enter" | "hold" | "exit">("enter");
 
   useEffect(() => {
-    const holdTimer = setTimeout(() => setPhase("hold"), 600);
-    const exitTimer = setTimeout(() => setPhase("exit"), 2400);
-    const finishTimer = setTimeout(onFinish, 3000);
+    const holdTimer = setTimeout(() => setPhase("hold"), 500);
+    const exitTimer = setTimeout(() => setPhase("exit"), 2000);
+    const finishTimer = setTimeout(onFinish, 2500);
     return () => {
       clearTimeout(holdTimer);
       clearTimeout(exitTimer);
