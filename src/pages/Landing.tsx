@@ -82,7 +82,7 @@ const Landing = () => {
             <motion.button
               whileTap={{ scale: 0.96 }}
               onClick={() => openAuth("signup")}
-              className="rounded-xl bg-gradient-to-r from-[hsl(38,75%,52%)] to-[hsl(345,65%,55%)] px-4 py-2 sm:px-5 sm:py-2.5 text-xs sm:text-sm font-display font-semibold text-white shadow-lg shadow-accent/20 transition-all hover:shadow-xl hover:shadow-accent/30"
+              className="rounded-xl bg-gradient-to-r from-[hsl(43,70%,50%)] to-[hsl(220,10%,65%)] px-4 py-2 sm:px-5 sm:py-2.5 text-xs sm:text-sm font-display font-semibold text-white shadow-lg shadow-accent/20 transition-all hover:shadow-xl hover:shadow-accent/30"
             >
               Get Started
             </motion.button>
@@ -138,7 +138,7 @@ const Landing = () => {
         {/* Background gradient orbs */}
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
           <div className="absolute -left-32 top-20 h-[300px] w-[300px] sm:h-[500px] sm:w-[500px] rounded-full bg-accent/10 blur-[120px]" />
-          <div className="absolute -right-32 top-40 h-[250px] w-[250px] sm:h-[400px] sm:w-[400px] rounded-full bg-[hsl(345,65%,55%)]/10 blur-[100px]" />
+          <div className="absolute -right-32 top-40 h-[250px] w-[250px] sm:h-[400px] sm:w-[400px] rounded-full bg-[hsl(220,10%,65%)]/10 blur-[100px]" />
         </div>
 
         <div className="relative mx-auto max-w-6xl px-5">
@@ -167,7 +167,7 @@ const Landing = () => {
               <motion.button
                 whileTap={{ scale: 0.96 }}
                 onClick={() => openAuth("signup")}
-                className="flex w-full sm:w-auto items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[hsl(38,75%,52%)] to-[hsl(345,65%,55%)] px-6 py-3.5 sm:px-8 sm:py-4 text-sm sm:text-base font-display font-semibold text-white shadow-xl shadow-accent/25 transition-all hover:shadow-2xl hover:shadow-accent/30"
+                className="flex w-full sm:w-auto items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[hsl(43,70%,50%)] to-[hsl(220,10%,65%)] px-6 py-3.5 sm:px-8 sm:py-4 text-sm sm:text-base font-display font-semibold text-white shadow-xl shadow-accent/25 transition-all hover:shadow-2xl hover:shadow-accent/30"
               >
                 Start For Free
                 <ArrowRight className="h-4 w-4" />
@@ -412,7 +412,7 @@ const Landing = () => {
                   "{testimonial.text}"
                 </p>
                 <div className="mt-5 flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-accent to-[hsl(345,65%,55%)] text-sm font-display font-bold text-white">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-accent to-[hsl(220,10%,65%)] text-sm font-display font-bold text-white">
                     {testimonial.name[0]}
                   </div>
                   <div>
@@ -431,7 +431,7 @@ const Landing = () => {
         <div className="mx-auto max-w-6xl px-4 sm:px-5">
           <motion.div
             {...fadeUp}
-            className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-r from-[hsl(38,75%,52%)] to-[hsl(345,65%,55%)] p-7 text-center sm:p-10 md:p-16"
+            className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-r from-[hsl(43,70%,50%)] to-[hsl(220,10%,65%)] p-7 text-center sm:p-10 md:p-16"
           >
             <div className="pointer-events-none absolute inset-0">
               <div className="absolute -left-20 -top-20 h-60 w-60 rounded-full bg-white/10 blur-3xl" />
