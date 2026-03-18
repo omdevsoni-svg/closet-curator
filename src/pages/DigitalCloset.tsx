@@ -14,6 +14,8 @@ import {
   Loader2,
   Sparkles,
   AlertCircle,
+  Archive,
+  ArchiveRestore,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
@@ -22,6 +24,7 @@ import {
   addClosetItem,
   deleteClosetItem,
   toggleFavorite,
+  toggleArchive,
   uploadImage,
   type ClothingItem,
 } from "@/lib/database";
@@ -118,7 +121,7 @@ const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => 
         if (attrs.category) setCategory(attrs.category);
         if (attrs.color) setColor(attrs.color);
         if (attrs.gender) setGender(attrs.gender as "women" | "men" | "unisex");
-        // Brand is intentionally NOT set by AI â user must enter it manually
+        // Brand is intentionally NOT set by AI Ã¢ÂÂ user must enter it manually
         if (attrs.material) setMaterial(attrs.material);
         if (attrs.tags?.length) setTags(attrs.tags.join(", "));
         setAiDetected(true);
@@ -150,7 +153,7 @@ const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => 
     setAiError(false);
   };
 
-  // Close and reset Ã¢ÂÂ prevents stale preview on reopen
+  // Close and reset ÃÂ¢ÃÂÃÂ prevents stale preview on reopen
   const handleClose = () => {
     resetForm();
     onClose();
@@ -288,7 +291,7 @@ const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => 
               >
                 <Sparkles className="h-4 w-4 text-green-600 dark:text-green-400" />
                 <span className="text-xs font-body text-green-700 dark:text-green-400 font-medium">
-                  AI auto-filled details Ã¢ÂÂ review and adjust below
+                  AI auto-filled details ÃÂ¢ÃÂÃÂ review and adjust below
                 </span>
               </motion.div>
             )}
@@ -300,7 +303,7 @@ const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => 
               >
                 <AlertCircle className="h-4 w-4 text-destructive" />
                 <span className="text-xs font-body text-destructive font-medium">
-                  AI detection unavailable Ã¢ÂÂ please fill in details manually
+                  AI detection unavailable ÃÂ¢ÃÂÃÂ please fill in details manually
                 </span>
               </motion.div>
             )}
@@ -448,7 +451,7 @@ const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => 
                 Purchase Price <span className="normal-case text-muted-foreground/60">(optional)</span>
               </label>
               <div className="relative mt-1.5">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">Ã¢ÂÂ¹</span>
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">ÃÂ¢ÃÂÃÂ¹</span>
                 <input
                   type="number"
                   value={price}
@@ -483,6 +486,61 @@ const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => 
 };
 
 /* ------------------------------------------------------------------ */
+/*  Item Detail Modal                                                   */
+/* ------------------------------------------------------------------ */
+interface ItemDetailModalProps {
+  item: ClothingItem | null;
+  onClose: () => void;
+  onToggleFavorite: (item: ClothingItem) => void;
+  onDelete: (id: string) => void;
+  onToggleArchive: (item: ClothingItem) => void;
+}
+
+const ItemDetailModal = ({ item, onClose, onToggleFavorite, onDelete, onToggleArchive }: ItemDetailModalProps) => {
+  if (!item) return null;
+  return (
+    <AnimatePresence>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+        <motion.div initial={{ y: "100%", opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: "100%", opacity: 0 }} transition={{ type: "spring", bounce: 0.15, duration: 0.5 }} className="relative z-10 max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-background p-6 pb-24 sm:rounded-3xl sm:pb-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-display font-bold text-foreground">Item Details</h2>
+            <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-full bg-card text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
+          </div>
+          <div className="mt-4 overflow-hidden rounded-2xl bg-card">
+            {item.image_url ? (<img src={item.image_url} alt={item.name} className="w-full object-contain max-h-[50vh]" />) : (<div className="flex h-48 w-full items-center justify-center"><ImageIcon className="h-16 w-16 text-muted-foreground/20" /></div>)}
+          </div>
+          <div className="mt-4">
+            <h3 className="text-xl font-display font-bold text-foreground">{item.name}</h3>
+            <p className="mt-0.5 text-sm font-body text-muted-foreground">{item.category}</p>
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            {item.color && (<div className="rounded-xl bg-card p-3"><p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">Color</p><p className="mt-0.5 text-sm font-medium font-body text-foreground">{item.color}</p></div>)}
+            {item.material && (<div className="rounded-xl bg-card p-3"><p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">Material</p><p className="mt-0.5 text-sm font-medium font-body text-foreground">{item.material}</p></div>)}
+            {item.brand && (<div className="rounded-xl bg-card p-3"><p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">Brand</p><p className="mt-0.5 text-sm font-medium font-body text-foreground">{item.brand}</p></div>)}
+            {item.gender && (<div className="rounded-xl bg-card p-3"><p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">Gender</p><p className="mt-0.5 text-sm font-medium font-body text-foreground capitalize">{item.gender}</p></div>)}
+            {item.price != null && (<div className="rounded-xl bg-card p-3"><p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">Price</p><p className="mt-0.5 text-sm font-semibold font-body text-ai">{String.fromCharCode(8377)}{item.price.toLocaleString("en-IN")}</p></div>)}
+            {item.purchase_type && (<div className="rounded-xl bg-card p-3"><p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">Condition</p><p className="mt-0.5 text-sm font-medium font-body text-foreground capitalize">{item.purchase_type}</p></div>)}
+          </div>
+          {item.tags.length > 0 && (<div className="mt-4"><p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">Tags</p><div className="mt-1.5 flex flex-wrap gap-1.5">{item.tags.map((tag) => (<span key={tag} className="rounded-full bg-card px-3 py-1 text-xs font-body text-muted-foreground">{tag}</span>))}</div></div>)}
+          <div className="mt-6 flex gap-2">
+            <motion.button whileTap={{ scale: 0.95 }} onClick={() => onToggleFavorite(item)} className={`flex flex-1 items-center justify-center gap-2 rounded-xl py-3 text-sm font-body font-medium transition-colors ${item.favorite ? "bg-rose-500/10 text-rose-500" : "bg-card text-muted-foreground hover:text-foreground"}`}>
+              <Heart className={`h-4 w-4 ${item.favorite ? "fill-current" : ""}`} />{item.favorite ? "Favorited" : "Favorite"}
+            </motion.button>
+            <motion.button whileTap={{ scale: 0.95 }} onClick={() => onToggleArchive(item)} className={`flex flex-1 items-center justify-center gap-2 rounded-xl py-3 text-sm font-body font-medium transition-colors ${item.archived ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" : "bg-card text-muted-foreground hover:text-foreground"}`}>
+              {item.archived ? (<><ArchiveRestore className="h-4 w-4" />Unarchive</>) : (<><Archive className="h-4 w-4" />Archive</>)}
+            </motion.button>
+            <motion.button whileTap={{ scale: 0.95 }} onClick={() => { onDelete(item.id); onClose(); }} className="flex items-center justify-center gap-2 rounded-xl bg-destructive/10 px-4 py-3 text-sm font-body font-medium text-destructive">
+              <Trash2 className="h-4 w-4" />
+            </motion.button>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+};
+
+/* ------------------------------------------------------------------ */
 /*  Main Closet component                                              */
 /* ------------------------------------------------------------------ */
 const DigitalCloset = () => {
@@ -493,6 +551,7 @@ const DigitalCloset = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [isListening, setIsListening] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<ClothingItem | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
   // Load items from Supabase
@@ -546,6 +605,17 @@ const DigitalCloset = () => {
     setItems((prev) => prev.filter((i) => i.id !== itemId));
   };
 
+  const handleToggleArchive = async (item: ClothingItem) => {
+    const newArchived = !item.archived;
+    await toggleArchive(item.id, newArchived);
+    setItems((prev) =>
+      prev.map((i) => (i.id === item.id ? { ...i, archived: newArchived } : i))
+    );
+    setSelectedItem((prev) =>
+      prev && prev.id === item.id ? { ...prev, archived: newArchived } : prev
+    );
+  };
+
   // Filter items
   const filtered = items.filter((item) => {
     const matchesCategory =
@@ -557,6 +627,9 @@ const DigitalCloset = () => {
     return matchesCategory && matchesSearch;
   });
 
+  const activeItems = filtered.filter((item) => !item.archived);
+  const archivedItems = filtered.filter((item) => item.archived);
+
   return (
     <div className="px-5 pt-5">
       {/* Header */}
@@ -566,7 +639,10 @@ const DigitalCloset = () => {
             My Closet
           </h1>
           <p className="text-sm text-muted-foreground font-body">
-            {items.length} {items.length === 1 ? "item" : "items"}
+            {items.filter(i => !i.archived).length} {items.filter(i => !i.archived).length === 1 ? "item" : "items"}
+            {items.filter(i => i.archived).length > 0 && (
+              <span className="text-muted-foreground/50">{" "}\u00b7 {items.filter(i => i.archived).length} archived</span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -643,18 +719,19 @@ const DigitalCloset = () => {
         </div>
       )}
 
-      {/* Clothing grid */}
-      {!loadingItems && filtered.length > 0 && (
+      {/* Active clothing grid */}
+      {!loadingItems && activeItems.length > 0 && (
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {filtered.map((item, i) => (
+          {activeItems.map((item, i) => (
             <motion.div
               key={item.id}
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: i * 0.05 }}
-              className="group"
+              className="group cursor-pointer"
+              onClick={() => setSelectedItem(item)}
             >
-              <div className="overflow-hidden rounded-2xl bg-card p-3">
+              <div className="overflow-hidden rounded-2xl bg-card p-3 transition-shadow hover:shadow-md">
                 <div className="relative aspect-square overflow-hidden rounded-xl bg-background">
                   {item.image_url ? (
                     <img
@@ -667,23 +744,12 @@ const DigitalCloset = () => {
                       <ImageIcon className="h-10 w-10 text-muted-foreground/30" />
                     </div>
                   )}
-                  {/* Action buttons */}
-                  <div className="absolute right-1.5 top-1.5 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={() => handleToggleFavorite(item)}
-                      className={`flex h-7 w-7 items-center justify-center rounded-full bg-white/80 shadow-sm backdrop-blur-sm ${
-                        item.favorite ? "text-rose-500" : "text-muted-foreground"
-                      }`}
-                    >
-                      <Heart className={`h-3.5 w-3.5 ${item.favorite ? "fill-current" : ""}`} />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(item.id)}
-                      className="flex h-7 w-7 items-center justify-center rounded-full bg-white/80 text-muted-foreground shadow-sm backdrop-blur-sm hover:text-destructive"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
+                  {/* Favorite badge */}
+                  {item.favorite && (
+                    <div className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-white/80 shadow-sm backdrop-blur-sm text-rose-500">
+                      <Heart className="h-3 w-3 fill-current" />
+                    </div>
+                  )}
                 </div>
                 <div className="mt-2">
                   <p className="text-xs font-medium font-body text-foreground truncate">
@@ -695,7 +761,7 @@ const DigitalCloset = () => {
                     </p>
                     {item.price && (
                       <p className="text-[10px] font-semibold text-ai font-body">
-                        Ã¢ÂÂ¹{item.price.toLocaleString("en-IN")}
+                        ÃÂ¢ÃÂÃÂ¹{item.price.toLocaleString("en-IN")}
                       </p>
                     )}
                   </div>
@@ -718,7 +784,52 @@ const DigitalCloset = () => {
         </div>
       )}
 
-      {/* Empty state Ã¢ÂÂ no items at all */}
+
+      {/* Archived items section */}
+      {!loadingItems && archivedItems.length > 0 && (
+        <div className="mt-8">
+          <div className="flex items-center gap-2 mb-3">
+            <Archive className="h-4 w-4 text-muted-foreground/50" />
+            <h3 className="text-sm font-display font-semibold text-muted-foreground">
+              Archived ({archivedItems.length})
+            </h3>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {archivedItems.map((item, i) => (
+              <motion.div
+                key={item.id}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 0.45, scale: 1 }}
+                transition={{ delay: i * 0.05 }}
+                className="group cursor-pointer hover:!opacity-70 transition-opacity"
+                onClick={() => setSelectedItem(item)}
+              >
+                <div className="overflow-hidden rounded-2xl bg-card p-3 grayscale-[30%]">
+                  <div className="relative aspect-square overflow-hidden rounded-xl bg-background">
+                    {item.image_url ? (
+                      <img src={item.image_url} alt={item.name} className="h-full w-full object-contain" />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center">
+                        <ImageIcon className="h-10 w-10 text-muted-foreground/20" />
+                      </div>
+                    )}
+                    <div className="absolute left-1.5 top-1.5 flex items-center gap-1 rounded-full bg-black/40 px-2 py-0.5 backdrop-blur-sm">
+                      <Archive className="h-2.5 w-2.5 text-white/80" />
+                      <span className="text-[9px] font-body text-white/80">Archived</span>
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <p className="text-xs font-medium font-body text-foreground/60 truncate">{item.name}</p>
+                    <p className="text-[10px] text-muted-foreground/60 font-body">{item.category}</p>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Empty state ÃÂ¢ÃÂÃÂ no items at all */}
       {!loadingItems && items.length === 0 && (
         <div className="mt-16 flex flex-col items-center text-center">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-card">
@@ -731,7 +842,7 @@ const DigitalCloset = () => {
         </div>
       )}
 
-      {/* Empty state Ã¢ÂÂ no search results */}
+      {/* Empty state ÃÂ¢ÃÂÃÂ no search results */}
       {!loadingItems && items.length > 0 && filtered.length === 0 && (
         <div className="mt-16 flex flex-col items-center text-center">
           <Search className="h-12 w-12 text-muted-foreground/30" />
@@ -749,6 +860,22 @@ const DigitalCloset = () => {
           onClose={() => setShowAddModal(false)}
           onAdd={(newItem) => setItems((prev) => [newItem, ...prev])}
           userId={user.id}
+        />
+      )}
+
+      {/* Item Detail Modal */}
+      {selectedItem && (
+        <ItemDetailModal
+          item={selectedItem}
+          onClose={() => setSelectedItem(null)}
+          onToggleFavorite={(item) => {
+            handleToggleFavorite(item);
+            setSelectedItem((prev) =>
+              prev && prev.id === item.id ? { ...prev, favorite: !prev.favorite } : prev
+            );
+          }}
+          onDelete={handleDelete}
+          onToggleArchive={handleToggleArchive}
         />
       )}
     </div>
