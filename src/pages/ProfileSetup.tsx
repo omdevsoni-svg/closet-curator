@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { User, Mail, Lock, ArrowRight, Eye, EyeOff } from "lucide-react";
@@ -6,7 +6,14 @@ import { useAuth } from "@/contexts/AuthContext";
 
 const ProfileSetup = () => {
   const navigate = useNavigate();
-  const { signUp, signIn } = useAuth();
+  const { user, loading: authLoading, signUp, signIn } = useAuth();
+
+  // Redirect to home if already logged in
+  useEffect(() => {
+    if (!authLoading && user) {
+      navigate("/home", { replace: true });
+    }
+  }, [user, authLoading, navigate]);
   const [mode, setMode] = useState<"signup" | "login">("signup");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
