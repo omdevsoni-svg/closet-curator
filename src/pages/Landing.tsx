@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Sparkles,
@@ -34,8 +35,16 @@ const staggerContainer = {
 
 const Landing = () => {
   const navigate = useNavigate();
+  const { user, loading } = useAuth();
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "signup">("signup");
+
+  // Redirect to home if already logged in
+  useEffect(() => {
+    if (!loading && user) {
+      navigate("/home", { replace: true });
+    }
+  }, [user, loading, navigate]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const openAuth = (mode: "login" | "signup") => {
@@ -50,7 +59,7 @@ const Landing = () => {
 
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
-      {/* ─── Navbar ─── */}
+      {/* âââ Navbar âââ */}
       <nav className="fixed top-0 z-40 w-full border-b border-white/10 bg-background/60 backdrop-blur-xl">
         <div className="mx-auto flex h-14 sm:h-16 max-w-6xl items-center justify-between px-4 sm:px-5">
           <div className="flex items-center gap-2">
@@ -124,7 +133,7 @@ const Landing = () => {
         </AnimatePresence>
       </nav>
 
-      {/* ─── Hero ─── */}
+      {/* âââ Hero âââ */}
       <section className="relative pt-24 pb-14 sm:pt-32 sm:pb-20 md:pt-44 md:pb-32">
         {/* Background gradient orbs */}
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
@@ -187,12 +196,12 @@ const Landing = () => {
               <div className="rounded-2xl bg-gradient-to-br from-background to-card p-6 sm:p-10">
                 <div className="grid grid-cols-3 gap-4 sm:grid-cols-6">
                   {[
-                    { name: "Blazer", color: "bg-blue-900/10", emoji: "🧥" },
-                    { name: "T-Shirt", color: "bg-gray-100", emoji: "👕" },
-                    { name: "Jeans", color: "bg-indigo-100", emoji: "👖" },
-                    { name: "Sneakers", color: "bg-orange-100", emoji: "👟" },
-                    { name: "Dress", color: "bg-pink-100", emoji: "👗" },
-                    { name: "Watch", color: "bg-amber-100", emoji: "⌚" },
+                    { name: "Blazer", color: "bg-blue-900/10", emoji: "ð§¥" },
+                    { name: "T-Shirt", color: "bg-gray-100", emoji: "ð" },
+                    { name: "Jeans", color: "bg-indigo-100", emoji: "ð" },
+                    { name: "Sneakers", color: "bg-orange-100", emoji: "ð" },
+                    { name: "Dress", color: "bg-pink-100", emoji: "ð" },
+                    { name: "Watch", color: "bg-amber-100", emoji: "â" },
                   ].map((item, i) => (
                     <motion.div
                       key={item.name}
@@ -216,7 +225,7 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* ─── Features ─── */}
+      {/* âââ Features âââ */}
       <section id="features" className="py-14 sm:py-20 md:py-28">
         <div className="mx-auto max-w-6xl px-5">
           <motion.div {...fadeUp} className="mx-auto max-w-2xl text-center">
@@ -241,7 +250,7 @@ const Landing = () => {
               {
                 icon: Sparkles,
                 title: "AI Stylist",
-                description: "Get personalized outfit recommendations for any occasion — date night, office, weekend, or party.",
+                description: "Get personalized outfit recommendations for any occasion â date night, office, weekend, or party.",
                 gradient: "from-blue-500/10 to-blue-600/5",
                 iconColor: "text-blue-500",
               },
@@ -255,7 +264,7 @@ const Landing = () => {
               {
                 icon: ShoppingBag,
                 title: "Smart Shopping",
-                description: "Get recommendations for pieces that fill your wardrobe gaps — only buy what you actually need.",
+                description: "Get recommendations for pieces that fill your wardrobe gaps â only buy what you actually need.",
                 gradient: "from-amber-500/10 to-amber-600/5",
                 iconColor: "text-amber-600",
               },
@@ -299,7 +308,7 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* ─── How It Works ─── */}
+      {/* âââ How It Works âââ */}
       <section id="how-it-works" className="relative py-14 sm:py-20 md:py-28">
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
           <div className="absolute left-1/2 top-0 h-[600px] w-[600px] -translate-x-1/2 rounded-full bg-accent/5 blur-[120px]" />
@@ -318,19 +327,19 @@ const Landing = () => {
                 step: "01",
                 title: "Upload Your Clothes",
                 description: "Take photos of your clothing items. Our AI instantly removes backgrounds and categorizes each piece.",
-                emoji: "📸",
+                emoji: "ð¸",
               },
               {
                 step: "02",
                 title: "Get Styled by AI",
                 description: "Tell us the occasion and our AI creates the perfect outfit from your existing wardrobe.",
-                emoji: "✨",
+                emoji: "â¨",
               },
               {
                 step: "03",
                 title: "Optimize & Shop Smart",
-                description: "See your wardrobe health score and get recommendations to fill gaps — only buy what you need.",
-                emoji: "🎯",
+                description: "See your wardrobe health score and get recommendations to fill gaps â only buy what you need.",
+                emoji: "ð¯",
               },
             ].map((item, i) => (
               <motion.div
@@ -355,7 +364,7 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* ─── Testimonials ─── */}
+      {/* âââ Testimonials âââ */}
       <section className="py-14 sm:py-20 md:py-28">
         <div className="mx-auto max-w-6xl px-4 sm:px-5">
           <motion.div {...fadeUp} className="mx-auto max-w-2xl text-center">
@@ -417,7 +426,7 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* ─── CTA Banner ─── */}
+      {/* âââ CTA Banner âââ */}
       <section className="py-14 sm:py-20">
         <div className="mx-auto max-w-6xl px-4 sm:px-5">
           <motion.div
@@ -448,7 +457,7 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* ─── Footer ─── */}
+      {/* âââ Footer âââ */}
       <footer className="border-t border-border py-10 sm:py-12">
         <div className="mx-auto max-w-6xl px-4 sm:px-5">
           <div className="grid gap-8 grid-cols-2 lg:grid-cols-4">
