@@ -74,7 +74,7 @@ const ProfileSetup = () => {
         {/* Logo */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-display font-bold tracking-tight bg-gradient-to-r from-[hsl(38,90%,50%)] to-[hsl(350,80%,58%)] bg-clip-text text-transparent">
-            Vastrika AI
+            StyleOS
           </h1>
           <p className="mt-2 text-sm text-muted-foreground font-body">
             {mode === "signup"
