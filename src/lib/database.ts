@@ -18,6 +18,7 @@ export interface ClothingItem {
   brand?: string;
   material?: string;
   favorite: boolean;
+  archived?: boolean;
   created_at: string;
 }
 
@@ -126,6 +127,15 @@ export const toggleFavorite = async (itemId: string, favorite: boolean) => {
   return { error };
 };
 
+export const toggleArchive = async (itemId: string, archived: boolean) => {
+  const { error } = await supabase
+    .from("closet_items")
+    .update({ archived })
+    .eq("id", itemId);
+  if (error) console.error("toggleArchive error:", error);
+  return { error };
+};
+
 /* ------------------------------------------------------------------ */
 /*  Helper: detect if a file is HEIC/HEIF format                       */
 /* ------------------------------------------------------------------ */
@@ -191,7 +201,7 @@ export const uploadImage = async (
 
   try {
     if (isHeicFile(file)) {
-      // HEIC/HEIF: browsers cannot decode these — use heic2any JS decoder
+      // HEIC/HEIF: browsers cannot decode these â use heic2any JS decoder
       uploadBlob = await convertHeicToJpeg(file);
       ext = "jpg";
       contentType = "image/jpeg";
