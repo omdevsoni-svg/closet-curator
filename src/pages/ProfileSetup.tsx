@@ -73,7 +73,7 @@ const ProfileSetup = () => {
       >
         {/* Logo */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-display font-bold tracking-tight bg-gradient-to-r from-[hsl(38,90%,50%)] to-[hsl(350,80%,58%)] bg-clip-text text-transparent">
+          <h1 className="text-3xl font-display font-bold tracking-tight bg-gradient-to-r from-[hsl(43,72%,50%)] to-[hsl(220,12%,68%)] bg-clip-text text-transparent">
             StyleOS
           </h1>
           <p className="mt-2 text-sm text-muted-foreground font-body">
@@ -165,7 +165,7 @@ const ProfileSetup = () => {
             whileTap={{ scale: 0.98 }}
             onClick={handleSubmit}
             disabled={loading}
-            className="h-12 w-full rounded-xl bg-gradient-to-r from-[hsl(38,90%,50%)] to-[hsl(350,80%,58%)] text-white font-display font-semibold text-sm transition-all hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
+            className="h-12 w-full rounded-xl bg-gradient-to-r from-[hsl(43,72%,50%)] to-[hsl(220,12%,68%)] text-white font-display font-semibold text-sm transition-all hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {loading ? (
               <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
