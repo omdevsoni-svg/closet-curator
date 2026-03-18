@@ -12,7 +12,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
-    storageKey: "vastrika-auth",
+    storageKey: "styleos-auth",
     storage: window.localStorage,
   },
 });
