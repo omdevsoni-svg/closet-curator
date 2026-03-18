@@ -13,7 +13,7 @@ const TopBar = () => {
       <div className="flex items-center gap-2.5">
         <Logo className="h-7 w-7" />
         <span className="text-base font-display font-bold tracking-tight text-foreground">
-          Vastrika AI
+          StyleOS
         </span>
       </div>
 
