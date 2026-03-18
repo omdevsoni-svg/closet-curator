@@ -59,13 +59,13 @@ const Landing = () => {
 
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
-      {/* âââ Navbar âââ */}
+      {/* Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Navbar Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ */}
       <nav className="fixed top-0 z-40 w-full border-b border-white/10 bg-background/60 backdrop-blur-xl">
         <div className="mx-auto flex h-14 sm:h-16 max-w-6xl items-center justify-between px-4 sm:px-5">
           <div className="flex items-center gap-2">
             <Logo className="h-7 w-7 sm:h-8 sm:w-8" />
             <span className="text-base sm:text-lg font-display font-bold tracking-tight text-foreground">
-              Vastrika AI
+              StyleOS
             </span>
           </div>
           <div className="hidden items-center gap-8 md:flex">
@@ -133,7 +133,7 @@ const Landing = () => {
         </AnimatePresence>
       </nav>
 
-      {/* âââ Hero âââ */}
+      {/* Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Hero Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ */}
       <section className="relative pt-24 pb-14 sm:pt-32 sm:pb-20 md:pt-44 md:pb-32">
         {/* Background gradient orbs */}
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
@@ -196,12 +196,12 @@ const Landing = () => {
               <div className="rounded-2xl bg-gradient-to-br from-background to-card p-6 sm:p-10">
                 <div className="grid grid-cols-3 gap-4 sm:grid-cols-6">
                   {[
-                    { name: "Blazer", color: "bg-blue-900/10", emoji: "ð§¥" },
-                    { name: "T-Shirt", color: "bg-gray-100", emoji: "ð" },
-                    { name: "Jeans", color: "bg-indigo-100", emoji: "ð" },
-                    { name: "Sneakers", color: "bg-orange-100", emoji: "ð" },
-                    { name: "Dress", color: "bg-pink-100", emoji: "ð" },
-                    { name: "Watch", color: "bg-amber-100", emoji: "â" },
+                    { name: "Blazer", color: "bg-blue-900/10", emoji: "Ã°ÂÂ§Â¥" },
+                    { name: "T-Shirt", color: "bg-gray-100", emoji: "Ã°ÂÂÂ" },
+                    { name: "Jeans", color: "bg-indigo-100", emoji: "Ã°ÂÂÂ" },
+                    { name: "Sneakers", color: "bg-orange-100", emoji: "Ã°ÂÂÂ" },
+                    { name: "Dress", color: "bg-pink-100", emoji: "Ã°ÂÂÂ" },
+                    { name: "Watch", color: "bg-amber-100", emoji: "Ã¢ÂÂ" },
                   ].map((item, i) => (
                     <motion.div
                       key={item.name}
@@ -225,7 +225,7 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* âââ Features âââ */}
+      {/* Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Features Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ */}
       <section id="features" className="py-14 sm:py-20 md:py-28">
         <div className="mx-auto max-w-6xl px-5">
           <motion.div {...fadeUp} className="mx-auto max-w-2xl text-center">
@@ -250,7 +250,7 @@ const Landing = () => {
               {
                 icon: Sparkles,
                 title: "AI Stylist",
-                description: "Get personalized outfit recommendations for any occasion â date night, office, weekend, or party.",
+                description: "Get personalized outfit recommendations for any occasion Ã¢ÂÂ date night, office, weekend, or party.",
                 gradient: "from-blue-500/10 to-blue-600/5",
                 iconColor: "text-blue-500",
               },
@@ -264,7 +264,7 @@ const Landing = () => {
               {
                 icon: ShoppingBag,
                 title: "Smart Shopping",
-                description: "Get recommendations for pieces that fill your wardrobe gaps â only buy what you actually need.",
+                description: "Get recommendations for pieces that fill your wardrobe gaps Ã¢ÂÂ only buy what you actually need.",
                 gradient: "from-amber-500/10 to-amber-600/5",
                 iconColor: "text-amber-600",
               },
@@ -308,7 +308,7 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* âââ How It Works âââ */}
+      {/* Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ How It Works Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ */}
       <section id="how-it-works" className="relative py-14 sm:py-20 md:py-28">
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
           <div className="absolute left-1/2 top-0 h-[600px] w-[600px] -translate-x-1/2 rounded-full bg-accent/5 blur-[120px]" />
@@ -327,19 +327,19 @@ const Landing = () => {
                 step: "01",
                 title: "Upload Your Clothes",
                 description: "Take photos of your clothing items. Our AI instantly removes backgrounds and categorizes each piece.",
-                emoji: "ð¸",
+                emoji: "Ã°ÂÂÂ¸",
               },
               {
                 step: "02",
                 title: "Get Styled by AI",
                 description: "Tell us the occasion and our AI creates the perfect outfit from your existing wardrobe.",
-                emoji: "â¨",
+                emoji: "Ã¢ÂÂ¨",
               },
               {
                 step: "03",
                 title: "Optimize & Shop Smart",
-                description: "See your wardrobe health score and get recommendations to fill gaps â only buy what you need.",
-                emoji: "ð¯",
+                description: "See your wardrobe health score and get recommendations to fill gaps Ã¢ÂÂ only buy what you need.",
+                emoji: "Ã°ÂÂÂ¯",
               },
             ].map((item, i) => (
               <motion.div
@@ -364,7 +364,7 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* âââ Testimonials âââ */}
+      {/* Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Testimonials Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ */}
       <section className="py-14 sm:py-20 md:py-28">
         <div className="mx-auto max-w-6xl px-4 sm:px-5">
           <motion.div {...fadeUp} className="mx-auto max-w-2xl text-center">
@@ -379,7 +379,7 @@ const Landing = () => {
               {
                 name: "Priya Sharma",
                 role: "Fashion Blogger",
-                text: "Vastrika AI completely changed how I plan outfits. The AI recommendations are surprisingly spot-on for Indian occasions.",
+                text: "StyleOS completely changed how I plan outfits. The AI recommendations are surprisingly spot-on for Indian occasions.",
                 rating: 5,
               },
               {
@@ -426,7 +426,7 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* âââ CTA Banner âââ */}
+      {/* Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ CTA Banner Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ */}
       <section className="py-14 sm:py-20">
         <div className="mx-auto max-w-6xl px-4 sm:px-5">
           <motion.div
@@ -457,14 +457,14 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* âââ Footer âââ */}
+      {/* Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Footer Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ */}
       <footer className="border-t border-border py-10 sm:py-12">
         <div className="mx-auto max-w-6xl px-4 sm:px-5">
           <div className="grid gap-8 grid-cols-2 lg:grid-cols-4">
             <div className="col-span-2 lg:col-span-1">
               <div className="flex items-center gap-2">
                 <Logo className="h-7 w-7" />
-                <span className="text-base font-display font-bold text-foreground">Vastrika AI</span>
+                <span className="text-base font-display font-bold text-foreground">StyleOS</span>
               </div>
               <p className="mt-3 text-sm text-muted-foreground font-body leading-relaxed max-w-xs">
                 Your AI-powered digital wardrobe manager. Dress smarter, shop less, style more.
@@ -503,7 +503,7 @@ const Landing = () => {
           </div>
           <div className="mt-10 flex flex-col items-center justify-between gap-4 border-t border-border pt-8 sm:flex-row">
             <p className="text-xs text-muted-foreground font-body">
-              &copy; {new Date().getFullYear()} Vastrika AI. All rights reserved.
+              &copy; {new Date().getFullYear()} StyleOS. All rights reserved.
             </p>
             <div className="flex gap-4">
               <a href="#" className="text-muted-foreground transition-colors hover:text-foreground">
