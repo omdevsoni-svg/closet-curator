@@ -4,8 +4,8 @@
   "description": "Your AI-powered digital wardrobe manager. Upload clothes, get styled by AI, and discover what your closet needs.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0f0a1a",
-  "theme_color": "#CC9A2E",
+  "background_color": "#121420",
+  "theme_color": "#C4962E",
   "orientation": "portrait",
   "icons": [
     {
