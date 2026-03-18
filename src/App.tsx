@@ -1,3 +1,4 @@
+import { useState, useCallback } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -6,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "./hooks/useTheme";
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
+import SplashScreen from "./components/SplashScreen";
 import AppLayout from "./components/AppLayout";
 import Landing from "./pages/Landing";
 import ProfileSetup from "./pages/ProfileSetup";
@@ -19,6 +21,17 @@ import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
 const App = () => {
+  // Show splash only on first-ever visit (persists across sessions via localStorage)
+  const [showSplash, setShowSplash] = useState(() => {
+    if (localStorage.getItem("vastrika_splash_shown")) return false;
+    return true;
+  });
+
+  const handleSplashFinish = useCallback(() => {
+    localStorage.setItem("vastrika_splash_shown", "1");
+    setShowSplash(false);
+  }, []);
+
   return (
     <AuthProvider>
       <ThemeProvider>
@@ -26,6 +39,7 @@ const App = () => {
           <TooltipProvider>
             <Toaster />
             <Sonner />
+            {showSplash && <SplashScreen onFinish={handleSplashFinish} />}
             <BrowserRouter>
               <Routes>
                 {/* Default route: login/signup for new users, auto-redirects to /home if already logged in */}
