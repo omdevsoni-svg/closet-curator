@@ -23,12 +23,12 @@ const queryClient = new QueryClient();
 const App = () => {
   // Show splash only on first-ever visit (persists across sessions via localStorage)
   const [showSplash, setShowSplash] = useState(() => {
-    if (localStorage.getItem("vastrika_splash_shown")) return false;
+    if (localStorage.getItem("styleos_splash_shown")) return false;
     return true;
   });
 
   const handleSplashFinish = useCallback(() => {
-    localStorage.setItem("vastrika_splash_shown", "1");
+    localStorage.setItem("styleos_splash_shown", "1");
     setShowSplash(false);
   }, []);
 
