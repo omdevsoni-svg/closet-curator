@@ -83,7 +83,7 @@ const SplashScreen = ({ onFinish }: SplashScreenProps) => {
             transition={{ duration: 0.5, delay: 0.8 }}
             className="text-2xl font-display font-extrabold tracking-tight text-white sm:text-3xl"
           >
-            Vastrika AI
+            StyleOS
           </motion.h1>
 
           {/* Tagline */}
