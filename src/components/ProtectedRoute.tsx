@@ -13,7 +13,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   }
 
   if (!user) {
-    return <Navigate to="/setup" replace />;
+    return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;
