@@ -538,7 +538,7 @@ const AiStylist = () => {
         <motion.button
           whileTap={{ scale: 0.95 }}
           onClick={() => setShowTryOn(true)}
-          className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-[hsl(38,75%,52%)] to-[hsl(345,65%,55%)] px-4 py-2.5 text-sm font-display font-semibold text-white shadow-lg shadow-ai/20"
+          className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-[hsl(43,70%,50%)] to-[hsl(220,10%,65%)] px-4 py-2.5 text-sm font-display font-semibold text-white shadow-lg shadow-ai/20"
         >
           <Camera className="h-4 w-4" />
           Virtual Try-On
