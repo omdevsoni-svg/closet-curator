@@ -4,7 +4,7 @@ import {
   Shirt,
   Sparkles,
   HeartPulse,
-  Calendar,
+  User,
   CloudSun,
   Droplets,
   Wind,
@@ -166,9 +166,9 @@ const featureCards = [
     color: "bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400",
   },
   {
-    label: "OOTD",
-    icon: Calendar,
-    path: "/stylist",
+    label: "Profile",
+    icon: User,
+    path: "/profile",
     color: "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400",
   },
 ];
@@ -180,7 +180,9 @@ const Home = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const weather = useWeather();
-  const [showWelcome, setShowWelcome] = useState(true);
+  const [showWelcome, setShowWelcome] = useState(() => {
+    return !localStorage.getItem("styleos_welcome_dismissed");
+  });
   const [userName, setUserName] = useState("Style Enthusiast");
   const [stats, setStats] = useState({ totalItems: 0, favorites: 0, styleScore: 0, items: [] as any[] });
   const [loadingStats, setLoadingStats] = useState(true);
@@ -213,7 +215,10 @@ const Home = () => {
             className="relative mb-5 overflow-hidden rounded-2xl bg-gradient-to-r from-[hsl(43,70%,50%)] to-[hsl(220,10%,65%)] p-5 text-white"
           >
             <button
-              onClick={() => setShowWelcome(false)}
+              onClick={() => {
+                localStorage.setItem("styleos_welcome_dismissed", "1");
+                setShowWelcome(false);
+              }}
               className="absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-full bg-white/20 text-white/80 hover:bg-white/30"
             >
               <X className="h-3.5 w-3.5" />
@@ -221,17 +226,19 @@ const Home = () => {
             <div className="flex items-center gap-2">
               <Sparkles className="h-5 w-5" />
               <h2 className="text-lg font-display font-bold">
-                Welcome, {userName}!
+                {stats.totalItems === 0 ? "Welcome, " + userName + "!" : "Hey, " + userName + "!"}
               </h2>
             </div>
             <p className="mt-1 text-sm font-body text-white/80">
-              Your AI stylist is ready. Add items to your closet and get personalized outfit suggestions.
+              {stats.totalItems === 0
+                ? "Your AI stylist is ready. Add items to your closet and get personalized outfit suggestions."
+                : "You have " + stats.totalItems + " items in your closet. Get styled by AI or check your closet health."}
             </p>
             <button
-              onClick={() => navigate("/closet")}
+              onClick={() => navigate(stats.totalItems === 0 ? "/closet" : "/stylist")}
               className="mt-3 flex items-center gap-1 rounded-xl bg-white/20 px-4 py-2 text-sm font-body font-medium text-white backdrop-blur-sm transition-colors hover:bg-white/30"
             >
-              Add Your First Item
+              {stats.totalItems === 0 ? "Add Your First Item" : "Get Styled"}
               <ChevronRight className="h-4 w-4" />
             </button>
           </motion.div>
