@@ -203,8 +203,54 @@ const Home = () => {
     load();
   }, [user]);
 
+  // First-time onboarding
+  const [onboardStep, setOnboardStep] = useState(() => {
+    if (localStorage.getItem("styleos_onboarded")) return -1;
+    return 0;
+  });
+  const onboardSteps = [
+    { title: "Add Your Wardrobe", desc: "Upload photos of your clothes. Our AI detects the type, color, and material automatically.", icon: Shirt },
+    { title: "Get AI Outfit Picks", desc: "Tell the AI your occasion and get personalized outfit suggestions from your actual closet.", icon: Sparkles },
+    { title: "Track Closet Health", desc: "See what is missing, what you wear most, and get smart shopping suggestions.", icon: HeartPulse },
+  ];
+  const finishOnboarding = () => {
+    localStorage.setItem("styleos_onboarded", "1");
+    setOnboardStep(-1);
+  };
+
   return (
     <div className="px-5 pt-6 pb-4">
+      {/* Onboarding for first-time users */}
+      <AnimatePresence>
+        {onboardStep >= 0 && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+            <motion.div key={onboardStep} initial={{ opacity: 0, y: 20, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -20 }}
+              transition={{ type: "spring", bounce: 0.2, duration: 0.5 }}
+              className="mx-6 w-full max-w-sm rounded-3xl bg-background p-8 text-center shadow-2xl">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-ai/10">
+                {(() => { const Icon = onboardSteps[onboardStep].icon; return <Icon className="h-8 w-8 text-ai" />; })()}
+              </div>
+              <h2 className="mt-5 text-xl font-display font-bold text-foreground">{onboardSteps[onboardStep].title}</h2>
+              <p className="mt-2 text-sm font-body text-muted-foreground">{onboardSteps[onboardStep].desc}</p>
+              <div className="mt-6 flex justify-center gap-2">
+                {onboardSteps.map((_, i) => (
+                  <div key={i} className={"h-2 rounded-full transition-all " + (i === onboardStep ? "w-6 bg-ai" : "w-2 bg-border")} />
+                ))}
+              </div>
+              <div className="mt-6 flex gap-3">
+                <button onClick={finishOnboarding} className="flex-1 rounded-xl py-3 text-sm font-body font-medium text-muted-foreground hover:text-foreground">Skip</button>
+                <button onClick={() => onboardStep < 2 ? setOnboardStep(onboardStep + 1) : finishOnboarding()}
+                  className="flex-1 rounded-xl bg-ai py-3 text-sm font-display font-semibold text-ai-foreground">
+                  {onboardStep < 2 ? "Next" : "Get Started"}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Welcome banner */}
       <AnimatePresence>
         {showWelcome && (
