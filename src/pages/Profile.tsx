@@ -182,36 +182,6 @@ const Profile = () => {
     setSaving(false);
   };
 
-  const handleFacePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !user) return;
-
-    // Show instant local preview
-    const localUrl = URL.createObjectURL(file);
-    setFacePreview(localUrl);
-    setFaceUploading(true);
-
-    try {
-      const url = await uploadImage("profile-images", user.id, file);
-      if (url) {
-        setFacePhoto(url);
-        await savePreferences({ face_image_url: url });
-        showToast("Face image uploaded successfully", "success");
-      } else {
-        showToast("Failed to upload face image. Please try again.", "error");
-      }
-    } catch (err) {
-      console.error("Face upload error:", err);
-      showToast("Upload failed. Please try a different image.", "error");
-    } finally {
-      setFaceUploading(false);
-      URL.revokeObjectURL(localUrl);
-      setFacePreview(null);
-      // Reset input so the same file can be re-selected
-      e.target.value = "";
-    }
-  };
-
   const handleBodyPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
@@ -307,78 +277,6 @@ const Profile = () => {
         <button className="flex h-8 w-8 items-center justify-center rounded-full bg-background text-muted-foreground hover:text-foreground">
           <Pencil className="h-4 w-4" />
         </button>
-      </motion.div>
-
-      {/* Face Image */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="mt-4 rounded-2xl bg-card p-5"
-      >
-        <div className="flex items-center gap-2">
-          <Camera className="h-4 w-4 text-muted-foreground" />
-          <div>
-            <h3 className="text-sm font-display font-semibold text-foreground">
-              Face Image
-            </h3>
-            <p className="text-xs text-muted-foreground font-body">
-              Clear face photo for virtual try-on
-            </p>
-          </div>
-        </div>
-        <div className="mt-4 flex items-start gap-4">
-          <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-full bg-background ring-2 ring-border">
-            {faceImageSrc ? (
-              <img
-                src={faceImageSrc}
-                alt="Face photo"
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center">
-                <User className="h-8 w-8 text-muted-foreground/30" />
-              </div>
-            )}
-            {faceUploading && (
-              <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40">
-                <Loader2 className="h-6 w-6 animate-spin text-white" />
-              </div>
-            )}
-          </div>
-
-          <div className="flex-1">
-            <p className="text-xs text-muted-foreground font-body">
-              Upload a clear, front-facing photo. Used for AI virtual try-on and
-              personalized style previews.
-            </p>
-            <div className="mt-2 flex gap-2">
-              <label className={`flex cursor-pointer items-center gap-1.5 rounded-lg bg-background px-3 py-1.5 text-xs font-body font-medium text-muted-foreground transition-colors hover:text-foreground ${faceUploading ? "pointer-events-none opacity-50" : ""}`}>
-                <input
-                  type="file"
-                  accept="image/*"
-                  capture="user"
-                  className="hidden"
-                  onChange={handleFacePhotoUpload}
-                  disabled={faceUploading}
-                />
-                <Camera className="h-3.5 w-3.5" />
-                Camera
-              </label>
-              <label className={`flex cursor-pointer items-center gap-1.5 rounded-lg bg-background px-3 py-1.5 text-xs font-body font-medium text-muted-foreground transition-colors hover:text-foreground ${faceUploading ? "pointer-events-none opacity-50" : ""}`}>
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleFacePhotoUpload}
-                  disabled={faceUploading}
-                />
-                <ImageIcon className="h-3.5 w-3.5" />
-                Gallery
-              </label>
-            </div>
-          </div>
-        </div>
       </motion.div>
 
       {/* Full-Body Image */}
