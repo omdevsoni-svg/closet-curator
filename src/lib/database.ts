@@ -118,6 +118,20 @@ export const deleteClosetItem = async (itemId: string) => {
   return { error };
 };
 
+export const updateClosetItem = async (
+  itemId: string,
+  updates: Partial<Omit<ClothingItem, "id" | "user_id" | "created_at">>
+) => {
+  const { data, error } = await supabase
+    .from("closet_items")
+    .update(updates)
+    .eq("id", itemId)
+    .select()
+    .single();
+  if (error) console.error("updateClosetItem error:", error);
+  return data as ClothingItem | null;
+};
+
 export const toggleFavorite = async (itemId: string, favorite: boolean) => {
   const { error } = await supabase
     .from("closet_items")
