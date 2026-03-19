@@ -6,7 +6,7 @@ const sideItems = [
   { path: "/home", label: "Home", icon: LayoutGrid },
   { path: "/closet", label: "Closet", icon: Shirt },
   // center FAB goes here visually
-  { path: "/health", label: "Insights", icon: HeartPulse },
+  { path: "/health", label: "Health", icon: HeartPulse },
   { path: "/profile", label: "Profile", icon: User },
 ];
 
