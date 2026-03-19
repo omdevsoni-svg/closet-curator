@@ -778,7 +778,7 @@ const DigitalCloset = () => {
                     </p>
                     {item.price && (
                       <p className="text-[10px] font-semibold text-ai font-body">
-                         - {item.price.toLocaleString("en-IN")}
+                        ₹{item.price.toLocaleString("en-IN")}
                       </p>
                     )}
                   </div>
