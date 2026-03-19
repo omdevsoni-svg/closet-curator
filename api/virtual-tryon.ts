@@ -61,7 +61,7 @@ CRITICAL REQUIREMENTS FOR PRECISION:
 2. BODY ACCURACY: Use the full-body reference image to match the person's exact body proportions, height, build, and posture.
 3. CLOTHING FIT: The clothing item must look naturally fitted on the person's body — proper draping, folding, and shadows where the garment meets the body.
 4. LIGHTING & ENVIRONMENT: Keep consistent lighting across face, body, and clothing. Maintain a clean, neutral background.
-5. NATURAL INTEGRATION: The final image should look like a real photograph, not a collage. Pay attention to shadows, fabric physics, and body-clothing interaction.
+4. NATURAL INTEGRATION: The final image should look like a real photograph, not a collage. Pay attention to shadows, fabric physics, and body-clothing interaction.
 
 Generate ONE photorealistic full-body image of this person wearing the shown clothing item.`;
 
@@ -117,14 +117,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Build the parts array with all reference images + prompt
     const parts: any[] = [];
 
-    // Add face image if provided (for facial accuracy)
-    if (faceImageBase64) {
-      parts.push({ text: "FACE REFERENCE IMAGE (match this face exactly):" });
-      parts.push({ inlineData: { mimeType: faceMimeType, data: faceImageBase64 } });
-    }
-
-    // Add full-body image (for body proportions and posture)
-    parts.push({ text: "FULL-BODY REFERENCE IMAGE (match this person's body, proportions, and skin tone):" });
+    // Add full-body reference image
+    parts.push({ text: "PERSON REFERENCE IMAGE (match this person's face, body, proportions, and skin tone exactly):" });
     parts.push({ inlineData: { mimeType: bodyMimeType, data: bodyImageBase64 } });
 
     // Add clothing/product image
