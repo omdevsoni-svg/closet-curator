@@ -576,13 +576,13 @@ const ToggleRow = ({
     </div>
     <button
       onClick={() => onChange(!value)}
-      className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${
+      className={`relative h-[26px] w-[46px] shrink-0 rounded-full transition-colors ${
         value ? "bg-ai" : "bg-border"
       }`}
     >
       <span
-        className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow-sm transition-transform ${
-          value ? "translate-x-5" : "translate-x-0.5"
+        className={`absolute top-[2px] left-[2px] h-[22px] w-[22px] rounded-full bg-white shadow-sm transition-transform ${
+          value ? "translate-x-[20px]" : "translate-x-0"
         }`}
       />
     </button>
