@@ -15,12 +15,13 @@ import {
   X,
   ArrowRight,
   Check,
+  AlertTriangle,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { getClosetItems, getProfile, type ClothingItem } from "@/lib/database";
-import { virtualTryOn, fileToBase64, urlToBase64 } from "@/lib/ai-service";
+import { getClosetItems, getProfile, type ClothingItem, type Profile } from "@/lib/database";
+import { virtualTryOn, fileToBase64, urlToBase64, getOutfitRecommendation } from "@/lib/ai-service";
 
 const occasions = [
   { label: "Date Night", icon: Heart, color: "bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400" },
@@ -36,88 +37,7 @@ type OutfitRecommendation = {
   items: ClothingItem[];
   tip: string;
   reasoning: string[];
-};
-
-/* ------------------------------------------------------------------ */
-/*  Simple outfit recommendation logic                                 */
-/* ------------------------------------------------------------------ */
-const occasionKeywords: Record<string, string[]> = {
-  "Date Night": ["formal", "date", "elegant", "evening", "dress"],
-  Office: ["office", "work", "formal", "smart-casual", "professional"],
-  Casual: ["casual", "everyday", "relaxed", "weekend"],
-  Party: ["party", "evening", "festive", "glam"],
-  Workout: ["workout", "athletic", "gym", "sport", "activewear"],
-  Formal: ["formal", "wedding", "ceremony", "suit", "gala"],
-};
-
-const tips: Record<string, string> = {
-  "Date Night": "Keep it classy with a polished look. Minimal accessories add elegance.",
-  Office: "Smart casual balances professionalism with comfort. Layer for versatility.",
-  Casual: "Comfort is key  -  classic combos never go out of style.",
-  Party: "Go bold with colors or statement pieces. Confidence is your best accessory.",
-  Workout: "Prioritize breathable, stretchy fabrics for maximum performance.",
-  Formal: "Clean lines and well-fitted pieces create a commanding presence.",
-};
-
-const generateRecommendation = (
-  occasion: string,
-  items: ClothingItem[]
-): OutfitRecommendation | null => {
-  if (items.length === 0) return null;
-
-  const keywords = occasionKeywords[occasion] || ["casual"];
-
-  const scored = items.map((item) => {
-    let score = 0;
-    const itemTags = item.tags.map((t) => t.toLowerCase());
-    const itemName = item.name.toLowerCase();
-    const itemCat = item.category.toLowerCase();
-
-    for (const kw of keywords) {
-      if (itemTags.includes(kw)) score += 3;
-      if (itemName.includes(kw)) score += 2;
-      if (itemCat.includes(kw)) score += 1;
-    }
-    return { item, score };
-  });
-
-  scored.sort((a, b) => b.score - a.score);
-
-  const picked: ClothingItem[] = [];
-  const usedCategories = new Set<string>();
-
-  for (const { item } of scored) {
-    if (picked.length >= 3) break;
-    if (!usedCategories.has(item.category)) {
-      picked.push(item);
-      usedCategories.add(item.category);
-    }
-  }
-
-  if (picked.length < 3) {
-    for (const { item } of scored) {
-      if (picked.length >= 3) break;
-      if (!picked.includes(item)) picked.push(item);
-    }
-  }
-
-  if (picked.length === 0) return null;
-
-  const reasoning = picked.map((item) => {
-    const reasons: string[] = [];
-    const matchedTags = item.tags.filter(t => keywords.includes(t.toLowerCase()));
-    if (matchedTags.length > 0) reasons.push("tags match \"" + occasion + "\" (" + matchedTags.join(", ") + ")");
-    if (item.category) reasons.push("adds " + item.category.toLowerCase() + " to the outfit");
-    if (item.color) reasons.push(item.color.toLowerCase() + " works well for this occasion");
-    return item.name + ": " + (reasons.length > 0 ? reasons.join(", ") : "versatile piece that completes the look");
-  });
-
-  return {
-    occasion,
-    items: picked,
-    tip: tips[occasion] || "Mix and match from your closet for a personalized look.",
-    reasoning,
-  };
+  missing: string | null;
 };
 
 /* ------------------------------------------------------------------ */
@@ -139,14 +59,15 @@ const TryOnModal = ({ isOpen, onClose, closetItems, userId }: TryOnModalProps) =
   const [resultImage, setResultImage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Auto-load face + body images from profile when modal opens
+  // Auto-load full-body image from profile when modal opens
   useEffect(() => {
     if (!isOpen || !userId) return;
-    const loadProfilePhotos = async () => {
+    const loadProfilePhoto = async () => {
       setStep("loading");
       try {
         const profile = await getProfile(userId);
         const bodyUrl = profile?.body_image_url;
+
         if (bodyUrl) {
           setPersonPhoto(bodyUrl);
           const bodyB64 = await urlToBase64(bodyUrl);
@@ -156,11 +77,11 @@ const TryOnModal = ({ isOpen, onClose, closetItems, userId }: TryOnModalProps) =
           setStep("no-photo");
         }
       } catch (err) {
-        console.error("Failed to load profile photos:", err);
+        console.error("Failed to load profile photo:", err);
         setStep("no-photo");
       }
     };
-    loadProfilePhotos();
+    loadProfilePhoto();
   }, [isOpen, userId]);
 
   const handleTryOn = async () => {
@@ -179,7 +100,7 @@ const TryOnModal = ({ isOpen, onClose, closetItems, userId }: TryOnModalProps) =
         return;
       }
 
-      // Pass both body + face images for maximum precision
+      // Pass body image for virtual try-on
       const results = await virtualTryOn(bodyPhotoBase64, productBase64, 1);
 
       if (results.length > 0) {
@@ -259,7 +180,7 @@ const TryOnModal = ({ isOpen, onClose, closetItems, userId }: TryOnModalProps) =
               </div>
             )}
 
-            {/* No profile photo  -  redirect to Profile */}
+            {/* No profile photo — redirect to Profile */}
             {step === "no-photo" && (
               <div className="mt-6 flex flex-col items-center text-center">
                 <div className="flex h-16 w-16 items-center justify-center rounded-full bg-card">
@@ -269,7 +190,7 @@ const TryOnModal = ({ isOpen, onClose, closetItems, userId }: TryOnModalProps) =
                   Full-body photo needed
                 </h3>
                 <p className="mt-1.5 text-sm font-body text-muted-foreground">
-                  Upload your face photo and full-body photo in your Profile to use Virtual Try-On. This only needs to be done once  -  your photos are used to generate precise, realistic try-on images.
+                  Upload a full-body photo in your Profile to use Virtual Try-On. This only needs to be done once — your photo is used to generate realistic try-on images.
                 </p>
                 <button
                   onClick={() => {
@@ -362,10 +283,10 @@ const TryOnModal = ({ isOpen, onClose, closetItems, userId }: TryOnModalProps) =
                   Try It On
                 </motion.button>
               </div>
-            )}
+            }
 
             {/* Step 3: Generating */}
-            {step === "generating" && (
+            { step === "generating" && (
               <div className="mt-8 flex flex-col items-center py-8">
                 <div className="relative">
                   <Loader2 className="h-10 w-10 animate-spin text-ai" />
@@ -386,7 +307,7 @@ const TryOnModal = ({ isOpen, onClose, closetItems, userId }: TryOnModalProps) =
                   </div>
                 </div>
               </div>
-            )}
+            }
 
             {/* Step 4: Result */}
             {step === "result" && resultImage && (
@@ -395,13 +316,13 @@ const TryOnModal = ({ isOpen, onClose, closetItems, userId }: TryOnModalProps) =
                   <img
                     src={resultImage}
                     alt="Virtual Try-On Result"
-                    className="w-full object-contain"
+                    className="aw-full object-contain"
                   />
                 </div>
                 <div className="mt-3 flex items-center gap-2 rounded-xl bg-ai/10 px-4 py-2.5">
                   <Sparkles className="h-4 w-4 text-ai" />
                   <span className="text-xs font-body text-ai font-medium">
-                    AI-generated preview  -  {selectedItem?.name}
+                    AI-generated preview — {selectedItem?.name}
                   </span>
                 </div>
                 <div className="mt-4 flex gap-2">
@@ -423,60 +344,106 @@ const TryOnModal = ({ isOpen, onClose, closetItems, userId }: TryOnModalProps) =
                   </button>
                 </div>
               </div>
-            )}
-          </motion.div>
+            }
         </motion.div>
-      )}
-    </AnimatePresence>
-  );
-};
+      </motion.div>
+    )
+  };
+}
 
-/* ------------------------------------------------------------------ */
-/*  AI Stylist component                                               */
+/* ------------------------------------------------------------------- */
+/*  AI Stylist component                                                */
 /* ------------------------------------------------------------------ */
 const AiStylist = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [closetItems, setClosetItems] = useState<ClothingItem[]>([]);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedOccasion, setSelectedOccasion] = useState<string | null>(null);
   const [prompt, setPrompt] = useState("");
   const [recommendation, setRecommendation] = useState<OutfitRecommendation | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
   const [showTryOn, setShowTryOn] = useState(false);
 
   useEffect(() => {
     if (!user) return;
     const load = async () => {
-      const items = await getClosetItems(user.id);
+      const [items, prof] = await Promise.all([
+        getClosetItems(user.id),
+        getProfile(user.id),
+      ]);
       setClosetItems(items);
+      setProfile(prof);
       setLoading(false);
     };
     load();
   }, [user]);
 
-  const handleOccasionSelect = (label: string) => {
-    setSelectedOccasion(label);
+  const fetchRecommendation = async (occasion: string) => {
+    setSelectedOccasion(occasion);
     setGenerating(true);
+    setAiError(null);
+    setRecommendation(null);
 
-    setTimeout(() => {
-      const rec = generateRecommendation(label, closetItems);
-      setRecommendation(rec);
+    try {
+      const result = await getOutfitRecommendation({
+        occasion,
+        items: closetItems.map((item) => ({
+          id: item.id,
+          name: item.name,
+          category: item.category,
+          color: item.color,
+          tags: item.tags,
+          material: item.material,
+          gender: item.gender,
+          image_url: item.image_url,
+        })),
+        profile: profile?.personalization
+          ? {
+              body_type: profile.body_type,
+              skin_tone: profile.skin_tone,
+              model_gender: profile.model_gender,
+            }
+          : undefined,
+      });
+
+      if (result.success) {
+        // Map item_ids back to full ClothingItem objects
+        const pickedItems = result.item_ids
+          .map((id) => closetItems.find((item) => item.id === id))
+          .filter(Boolean) as ClothingItem[];
+
+        const reasoning = result.reasoning.map((r) => {
+          const item = closetItems.find((i) => i.id === r.id);
+          return `${item?.name || "Item"}: ${r.reason}`;
+        });
+
+        setRecommendation({
+          occasion,
+          items: pickedItems,
+          tip: result.tip,
+          reasoning,
+          missing: result.missing,
+        });
+      } else {
+        setAiError(result.error);
+      }
+    } catch {
+      setAiError("Something went wrong. Please try again.");
+    } finally {
       setGenerating(false);
-    }, 600);
+    }
+  };
+
+  const handleOccasionSelect = (label: string) => {
+    fetchRecommendation(label);
   };
 
   const handleSubmitPrompt = () => {
     if (prompt.trim()) {
-      setSelectedOccasion(prompt.trim());
-      setGenerating(true);
-
-      setTimeout(() => {
-        const rec = generateRecommendation("Casual", closetItems);
-        if (rec) rec.occasion = prompt.trim();
-        setRecommendation(rec);
-        setGenerating(false);
-      }, 600);
+      fetchRecommendation(prompt.trim());
       setPrompt("");
     }
   };
@@ -588,8 +555,24 @@ const AiStylist = () => {
         <div className="mt-8 flex flex-col items-center">
           <Loader2 className="h-6 w-6 animate-spin text-ai" />
           <p className="mt-2 text-sm font-body text-muted-foreground">
-            Picking the best outfit for you...
+            AI is styling your outfit...
           </p>
+          <p className="mt-1 text-[11px] font-body text-muted-foreground/60">
+            Powered by Gemini
+          </p>
+        </div>
+      )}
+
+      {/* AI Error */}
+      {!generating && aiError && (
+        <div className="mt-6 flex items-start gap-3 rounded-2xl bg-red-500/10 p-4">
+          <AlertTriangle className="h-5 w-5 shrink-0 text-red-500 mt-0.5" />
+          <div>
+            <p className="text-sm font-body font-medium text-red-600 dark:text-red-400">
+              Couldn't generate recommendation
+            </p>
+            <p className="mt-0.5 text-xs font-body text-red-500/80">{aiError}</p>
+          </div>
         </div>
       )}
 
@@ -659,8 +642,9 @@ const AiStylist = () => {
               </p>
             </div>
 
+            {/* AI Reasoning */}
             {recommendation.reasoning && recommendation.reasoning.length > 0 && (
-              <div className="border-t border-border/50 px-4 py-3">
+              <div className="mt-3 rounded-2xl border border-border/50 px-4 py-3">
                 <p className="text-xs font-body text-ai font-medium flex items-center gap-1">
                   <Sparkles className="h-3 w-3 inline" />
                   Why these picks
@@ -672,6 +656,19 @@ const AiStylist = () => {
                     </p>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* Missing items suggestion */}
+            {recommendation.missing && (
+              <div className="mt-3 rounded-2xl bg-amber-500/10 px-4 py-3">
+                <p className="text-xs font-body font-medium text-amber-700 dark:text-amber-400 flex items-center gap-1">
+                  <AlertTriangle className="h-3 w-3 inline" />
+                  What's missing
+                </p>
+                <p className="mt-1 text-[11px] font-body text-amber-600/80 dark:text-amber-400/80">
+                  {recommendation.missing}
+                </p>
               </div>
             )}
           </motion.div>
