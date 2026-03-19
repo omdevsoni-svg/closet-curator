@@ -111,7 +111,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const project = "fynd-jio-impetus-non-prod";
     const region = "us-central1";
-    const model = "gemini-2.0-flash";
+    const model = "gemini-2.5-flash-image";
     const url = `https://${region}-aiplatform.googleapis.com/v1/projects/${project}/locations/${region}/publishers/google/models/${model}:generateContent`;
 
     // Build the parts array with all reference images + prompt
@@ -137,7 +137,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       body: JSON.stringify({
         contents: [{ role: "user", parts }],
         generationConfig: {
-          temperature: 0.4,
+          temperature: 0.5,
           maxOutputTokens: 8192,
           responseModalities: ["TEXT", "IMAGE"],
         },
