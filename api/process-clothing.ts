@@ -184,7 +184,63 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Remove brand — this should be user-provided only
     delete attrs.brand;
 
-    return res.status(200).json({ success: true, attributes: attrs });
+    // Ghost mannequin extraction using gemini-2.5-flash-image
+    let enhancedImage = null;
+    let enhanceDebug = "";
+    try {
+      const cat = attrs.category || "garment";
+      const enhancePrompt = "Extract the COMPLETE " + cat + " from this image. Remove the person/model/mannequin body COMPLETELY - show ONLY the clothing as a ghost mannequin / flat lay product photo. WHAT TO REMOVE: The human model body, face, hands, feet, skin - ALL of it. Any mannequin body. Background, props. WHAT TO KEEP: ONLY the fabric/clothing itself. Every garment detail: exact color, pattern, fabric texture, buttons, embroidery, logos, collar, sleeves, stitching. Output: One clean product photo on a white background. NO person visible.";
+
+      const enhanceModel = "gemini-2.5-flash-image";
+      const enhanceUrl = "https://" + region + "-aiplatform.googleapis.com/v1/projects/" + project + "/locations/" + region + "/publishers/google/models/" + enhanceModel + ":generateContent";
+
+      const enhanceRes = await fetch(enhanceUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + accessToken,
+        },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [
+            { inlineData: { mimeType, data: imageBase64 } },
+            { text: enhancePrompt },
+          ]}],
+          generationConfig: {
+            temperature: 0.5,
+            maxOutputTokens: 8192,
+            responseModalities: ["TEXT", "IMAGE"],
+          },
+        }),
+      });
+
+      if (enhanceRes.ok) {
+        const enhanceData = await enhanceRes.json();
+        const eCandidates = enhanceData?.candidates || [];
+        for (const candidate of eCandidates) {
+          const eParts = candidate?.content?.parts || [];
+          for (const part of eParts) {
+            if (part.inlineData) {
+              enhancedImage = { mimeType: part.inlineData.mimeType, base64: part.inlineData.data };
+              break;
+            }
+          }
+          if (enhancedImage) break;
+        }
+        if (!enhancedImage) enhanceDebug = "ok_response_but_no_image";
+      } else {
+        const errBody = await enhanceRes.text().catch(() => "");
+        enhanceDebug = "HTTP " + enhanceRes.status + ": " + errBody.substring(0, 300);
+      }
+    } catch (enhErr) {
+      enhanceDebug = "Exception: " + String(enhErr).substring(0, 200);
+    }
+
+    return res.status(200).json({
+      success: true,
+      attributes: attrs,
+      ...(enhancedImage ? { enhancedImage } : {}),
+      _enhanceDebug: enhanceDebug || (enhancedImage ? "ok" : "unknown"),
+    });
   } catch (err: any) {
     console.error("process-clothing error:", err);
     return res.status(500).json({ success: false, error: err.message || "Internal server error" });
