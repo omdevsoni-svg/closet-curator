@@ -113,19 +113,34 @@ const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => 
     setAiError(false);
     try {
       const base64 = await fileToBase64(processedFile);
-      const attrs = await detectClothingAttributes(
+      const result = await detectClothingAttributes(
         base64,
         processedFile.type || "image/jpeg"
       );
-      if (attrs) {
+      if (result.success && "attributes" in result) {
+        const attrs = result.attributes;
         if (attrs.name) setItemName(attrs.name);
         if (attrs.category) setCategory(attrs.category);
         if (attrs.color) setColor(attrs.color);
         if (attrs.gender) setGender(attrs.gender as "women" | "men" | "unisex");
-        // Brand is intentionally NOT set by AI Ã¢ÂÂ user must enter it manually
         if (attrs.material) setMaterial(attrs.material);
         if (attrs.tags?.length) setTags(attrs.tags.join(", "));
+
+        // Use AI-enhanced catalog image if available
+        if (result.enhancedImage) {
+          const eUrl = "data:" + result.enhancedImage.mimeType + ";base64," + result.enhancedImage.base64;
+          const resp2 = await fetch(eUrl);
+          const blob2 = await resp2.blob();
+          const enhancedFile = new File([blob2], "enhanced.png", { type: result.enhancedImage.mimeType });
+          setImageFile(enhancedFile);
+          setImagePreview(eUrl);
+        }
+
         setAiDetected(true);
+      } else if ("is_garment" in result && result.is_garment === false) {
+        setAiRejection(result.rejection_reason);
+        setImageFile(null);
+        setImagePreview(null);
       } else {
         setAiError(true);
       }
