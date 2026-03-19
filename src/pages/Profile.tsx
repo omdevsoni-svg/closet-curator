@@ -285,7 +285,7 @@ const Profile = () => {
         transition={{ delay: 0.15 }}
         className="mt-4 rounded-2xl bg-card p-5"
       >
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-4 py-2">
           <div className="flex items-center gap-2">
             <User className="h-4 w-4 text-muted-foreground" />
             <div>
@@ -495,7 +495,7 @@ const Profile = () => {
           <Bell className="h-4 w-4 text-muted-foreground" />
           <h3 className="text-sm font-display font-semibold text-foreground">Notifications</h3>
         </div>
-        <div className="mt-3 space-y-3">
+        <div className="mt-3 divide-y divide-border/50">
           <ToggleRow
             label="Outfit suggestions"
             desc="Get notified for new outfit ideas"
@@ -583,18 +583,18 @@ const ToggleRow = ({
   onChange: (v: boolean) => void;
 }) => (
   <div className="flex items-center justify-between">
-    <div>
+    <div className="flex-1 min-w-0">
       <p className="text-sm font-body font-medium text-foreground">{label}</p>
       <p className="text-xs font-body text-muted-foreground">{desc}</p>
     </div>
     <button
       onClick={() => onChange(!value)}
-      className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
-        value ? "bg-primary" : "bg-border"
+      className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${
+        value ? "bg-ai" : "bg-border"
       }`}
     >
       <span
-        className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+        className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow-sm transition-transform ${
           value ? "translate-x-5" : "translate-x-0.5"
         }`}
       />
