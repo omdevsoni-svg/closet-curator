@@ -52,7 +52,7 @@ const occasionKeywords: Record<string, string[]> = {
 const tips: Record<string, string> = {
   "Date Night": "Keep it classy with a polished look. Minimal accessories add elegance.",
   Office: "Smart casual balances professionalism with comfort. Layer for versatility.",
-  Casual: "Comfort is key Ã¢ÂÂ classic combos never go out of style.",
+  Casual: "Comfort is key  -  classic combos never go out of style.",
   Party: "Go bold with colors or statement pieces. Confidence is your best accessory.",
   Workout: "Prioritize breathable, stretchy fabrics for maximum performance.",
   Formal: "Clean lines and well-fitted pieces create a commanding presence.",
@@ -248,7 +248,7 @@ const TryOnModal = ({ isOpen, onClose, closetItems, userId }: TryOnModalProps) =
               </div>
             )}
 
-            {/* No profile photo â redirect to Profile */}
+            {/* No profile photo  -  redirect to Profile */}
             {step === "no-photo" && (
               <div className="mt-6 flex flex-col items-center text-center">
                 <div className="flex h-16 w-16 items-center justify-center rounded-full bg-card">
@@ -258,7 +258,7 @@ const TryOnModal = ({ isOpen, onClose, closetItems, userId }: TryOnModalProps) =
                   Full-body photo needed
                 </h3>
                 <p className="mt-1.5 text-sm font-body text-muted-foreground">
-                  Upload your face photo and full-body photo in your Profile to use Virtual Try-On. This only needs to be done once — your photos are used to generate precise, realistic try-on images.
+                  Upload your face photo and full-body photo in your Profile to use Virtual Try-On. This only needs to be done once  -  your photos are used to generate precise, realistic try-on images.
                 </p>
                 <button
                   onClick={() => {
@@ -390,7 +390,7 @@ const TryOnModal = ({ isOpen, onClose, closetItems, userId }: TryOnModalProps) =
                 <div className="mt-3 flex items-center gap-2 rounded-xl bg-ai/10 px-4 py-2.5">
                   <Sparkles className="h-4 w-4 text-ai" />
                   <span className="text-xs font-body text-ai font-medium">
-                    AI-generated preview Ã¢ÂÂ {selectedItem?.name}
+                    AI-generated preview  -  {selectedItem?.name}
                   </span>
                 </div>
                 <div className="mt-4 flex gap-2">
