@@ -227,7 +227,6 @@ const Profile = () => {
     profile?.name || user?.user_metadata?.name || "Style Enthusiast";
 
   // Decide which image src to show (local preview during upload, or saved URL)
-  const faceImageSrc = facePreview || facePhoto;
   const bodyImageSrc = bodyPreview || bodyPhoto;
 
   if (loading) {
