@@ -308,7 +308,7 @@ const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => 
               >
                 <Sparkles className="h-4 w-4 text-green-600 dark:text-green-400" />
                 <span className="text-xs font-body text-green-700 dark:text-green-400 font-medium">
-                  AI auto-filled details ÃÂ¢ÃÂÃÂ review and adjust below
+                  AI auto-filled details - review and adjust below
                 </span>
               </motion.div>
             )}
