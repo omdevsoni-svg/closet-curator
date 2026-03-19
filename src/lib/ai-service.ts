@@ -4,7 +4,7 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 /* ------------------------------------------------------------------ */
-/*  Helper: convert File â base64 string (no data: prefix)            */
+/*  Helper: convert File → base64 string (no data: prefix)            */
 /* ------------------------------------------------------------------ */
 export const fileToBase64 = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -19,7 +19,7 @@ export const fileToBase64 = (file: File): Promise<string> =>
   });
 
 /* ------------------------------------------------------------------ */
-/*  Helper: convert image URL â base64 string                         */
+/*  Helper: convert image URL → base64 string                         */
 /* ------------------------------------------------------------------ */
 export const urlToBase64 = async (url: string): Promise<string> => {
   const res = await fetch(url);
@@ -28,7 +28,7 @@ export const urlToBase64 = async (url: string): Promise<string> => {
 };
 
 /* ------------------------------------------------------------------ */
-/*  AI Attribute Detection â calls Gemini API directly                 */
+/*  AI Attribute Detection — calls Gemini API directly                 */
 /* ------------------------------------------------------------------ */
 export interface DetectedAttributes {
   name: string;
@@ -77,7 +77,7 @@ export const detectClothingAttributes = async (
 };
 
 /* ------------------------------------------------------------------ */
-/*  Virtual Try-On â calls virtual-tryon Edge Function                 */
+/*  Virtual Try-On — calls Vercel serverless function with face + body */
 /* ------------------------------------------------------------------ */
 export interface TryOnResult {
   mimeType: string;
@@ -110,6 +110,64 @@ export const virtualTryOn = async (
   } catch (err) {
     console.error("virtualTryOn error:", err);
     return [];
+  }
+};
+
+/* ------------------------------------------------------------------ */
+/*  AI Outfit Recommendation — calls Gemini via serverless function    */
+/* ------------------------------------------------------------------ */
+
+export interface RecommendationRequest {
+  occasion: string;
+  items: {
+    id: string;
+    name: string;
+    category: string;
+    color: string;
+    tags: string[];
+    material?: string;
+    gender: string;
+    image_url: string;
+  }[];
+  profile?: {
+    body_type?: string;
+    skin_tone?: string;
+    model_gender?: string;
+  };
+  weather?: {
+    temp: number;
+    condition: string;
+    humidity: number;
+    windSpeed: number;
+  };
+}
+
+export interface RecommendationResponse {
+  success: true;
+  item_ids: string[];
+  tip: string;
+  reasoning: { id: string; reason: string }[];
+  missing: string | null;
+}
+
+export const getOutfitRecommendation = async (
+  request: RecommendationRequest
+): Promise<RecommendationResponse | { success: false; error: string }> => {
+  try {
+    const res = await fetch("/api/outfit-recommendation", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request),
+    });
+
+    const data = await res.json();
+    if (data.success) {
+      return data as RecommendationResponse;
+    }
+    return { success: false, error: data.error || "Recommendation failed" };
+  } catch (err) {
+    console.error("getOutfitRecommendation error:", err);
+    return { success: false, error: "Network error during recommendation" };
   }
 };
 
