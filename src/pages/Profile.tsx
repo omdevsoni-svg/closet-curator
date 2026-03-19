@@ -352,6 +352,15 @@ const Profile = () => {
               </label>
             </div>
           </div>
+                  <ToggleRow
+            label="Personalization"
+            desc="Allow AI to learn your style preferences"
+            value={personalization}
+            onChange={(v) => {
+              setPersonalization(v);
+              savePreferences({ personalization: v });
+            }}
+          />
         </div>
       </motion.div>
 
@@ -493,7 +502,7 @@ const Profile = () => {
       >
         <div className="flex items-center gap-2">
           <Bell className="h-4 w-4 text-muted-foreground" />
-          <h3 className="text-sm font-display font-semibold text-foreground">Notifications</h3>
+          <h3 className="text-sm font-display font-semibold text-foreground">Preferences</h3>
         </div>
         <div className="mt-3 divide-y divide-border/50">
           <ToggleRow
@@ -517,29 +526,7 @@ const Profile = () => {
         </div>
       </motion.div>
 
-      {/* Privacy */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.35 }}
-        className="mt-4 rounded-2xl bg-card p-5"
-      >
-        <div className="flex items-center gap-2">
-          <Shield className="h-4 w-4 text-muted-foreground" />
-          <h3 className="text-sm font-display font-semibold text-foreground">Privacy</h3>
-        </div>
-        <div className="mt-3">
-          <ToggleRow
-            label="Personalization"
-            desc="Allow AI to learn preferences"
-            value={personalization}
-            onChange={(v) => {
-              setPersonalization(v);
-              savePreferences({ personalization: v });
-            }}
-          />
-        </div>
-      </motion.div>
+      
 
       {/* Danger zone */}
       <motion.button
