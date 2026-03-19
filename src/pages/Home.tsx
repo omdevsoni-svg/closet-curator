@@ -35,8 +35,8 @@ interface WeatherData {
 
 const weatherTips: Record<string, string> = {
   hot: "Opt for light fabrics, breathable cotton, and open footwear.",
-  warm: "Go with light layers — a tee with optional light jacket works great.",
-  mild: "Perfect layering weather — try a shirt with a light blazer.",
+  warm: "Go with light layers  -  a tee with optional light jacket works great.",
+  mild: "Perfect layering weather  -  try a shirt with a light blazer.",
   cool: "Add a structured jacket or sweater over your outfit.",
   cold: "Bundle up with coats, scarves, and warm boots.",
 };
@@ -89,7 +89,7 @@ const useWeather = (): WeatherData | null => {
           humidity: current.relative_humidity_2m,
           windSpeed: Math.round(current.wind_speed_10m),
           city,
-          icon: current.weather_code <= 1 ? "☀️" : current.weather_code <= 3 ? "⛅" : "🌧️",
+          icon: current.weather_code <= 1 ? " - " : current.weather_code <= 3 ? " - " : " - ",
           tip: weatherTips[cat],
         });
       } catch {
@@ -99,7 +99,7 @@ const useWeather = (): WeatherData | null => {
           humidity: 65,
           windSpeed: 12,
           city: "Your Location",
-          icon: "⛅",
+          icon: " - ",
           tip: weatherTips.warm,
         });
       }
@@ -130,7 +130,7 @@ const useWeather = (): WeatherData | null => {
             humidity: 65,
             windSpeed: 12,
             city: "Your Location",
-            icon: "⛅",
+            icon: " - ",
             tip: weatherTips.warm,
           });
         }
@@ -248,7 +248,7 @@ const Home = () => {
         >
           <Shirt className="h-5 w-5 text-ai" />
           <span className="mt-1.5 text-xl font-display font-bold text-foreground">
-            {loadingStats ? "—" : stats.totalItems}
+            {loadingStats ? " - " : stats.totalItems}
           </span>
           <span className="text-[10px] font-body text-muted-foreground">Total Items</span>
         </motion.div>
@@ -260,7 +260,7 @@ const Home = () => {
         >
           <Heart className="h-5 w-5 text-rose-500" />
           <span className="mt-1.5 text-xl font-display font-bold text-foreground">
-            {loadingStats ? "—" : stats.favorites}
+            {loadingStats ? " - " : stats.favorites}
           </span>
           <span className="text-[10px] font-body text-muted-foreground">Favorites</span>
         </motion.div>
@@ -272,7 +272,7 @@ const Home = () => {
         >
           <Star className="h-5 w-5 text-amber-500" />
           <span className="mt-1.5 text-xl font-display font-bold text-foreground">
-            {loadingStats ? "—" : stats.styleScore || "—"}
+            {loadingStats ? " - " : stats.styleScore || " - "}
           </span>
           <span className="text-[10px] font-body text-muted-foreground">Style Score</span>
         </motion.div>
@@ -327,10 +327,10 @@ const Home = () => {
                 <span className="text-3xl font-emoji">{weather.icon}</span>
                 <div>
                   <span className="text-2xl font-display font-bold text-foreground">
-                    {weather.temp}°C
+                    {weather.temp} - C
                   </span>
                   <p className="text-xs font-body text-muted-foreground">
-                    {weather.condition} · {weather.city}
+                    {weather.condition}  -  {weather.city}
                   </p>
                 </div>
               </div>
