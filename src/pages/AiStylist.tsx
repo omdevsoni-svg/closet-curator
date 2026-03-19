@@ -124,7 +124,6 @@ const TryOnModal = ({ isOpen, onClose, closetItems, userId }: TryOnModalProps) =
   const [step, setStep] = useState<"loading" | "no-photo" | "select" | "generating" | "result">("loading");
   const [personPhoto, setPersonPhoto] = useState<string | null>(null);
   const [bodyPhotoBase64, setBodyPhotoBase64] = useState<string | null>(null);
-  const [facePhotoBase64, setFacePhotoBase64] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<ClothingItem | null>(null);
   const [resultImage, setResultImage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -137,23 +136,10 @@ const TryOnModal = ({ isOpen, onClose, closetItems, userId }: TryOnModalProps) =
       try {
         const profile = await getProfile(userId);
         const bodyUrl = profile?.body_image_url;
-        const faceUrl = profile?.face_image_url;
-
         if (bodyUrl) {
           setPersonPhoto(bodyUrl);
           const bodyB64 = await urlToBase64(bodyUrl);
           setBodyPhotoBase64(bodyB64);
-
-          // Also load face image if available (for facial precision)
-          if (faceUrl) {
-            try {
-              const faceB64 = await urlToBase64(faceUrl);
-              setFacePhotoBase64(faceB64);
-            } catch (e) {
-              console.warn("Could not load face image, proceeding with body only:", e);
-            }
-          }
-
           setStep("select");
         } else {
           setStep("no-photo");
@@ -183,7 +169,7 @@ const TryOnModal = ({ isOpen, onClose, closetItems, userId }: TryOnModalProps) =
       }
 
       // Pass both body + face images for maximum precision
-      const results = await virtualTryOn(bodyPhotoBase64, productBase64, 1, facePhotoBase64 || undefined);
+      const results = await virtualTryOn(bodyPhotoBase64, productBase64, 1);
 
       if (results.length > 0) {
         setResultImage(`data:${results[0].mimeType};base64,${results[0].base64}`);
@@ -269,7 +255,7 @@ const TryOnModal = ({ isOpen, onClose, closetItems, userId }: TryOnModalProps) =
                   <Camera className="h-8 w-8 text-muted-foreground/40" />
                 </div>
                 <h3 className="mt-4 text-base font-display font-semibold text-foreground">
-                  Profile photos needed
+                  Full-body photo needed
                 </h3>
                 <p className="mt-1.5 text-sm font-body text-muted-foreground">
                   Upload your face photo and full-body photo in your Profile to use Virtual Try-On. This only needs to be done once — your photos are used to generate precise, realistic try-on images.
