@@ -523,6 +523,15 @@ const Profile = () => {
               savePreferences({ notif_gaps: v });
             }}
           />
+          <ToggleRow
+            label="Personalization"
+            desc="Allow AI to learn your style"
+            value={personalization}
+            onChange={(v) => {
+              setPersonalization(v);
+              savePreferences({ personalization: v });
+            }}
+          />
         </div>
       </motion.div>
 
