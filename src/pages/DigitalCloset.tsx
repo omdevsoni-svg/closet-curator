@@ -28,7 +28,7 @@ import {
   uploadImage,
   type ClothingItem,
 } from "@/lib/database";
-import { detectClothingAttributes, fileToBase64 } from "@/lib/ai-service";
+import { detectClothingAttributes, fileToBase64, type DetectionResult } from "@/lib/ai-service";
 import heic2any from "heic2any";
 
 /* ------------------------------------------------------------------ */
@@ -75,6 +75,7 @@ const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => 
   const [aiDetecting, setAiDetecting] = useState(false);
   const [aiDetected, setAiDetected] = useState(false);
   const [aiError, setAiError] = useState(false);
+  const [aiRejection, setAiRejection] = useState<string | null>(null);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -151,6 +152,7 @@ const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => 
     setAiDetecting(false);
     setAiDetected(false);
     setAiError(false);
+    setAiRejection(null);
   };
 
   // Close and reset ÃÂ¢ÃÂÃÂ prevents stale preview on reopen
