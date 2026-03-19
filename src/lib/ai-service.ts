@@ -39,12 +39,16 @@ export interface DetectedAttributes {
   gender: "men" | "women" | "unisex";
 }
 
+export type DetectionResult =
+  | { success: true; attributes: DetectedAttributes; enhancedImage?: { mimeType: string; base64: string } }
+  | { success: false; is_garment: false; rejection_reason: string }
+  | { success: false; error: string };
+
 export const detectClothingAttributes = async (
   imageBase64: string,
   mimeType = "image/jpeg"
-): Promise<DetectedAttributes | null> => {
+): Promise<DetectionResult> => {
   try {
-    // Call our Vercel serverless function (handles GCP auth + Vertex AI)
     const res = await fetch("/api/process-clothing", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -52,14 +56,23 @@ export const detectClothingAttributes = async (
     });
 
     const data = await res.json();
-    if (data.success && data.attributes) {
-      return data.attributes as DetectedAttributes;
+
+    // Non-garment image rejected
+    if (data.is_garment === false) {
+      return { success: false, is_garment: false, rejection_reason: data.rejection_reason };
     }
-    console.error("AI detection failed:", data.error);
-    return null;
+
+    if (data.success && data.attributes) {
+      return {
+        success: true,
+        attributes: data.attributes as DetectedAttributes,
+        ...(data.enhancedImage ? { enhancedImage: data.enhancedImage } : {}),
+      };
+    }
+    return { success: false, error: data.error || "AI detection failed" };
   } catch (err) {
     console.error("detectClothingAttributes error:", err);
-    return null;
+    return { success: false, error: "Network error during detection" };
   }
 };
 
