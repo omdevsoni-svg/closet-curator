@@ -54,7 +54,11 @@ async function getAccessToken(sa: ServiceAccountKey): Promise<string> {
 /*  Clothing analysis prompt                                           */
 /* ------------------------------------------------------------------ */
 
-const CLOTHING_PROMPT = `Analyze this clothing image and return a JSON object with these exact fields:
+const CLOTHING_PROMPT = `First, determine if this image contains a clothing item, garment, footwear, or fashion accessory. If the image does NOT contain any clothing/garment/footwear/accessory (e.g. it shows a person without focus on clothing, a random object, food, scenery, animal, etc.), return this exact JSON:
+{"is_garment": false, "rejection_reason": "Brief explanation of what was detected instead of a garment, and a tip like: Please upload a clear photo of a clothing item with good lighting against a plain background."}
+
+If the image DOES contain a valid clothing/garment item, analyze it and return a JSON object with these exact fields:
+- is_garment: true
 - name: a short descriptive name for the clothing item (e.g. "Blue Denim Jacket")
 - category: EXACTLY one of these values: "Tops", "Bottoms", "Dresses", "Outerwear", "Activewear", "Footwear", "Accessories"
 - color: EXACTLY one of these values: "Black", "White", "Navy", "Blue", "Red", "Green", "Beige", "Grey", "Pink", "Brown"
@@ -143,6 +147,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const attrs = JSON.parse(jsonMatch[0]);
+
+    // Check if the image is a valid garment
+    if (attrs.is_garment === false) {
+      return res.status(200).json({
+        success: false,
+        is_garment: false,
+        rejection_reason: attrs.rejection_reason || "This doesn't appear to be a clothing item. Please upload a clear photo of a garment with good lighting.",
+      });
+    }
 
     // Validate and normalize category (match exact dropdown values)
     const validCategories = ["Tops", "Bottoms", "Dresses", "Outerwear", "Activewear", "Footwear", "Accessories"];
