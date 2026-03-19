@@ -327,7 +327,7 @@ const Home = () => {
                 <span className="text-3xl font-emoji">{weather.icon}</span>
                 <div>
                   <span className="text-2xl font-display font-bold text-foreground">
-                    {weather.temp} - C
+                    {weather.temp}°C
                   </span>
                   <p className="text-xs font-body text-muted-foreground">
                     {weather.condition}  -  {weather.city}
