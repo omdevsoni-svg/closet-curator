@@ -170,7 +170,7 @@ const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => 
     setAiRejection(null);
   };
 
-  // Close and reset ÃÂ¢ÃÂÃÂ prevents stale preview on reopen
+  // Close and reset  -  prevents stale preview on reopen
   const handleClose = () => {
     resetForm();
     onClose();
@@ -320,7 +320,7 @@ const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => 
               >
                 <AlertCircle className="h-4 w-4 text-destructive" />
                 <span className="text-xs font-body text-destructive font-medium">
-                  AI detection unavailable ÃÂ¢ÃÂÃÂ please fill in details manually
+                  AI detection unavailable  -  please fill in details manually
                 </span>
               </motion.div>
             )}
@@ -468,7 +468,7 @@ const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => 
                 Purchase Price <span className="normal-case text-muted-foreground/60">(optional)</span>
               </label>
               <div className="relative mt-1.5">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">ÃÂ¢ÃÂÃÂ¹</span>
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground"> - </span>
                 <input
                   type="number"
                   value={price}
@@ -778,7 +778,7 @@ const DigitalCloset = () => {
                     </p>
                     {item.price && (
                       <p className="text-[10px] font-semibold text-ai font-body">
-                        ÃÂ¢ÃÂÃÂ¹{item.price.toLocaleString("en-IN")}
+                         - {item.price.toLocaleString("en-IN")}
                       </p>
                     )}
                   </div>
@@ -846,7 +846,7 @@ const DigitalCloset = () => {
         </div>
       )}
 
-      {/* Empty state ÃÂ¢ÃÂÃÂ no items at all */}
+      {/* Empty state  -  no items at all */}
       {!loadingItems && items.length === 0 && (
         <div className="mt-16 flex flex-col items-center text-center">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-card">
@@ -859,7 +859,7 @@ const DigitalCloset = () => {
         </div>
       )}
 
-      {/* Empty state ÃÂ¢ÃÂÃÂ no search results */}
+      {/* Empty state  -  no search results */}
       {!loadingItems && items.length > 0 && filtered.length === 0 && (
         <div className="mt-16 flex flex-col items-center text-center">
           <Search className="h-12 w-12 text-muted-foreground/30" />
