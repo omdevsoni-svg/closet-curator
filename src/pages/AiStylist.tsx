@@ -35,6 +35,7 @@ type OutfitRecommendation = {
   occasion: string;
   items: ClothingItem[];
   tip: string;
+  reasoning: string[];
 };
 
 /* ------------------------------------------------------------------ */
@@ -102,10 +103,20 @@ const generateRecommendation = (
 
   if (picked.length === 0) return null;
 
+  const reasoning = picked.map((item) => {
+    const reasons: string[] = [];
+    const matchedTags = item.tags.filter(t => keywords.includes(t.toLowerCase()));
+    if (matchedTags.length > 0) reasons.push("tags match \"" + occasion + "\" (" + matchedTags.join(", ") + ")");
+    if (item.category) reasons.push("adds " + item.category.toLowerCase() + " to the outfit");
+    if (item.color) reasons.push(item.color.toLowerCase() + " works well for this occasion");
+    return item.name + ": " + (reasons.length > 0 ? reasons.join(", ") : "versatile piece that completes the look");
+  });
+
   return {
     occasion,
     items: picked,
     tip: tips[occasion] || "Mix and match from your closet for a personalized look.",
+    reasoning,
   };
 };
 
@@ -647,6 +658,22 @@ const AiStylist = () => {
                 {recommendation.tip}
               </p>
             </div>
+
+            {recommendation.reasoning && recommendation.reasoning.length > 0 && (
+              <div className="border-t border-border/50 px-4 py-3">
+                <p className="text-xs font-body text-ai font-medium flex items-center gap-1">
+                  <Sparkles className="h-3 w-3 inline" />
+                  Why these picks
+                </p>
+                <div className="mt-1.5 space-y-1">
+                  {recommendation.reasoning.map((reason, i) => (
+                    <p key={i} className="text-[11px] font-body text-muted-foreground">
+                      {reason}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
