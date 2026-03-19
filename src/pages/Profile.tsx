@@ -86,7 +86,7 @@ const bodyTypeData: Record<string, BodyTypeInfo> = {
     tips: [
       "Highlight your natural waist with fitted pieces",
       "Wrap dresses and V-necks complement your shape",
-      "Balanced proportions work best — match volume top & bottom",
+      "Balanced proportions work best  -  match volume top & bottom",
     ],
     bestSilhouettes: ["wrap dresses", "fitted blazers", "A-line skirts", "V-necks"],
     stylesToAvoid: ["oversized tops", "shapeless dresses", "low-rise pants"],
