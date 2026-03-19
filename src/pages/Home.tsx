@@ -17,8 +17,9 @@ import {
   Loader2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useAuth } from "@/contexts/AuthContext";
-import { getClosetStats, getProfile } from "@/lib/database";
+import { useAuth } from "A/contexts/AuthContext";
+import { getClosetStats, getProfile, type ClothingItem, type Profile } from "A/lib/database";
+import { getOutfitRecommendation } from "@/lib/ai-service";
 
 /* ------------------------------------------------------------------ */
 /*  Weather hook                                                       */
@@ -35,8 +36,8 @@ interface WeatherData {
 
 const weatherTips: Record<string, string> = {
   hot: "Opt for light fabrics, breathable cotton, and open footwear.",
-  warm: "Go with light layers  -  a tee with optional light jacket works great.",
-  mild: "Perfect layering weather  -  try a shirt with a light blazer.",
+  warm: "Go with light layers — a tee with optional light jacket works great.",
+  mild: "Perfect layering weather — try a shirt with a light blazer.",
   cool: "Add a structured jacket or sweater over your outfit.",
   cold: "Bundle up with coats, scarves, and warm boots.",
 };
@@ -75,7 +76,7 @@ const useWeather = (): WeatherData | null => {
           city = geoData.city || geoData.locality || "Your Location";
         } catch {}
 
-        const res = await fetch(
+        const res = await fetch (
           `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&timezone=auto`
         );
         const data = await res.json();
@@ -89,7 +90,7 @@ const useWeather = (): WeatherData | null => {
           humidity: current.relative_humidity_2m,
           windSpeed: Math.round(current.wind_speed_10m),
           city,
-          icon: current.weather_code <= 1 ? " - " : current.weather_code <= 3 ? " - " : " - ",
+          icon: current.weather_code <= 1 ? "☀️" : current.weather_code <= 3 ? "⛅" : "🌧️",
           tip: weatherTips[cat],
         });
       } catch {
@@ -99,7 +100,7 @@ const useWeather = (): WeatherData | null => {
           humidity: 65,
           windSpeed: 12,
           city: "Your Location",
-          icon: " - ",
+          icon: "⛅",
           tip: weatherTips.warm,
         });
       }
@@ -130,7 +131,7 @@ const useWeather = (): WeatherData | null => {
             humidity: 65,
             windSpeed: 12,
             city: "Your Location",
-            icon: " - ",
+            icon: "⛅",
             tip: weatherTips.warm,
           });
         }
@@ -143,7 +144,7 @@ const useWeather = (): WeatherData | null => {
   return weather;
 };
 
-/* ------------------------------------------------------------------ */
+/* ----------------------------------------------------------------- */
 /*  Feature cards                                                      */
 /* ------------------------------------------------------------------ */
 const featureCards = [
@@ -186,14 +187,19 @@ const Home = () => {
   const [userName, setUserName] = useState("Style Enthusiast");
   const [stats, setStats] = useState({ totalItems: 0, favorites: 0, styleScore: 0, items: [] as any[] });
   const [loadingStats, setLoadingStats] = useState(true);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [weatherOutfit, setWeatherOutfit] = useState<ClothingItem[]>([]);
+  const [weatherTipAI, setWeatherTipAI] = useState<string | null>(null);
+  const [loadingWeatherOutfit, setLoadingWeatherOutfit] = useState(false);
 
   useEffect(() => {
     if (!user) return;
 
     const load = async () => {
       // Load profile name
-      const profile = await getProfile(user.id);
-      if (profile?.name) setUserName(profile.name);
+      const prof = await getProfile(user.id);
+      setProfile(prof);
+      if (prof?.name) setUserName(prof.name);
 
       // Load closet stats
       const s = await getClosetStats(user.id);
@@ -203,16 +209,70 @@ const Home = () => {
     load();
   }, [user]);
 
+  // Fetch AI weather-based outfit when weather + items are ready
+  useEffect(() => {
+    if (!weather || stats.items.length === 0 || loadingStats || loadingWeatherOutfit || weatherOutfit.length > 0) return;
+
+    const fetchWeatherOutfit = async () => {
+      setLoadingWeatherOutfit(true);
+      try {
+        const occasion = `Everyday outfit for ${weather.temp}°C ${weather.condition} weather`;
+        const result = await getOutfitRecommendation({
+          occasion,
+          items: stats.items.map((item: ClothingItem) => ({
+            id: item.id,
+            name: item.name,
+            category: item.category,
+            color: item.color,
+            tags: item.tags,
+            material: item.material,
+            gender: item.gender,
+            image_url: item.image_url,
+          })),
+          profile: profile?.personalization
+            ? {
+                body_type: profile.body_type,
+                skin_tone: profile.skin_tone,
+                model_gender: profile.model_gender,
+              }
+            : undefined,
+          weather: {
+            temp: weather.temp,
+            condition: weather.condition,
+            humidity: weather.humidity,
+            windSpeed: weather.windSpeed,
+          },
+        });
+
+        if (result.success) {
+          const picked = result.item_ids
+            .map((id) => stats.items.find((item: ClothingItem) => item.id === id))
+            .filter(Boolean) as ClothingItem[];
+          setWeatherOutfit(picked);
+          setWeatherTipAI(result.tip);
+        }
+      } catch {
+        // Silently fall back to default tip
+      } finally {
+        setLoadingWeatherOutfit(false);
+      }
+    };
+
+    fetchWeatherOutfit();
+  }, [weather, stats.items, loadingStats]);
+
   // First-time onboarding
   const [onboardStep, setOnboardStep] = useState(() => {
     if (localStorage.getItem("styleos_onboarded")) return -1;
     return 0;
   });
+
   const onboardSteps = [
     { title: "Add Your Wardrobe", desc: "Upload photos of your clothes. Our AI detects the type, color, and material automatically.", icon: Shirt },
     { title: "Get AI Outfit Picks", desc: "Tell the AI your occasion and get personalized outfit suggestions from your actual closet.", icon: Sparkles },
-    { title: "Track Closet Health", desc: "See what is missing, what you wear most, and get smart shopping suggestions.", icon: HeartPulse },
+    { title: "Track Closet Health", desc: "See what's missing, what you wear most, and get smart shopping suggestions.", icon: HeartPulse },
   ];
+
   const finishOnboarding = () => {
     localStorage.setItem("styleos_onboarded", "1");
     setOnboardStep(-1);
@@ -220,29 +280,49 @@ const Home = () => {
 
   return (
     <div className="px-5 pt-6 pb-4">
-      {/* Onboarding for first-time users */}
+      {/* Onboarding overlay for first-time users */}
       <AnimatePresence>
         {onboardStep >= 0 && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-            <motion.div key={onboardStep} initial={{ opacity: 0, y: 20, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -20 }}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          >
+            <motion.div
+              key={onboardStep}
+              initial={{ opacity: 0, y: 20, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20 }}
               transition={{ type: "spring", bounce: 0.2, duration: 0.5 }}
-              className="mx-6 w-full max-w-sm rounded-3xl bg-background p-8 text-center shadow-2xl">
+              className="mx-6 w-full max-w-sm rounded-3xl bg-background p-8 text-center shadow-2xl"
+            >
               <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-ai/10">
                 {(() => { const Icon = onboardSteps[onboardStep].icon; return <Icon className="h-8 w-8 text-ai" />; })()}
               </div>
-              <h2 className="mt-5 text-xl font-display font-bold text-foreground">{onboardSteps[onboardStep].title}</h2>
-              <p className="mt-2 text-sm font-body text-muted-foreground">{onboardSteps[onboardStep].desc}</p>
+              <h2 className="mt-5 text-xl font-display font-bold text-foreground">
+                {onboardSteps[onboardStep].title}
+              </h2>
+              <p className="mt-2 text-sm font-body text-muted-foreground">
+                {onboardSteps[onboardStep].desc}
+              </p>
+              {/* Step dots */}
               <div className="mt-6 flex justify-center gap-2">
                 {onboardSteps.map((_, i) => (
-                  <div key={i} className={"h-2 rounded-full transition-all " + (i === onboardStep ? "w-6 bg-ai" : "w-2 bg-border")} />
+                  <div key={i} className={`h-2 rounded-full transition-all ${i === onboardStep ? "w-6 bg-ai" : "w-2 bg-border"}`} />
                 ))}
               </div>
               <div className="mt-6 flex gap-3">
-                <button onClick={finishOnboarding} className="flex-1 rounded-xl py-3 text-sm font-body font-medium text-muted-foreground hover:text-foreground">Skip</button>
-                <button onClick={() => onboardStep < 2 ? setOnboardStep(onboardStep + 1) : finishOnboarding()}
-                  className="flex-1 rounded-xl bg-ai py-3 text-sm font-display font-semibold text-ai-foreground">
+                <button
+                  onClick={finishOnboarding}
+                  className="flex-1 rounded-xl py-3 text-sm font-body font-medium text-muted-foreground hover:text-foreground"
+                >
+                  Skip
+                </button>
+                <button
+                  onClick={() => onboardStep < 2 ? setOnboardStep(onboardStep + 1) : finishOnboarding()}
+                  className="flex-1 rounded-xl bg-ai py-3 text-sm font-display font-semibold text-ai-foreground"
+                >
                   {onboardStep < 2 ? "Next" : "Get Started"}
                 </button>
               </div>
@@ -272,13 +352,13 @@ const Home = () => {
             <div className="flex items-center gap-2">
               <Sparkles className="h-5 w-5" />
               <h2 className="text-lg font-display font-bold">
-                {stats.totalItems === 0 ? "Welcome, " + userName + "!" : "Hey, " + userName + "!"}
+                {stats.totalItems === 0 ? `Welcome, ${userName}!` : `Hey, ${userName}!`}
               </h2>
             </div>
             <p className="mt-1 text-sm font-body text-white/80">
               {stats.totalItems === 0
                 ? "Your AI stylist is ready. Add items to your closet and get personalized outfit suggestions."
-                : "You have " + stats.totalItems + " items in your closet. Get styled by AI or check your closet health."}
+                : `You have ${stats.totalItems} items in your closet. Get styled by AI or check your closet health.`}
             </p>
             <button
               onClick={() => navigate(stats.totalItems === 0 ? "/closet" : "/stylist")}
@@ -301,7 +381,7 @@ const Home = () => {
         >
           <Shirt className="h-5 w-5 text-ai" />
           <span className="mt-1.5 text-xl font-display font-bold text-foreground">
-            {loadingStats ? " - " : stats.totalItems}
+            {loadingStats ? "—" : stats.totalItems}
           </span>
           <span className="text-[10px] font-body text-muted-foreground">Total Items</span>
         </motion.div>
@@ -313,7 +393,7 @@ const Home = () => {
         >
           <Heart className="h-5 w-5 text-rose-500" />
           <span className="mt-1.5 text-xl font-display font-bold text-foreground">
-            {loadingStats ? " - " : stats.favorites}
+            {loadingStats ? "—" : stats.favorites}
           </span>
           <span className="text-[10px] font-body text-muted-foreground">Favorites</span>
         </motion.div>
@@ -325,7 +405,7 @@ const Home = () => {
         >
           <Star className="h-5 w-5 text-amber-500" />
           <span className="mt-1.5 text-xl font-display font-bold text-foreground">
-            {loadingStats ? " - " : stats.styleScore || " - "}
+            {loadingStats ? "—" : stats.styleScore || "—"}
           </span>
           <span className="text-[10px] font-body text-muted-foreground">Style Score</span>
         </motion.div>
@@ -383,7 +463,7 @@ const Home = () => {
                     {weather.temp}°C
                   </span>
                   <p className="text-xs font-body text-muted-foreground">
-                    {weather.condition}  -  {weather.city}
+                    {weather.condition} · {weather.city}
                   </p>
                 </div>
               </div>
@@ -400,15 +480,51 @@ const Home = () => {
             <div className="px-4 py-3">
               <p className="text-xs font-body text-ai font-medium">
                 <Sparkles className="mr-1 inline h-3 w-3" />
-                Styling Tip
+                {weatherTipAI ? "AI Styling Tip" : "Styling Tip"}
               </p>
               <p className="mt-0.5 text-sm font-body text-foreground">
-                {weather.tip}
+                {weatherTipAI || weather.tip}
               </p>
             </div>
 
-            {/* Show closet items if available */}
-            {stats.items.length > 0 ? (
+            {/* Show AI-recommended weather outfit or loading state */}
+            {loadingWeatherOutfit ? (
+              <div className="flex items-center justify-center gap-2 px-4 pb-4">
+                <Loader2 className="h-4 w-4 animate-spin text-ai" />
+                <span className="text-xs font-body text-muted-foreground">
+                  AI is picking your weather outfit...
+                </span>
+              </div>
+            ) : weatherOutfit.length > 0 ? (
+              <div className="flex gap-3 overflow-x-auto px-4 pb-4 scrollbar-none">
+                {weatherOutfit.map((item: ClothingItem, i: number) => (
+                  <motion.div
+                    key={item.id}
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.4 + i * 0.1 }}
+                    className="shrink-0"
+                  >
+                    <div className="h-28 w-24 overflow-hidden rounded-xl bg-background p-2">
+                      {item.image_url ? (
+                        <img
+                          src={item.image_url}
+                          alt={item.name}
+                          className="h-full w-full object-contain"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center">
+                          <ImageIcon className="h-6 w-6 text-muted-foreground/30" />
+                        </div>
+                      )}
+                    </div>
+                    <p className="mt-1 text-center text-[10px] font-body font-medium text-foreground truncate w-24">
+                      {item.name}
+                    </p>
+                  </motion.div>
+                ))}
+              </div>
+            ) : stats.items.length > 0 ? (
               <div className="flex gap-3 overflow-x-auto px-4 pb-4 scrollbar-none">
                 {stats.items.slice(0, 4).map((item: any, i: number) => (
                   <motion.div
