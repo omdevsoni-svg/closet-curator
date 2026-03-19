@@ -25,6 +25,7 @@ import {
   deleteClosetItem,
   toggleFavorite,
   toggleArchive,
+  updateClosetItem,
   uploadImage,
   type ClothingItem,
 } from "@/lib/database";
@@ -511,9 +512,46 @@ interface ItemDetailModalProps {
   onToggleFavorite: (item: ClothingItem) => void;
   onDelete: (id: string) => void;
   onToggleArchive: (item: ClothingItem) => void;
+  onUpdate: (item: ClothingItem) => void;
 }
 
-const ItemDetailModal = ({ item, onClose, onToggleFavorite, onDelete, onToggleArchive }: ItemDetailModalProps) => {
+const ItemDetailModal = ({ item, onClose, onToggleFavorite, onDelete, onToggleArchive, onUpdate }: ItemDetailModalProps) => {
+  const [editing, setEditing] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editColor, setEditColor] = useState("");
+  const [editMaterial, setEditMaterial] = useState("");
+  const [editBrand, setEditBrand] = useState("");
+  const [editTags, setEditTags] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (item) {
+      setEditName(item.name);
+      setEditColor(item.color);
+      setEditMaterial(item.material || "");
+      setEditBrand(item.brand || "");
+      setEditTags(item.tags.join(", "));
+      setEditing(false);
+    }
+  }, [item]);
+
+  const handleSaveEdit = async () => {
+    if (!item) return;
+    setSaving(true);
+    const updated = await updateClosetItem(item.id, {
+      name: editName,
+      color: editColor,
+      material: editMaterial || undefined,
+      brand: editBrand || undefined,
+      tags: editTags.split(",").map(t => t.trim()).filter(Boolean),
+    });
+    setSaving(false);
+    if (updated) {
+      onUpdate(updated);
+      setEditing(false);
+    }
+  };
+
   if (!item) return null;
   return (
     <AnimatePresence>
@@ -893,6 +931,10 @@ const DigitalCloset = () => {
           }}
           onDelete={handleDelete}
           onToggleArchive={handleToggleArchive}
+          onUpdate={(updated) => {
+            setItems(prev => prev.map(i => i.id === updated.id ? updated : i));
+            setSelectedItem(updated);
+          }}
         />
       )}
     </div>
