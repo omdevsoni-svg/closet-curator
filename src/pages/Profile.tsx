@@ -352,15 +352,6 @@ const Profile = () => {
               </label>
             </div>
           </div>
-                  <ToggleRow
-            label="Personalization"
-            desc="Allow AI to learn your style preferences"
-            value={personalization}
-            onChange={(v) => {
-              setPersonalization(v);
-              savePreferences({ personalization: v });
-            }}
-          />
         </div>
       </motion.div>
 
