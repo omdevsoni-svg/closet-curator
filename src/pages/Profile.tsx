@@ -130,7 +130,6 @@ const Profile = () => {
   const [bodyType, setBodyType] = useState("rectangle");
   const [skinTone, setSkinTone] = useState("Medium");
   const [modelGender, setModelGender] = useState<"women" | "men" | "neutral">("neutral");
-  const [facePhoto, setFacePhoto] = useState<string | null>(null);
   const [bodyPhoto, setBodyPhoto] = useState<string | null>(null);
   const [notifOutfits, setNotifOutfits] = useState(true);
   const [notifGaps, setNotifGaps] = useState(true);
@@ -165,7 +164,6 @@ const Profile = () => {
         setBodyType(p.body_type || "rectangle");
         setSkinTone(p.skin_tone || "Medium");
         setModelGender((p.model_gender as any) || "neutral");
-        setFacePhoto(p.face_image_url || null);
         setBodyPhoto(p.body_image_url || null);
         setNotifOutfits(p.notif_outfits);
         setNotifGaps(p.notif_gaps);
