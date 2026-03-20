@@ -54,16 +54,50 @@ async function getAccessToken(sa: ServiceAccountKey): Promise<string> {
 /*  Virtual Try-On Prompt                                              */
 /* ------------------------------------------------------------------ */
 
-const TRYON_PROMPT = `You are a professional fashion virtual try-on system. Your task is to generate a highly realistic image of the person wearing the clothing item shown.
+const TRYON_PROMPT_SINGLE = `You are a virtual try-on system. You MUST generate a NEW image showing this person wearing the garment from the last image.
 
-CRITICAL REQUIREMENTS FOR PRECISION:
-1. FACE ACCURACY: The person's face in the generated image must EXACTLY match the face reference image provided. Preserve every facial detail — skin tone, facial structure, eye shape, nose, lips, eyebrows, facial hair, and expression.
-2. BODY ACCURACY: Use the full-body reference image to match the person's exact body proportions, height, build, and posture.
-3. CLOTHING FIT: The clothing item must look naturally fitted on the person's body — proper draping, folding, and shadows where the garment meets the body.
-4. LIGHTING & ENVIRONMENT: Keep consistent lighting across face, body, and clothing. Maintain a clean, neutral background.
-4. NATURAL INTEGRATION: The final image should look like a real photograph, not a collage. Pay attention to shadows, fabric physics, and body-clothing interaction.
+IMPORTANT: You MUST change the person's clothing. Do NOT return the original photo unchanged. The output MUST show the person wearing the NEW garment.
 
-Generate ONE photorealistic full-body image of this person wearing the shown clothing item.`;
+IMAGES PROVIDED:
+- Image 1: Customer's full body photo (BASE IMAGE to edit)
+- Image 2: Clean garment image (the clothing to dress them in)
+
+TASK: Replace the person's current clothing with the garment shown in Image 2.
+
+CRITICAL RULES:
+1. You MUST generate a NEW image - NOT return any input image unchanged.
+2. The person MUST be wearing the NEW garment from Image 2 in your output.
+3. Preserve the person's EXACT face, skin color, hair, body shape, and all distinctive features.
+4. PRESERVE EYE DETAILS EXACTLY: eye color, contact lenses, glasses - do NOT change or remove them.
+5. ONLY change their clothing - everything else stays identical.
+6. Render the garment with FULL detail: exact color, pattern, fabric texture, buttons, embroidery, design elements as shown in the garment image.
+7. The output must look like a NATURAL PHOTOGRAPH - photorealistic, not a composite.
+
+OUTPUT: One single photorealistic full-body photo (head to toe), clean background, natural pose. The person MUST be wearing the new garment.`;
+
+function buildMultiGarmentPrompt(count: number): string {
+  return `You are a virtual try-on system. You MUST generate a NEW image showing this person wearing ALL ${count} garments provided below AS A COMPLETE OUTFIT.
+
+IMPORTANT: You MUST change the person's clothing. Do NOT return the original photo unchanged. The output MUST show the person wearing ALL the provided garments TOGETHER as one cohesive outfit.
+
+IMAGES PROVIDED:
+- Image 1: Customer's full body photo (BASE IMAGE to edit)
+- Images 2 through ${count + 1}: Individual garment images (each piece of the outfit)
+
+TASK: Replace the person's ENTIRE current clothing with ALL the garments shown. Dress them in the complete outfit — top, bottom, shoes, layers, accessories — whatever is provided.
+
+CRITICAL RULES:
+1. You MUST generate a NEW image - NOT return any input image unchanged.
+2. The person MUST be wearing ALL ${count} garments together in the output.
+3. Preserve the person's EXACT face, skin color, hair, body shape, and all distinctive features.
+4. PRESERVE EYE DETAILS EXACTLY: eye color, contact lenses, glasses - do NOT change or remove them.
+5. ONLY change their clothing - everything else stays identical.
+6. Render EACH garment with FULL detail: exact color, pattern, fabric texture, buttons, embroidery, design elements as shown in each garment image.
+7. The output must look like a NATURAL PHOTOGRAPH - photorealistic, not a composite.
+8. Combine the garments naturally — e.g. shirt tucked or untucked as appropriate, pants over shoes, jacket over shirt, etc.
+
+OUTPUT: One single photorealistic full-body photo (head to toe), clean background, natural pose. The person MUST be wearing the COMPLETE outfit with ALL garments.`;
+}
 
 /* ------------------------------------------------------------------ */
 /*  Vercel Serverless Handler                                          */
@@ -88,6 +122,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       faceImageBase64,
       bodyImageBase64,
       productImageBase64,
+      productImages,
       faceMimeType = "image/jpeg",
       bodyMimeType = "image/jpeg",
       productMimeType = "image/jpeg",
@@ -96,8 +131,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!bodyImageBase64) {
       return res.status(400).json({ success: false, error: "bodyImageBase64 is required" });
     }
-    if (!productImageBase64) {
-      return res.status(400).json({ success: false, error: "productImageBase64 is required" });
+
+    // Support both single product image (backward compat) and multiple product images
+    const garments: { base64: string; mimeType: string; label?: string }[] = [];
+    if (productImages && Array.isArray(productImages) && productImages.length > 0) {
+      for (const img of productImages) {
+        garments.push({
+          base64: img.base64,
+          mimeType: img.mimeType || "image/jpeg",
+          label: img.label,
+        });
+      }
+    } else if (productImageBase64) {
+      garments.push({ base64: productImageBase64, mimeType: productMimeType });
+    }
+
+    if (garments.length === 0) {
+      return res.status(400).json({ success: false, error: "At least one product image is required" });
     }
 
     // Parse service account key from env
@@ -121,12 +171,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     parts.push({ text: "PERSON REFERENCE IMAGE (match this person's face, body, proportions, and skin tone exactly):" });
     parts.push({ inlineData: { mimeType: bodyMimeType, data: bodyImageBase64 } });
 
-    // Add clothing/product image
-    parts.push({ text: "CLOTHING ITEM TO TRY ON (dress this person in this exact garment):" });
-    parts.push({ inlineData: { mimeType: productMimeType, data: productImageBase64 } });
+    // Add all garment images
+    for (let i = 0; i < garments.length; i++) {
+      const g = garments[i];
+      const label = g.label || `Garment ${i + 1}`;
+      parts.push({ text: `CLOTHING ITEM ${i + 1}: ${label} (dress the person in this exact garment):` });
+      parts.push({ inlineData: { mimeType: g.mimeType, data: g.base64 } });
+    }
 
-    // Add the instruction prompt
-    parts.push({ text: TRYON_PROMPT });
+    // Add the instruction prompt — use multi-garment prompt when more than 1 item
+    const prompt = garments.length > 1 ? buildMultiGarmentPrompt(garments.length) : TRYON_PROMPT_SINGLE;
+    parts.push({ text: prompt });
 
     const geminiRes = await fetch(url, {
       method: "POST",
