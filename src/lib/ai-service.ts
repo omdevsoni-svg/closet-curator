@@ -4,7 +4,7 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 /* ------------------------------------------------------------------ */
-/*  Helper: convert File → base64 string (no data: prefix)            */
+/* Helper: convert File → base64 string (no data: prefix)             */
 /* ------------------------------------------------------------------ */
 export const fileToBase64 = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -19,7 +19,7 @@ export const fileToBase64 = (file: File): Promise<string> =>
   });
 
 /* ------------------------------------------------------------------ */
-/*  Helper: convert image URL → base64 string                         */
+/* Helper: convert image URL → base64 string                          */
 /* ------------------------------------------------------------------ */
 export const urlToBase64 = async (url: string): Promise<string> => {
   const res = await fetch(url);
@@ -28,7 +28,42 @@ export const urlToBase64 = async (url: string): Promise<string> => {
 };
 
 /* ------------------------------------------------------------------ */
-/*  AI Attribute Detection — calls Gemini API directly                 */
+/* Helper: compress a base64 image to max dimension & JPEG quality    */
+/* Keeps payload small so multi-garment requests don't exceed limits  */
+/* ------------------------------------------------------------------ */
+export const compressBase64Image = (
+  base64: string,
+  maxDim = 768,
+  quality = 0.75,
+  inputMime = "image/jpeg"
+): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      let { width, height } = img;
+      if (width > maxDim || height > maxDim) {
+        if (width >= height) {
+          height = Math.round((height / width) * maxDim);
+          width = maxDim;
+        } else {
+          width = Math.round((width / height) * maxDim);
+          height = maxDim;
+        }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d")!;
+      ctx.drawImage(img, 0, 0, width, height);
+      const dataUrl = canvas.toDataURL("image/jpeg", quality);
+      resolve(dataUrl.split(",")[1]);
+    };
+    img.onerror = () => reject(new Error("Failed to load image for compression"));
+    img.src = `data:${inputMime};base64,${base64}`;
+  });
+
+/* ------------------------------------------------------------------ */
+/* AI Attribute Detection — calls Gemini API directly                  */
 /* ------------------------------------------------------------------ */
 export interface DetectedAttributes {
   name: string;
@@ -54,7 +89,6 @@ export const detectClothingAttributes = async (
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ imageBase64, mimeType }),
     });
-
     const data = await res.json();
 
     // Non-garment image rejected
@@ -77,7 +111,7 @@ export const detectClothingAttributes = async (
 };
 
 /* ------------------------------------------------------------------ */
-/*  Virtual Try-On — calls Vercel serverless function with face + body */
+/* Virtual Try-On — calls Vercel serverless function with face + body */
 /* ------------------------------------------------------------------ */
 export interface TryOnResult {
   mimeType: string;
@@ -114,7 +148,8 @@ export const virtualTryOn = async (
 };
 
 /* ------------------------------------------------------------------ */
-/*  Virtual Try-On (Multi-Garment) — sends all outfit items at once    */
+/* Virtual Try-On (Multi-Garment) — sends all outfit items at once    */
+/* Compresses all images first to stay within payload limits          */
 /* ------------------------------------------------------------------ */
 export interface GarmentInput {
   base64: string;
@@ -128,17 +163,32 @@ export const virtualTryOnMulti = async (
   faceImageBase64?: string
 ): Promise<TryOnResult[]> => {
   try {
+    // Compress body image and all garment images to reduce payload
+    const compressedBody = await compressBase64Image(bodyImageBase64, 768, 0.75);
+    const compressedGarments = await Promise.all(
+      garments.map(async (g) => ({
+        base64: await compressBase64Image(g.base64, 512, 0.70, g.mimeType || "image/jpeg"),
+        mimeType: "image/jpeg",
+        label: g.label,
+      }))
+    );
+
+    console.log(
+      "[virtualTryOnMulti] Sending",
+      compressedGarments.length,
+      "garments. Payload sizes — body:",
+      Math.round(compressedBody.length / 1024) + "KB",
+      "garments:",
+      compressedGarments.map((g) => Math.round(g.base64.length / 1024) + "KB").join(", ")
+    );
+
     const res = await fetch("/api/virtual-tryon", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        faceImageBase64: faceImageBase64 || undefined,
-        bodyImageBase64,
-        productImages: garments.map((g) => ({
-          base64: g.base64,
-          mimeType: g.mimeType || "image/jpeg",
-          label: g.label,
-        })),
+        faceImageBase64: faceImageBase64 ? await compressBase64Image(faceImageBase64, 512, 0.70) : undefined,
+        bodyImageBase64: compressedBody,
+        productImages: compressedGarments,
       }),
     });
 
@@ -146,18 +196,23 @@ export const virtualTryOnMulti = async (
     if (data.success && data.images) {
       return data.images as TryOnResult[];
     }
-    console.error("Virtual try-on (multi) failed:", data.error, data.details);
-    return [];
-  } catch (err) {
+
+    // Surface the actual error for debugging
+    const errMsg = data.error || "Unknown error";
+    const details = data.details || "";
+    console.error("Virtual try-on (multi) failed:", errMsg, details);
+
+    // Throw so the caller can display the real error
+    throw new Error(errMsg);
+  } catch (err: any) {
     console.error("virtualTryOnMulti error:", err);
-    return [];
+    throw err; // Re-throw so handleTryOn can show the real message
   }
 };
 
 /* ------------------------------------------------------------------ */
-/*  AI Outfit Recommendation — calls Gemini via serverless function    */
+/* AI Outfit Recommendation — calls Gemini via serverless function    */
 /* ------------------------------------------------------------------ */
-
 export interface RecommendationRequest {
   occasion: string;
   items: {
@@ -220,7 +275,6 @@ export const getOutfitRecommendation = async (
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(request),
     });
-
     const data = await res.json();
     if (data.success) {
       // Handle both new (combinations) and legacy (flat) response formats
@@ -250,7 +304,7 @@ export const getOutfitRecommendation = async (
 };
 
 /* ------------------------------------------------------------------ */
-/*  Upload try-on result to Supabase Storage                          */
+/* Upload try-on result to Supabase Storage                           */
 /* ------------------------------------------------------------------ */
 export const uploadTryOnImage = async (
   userId: string,
@@ -264,8 +318,8 @@ export const uploadTryOnImage = async (
       byteArray[i] = byteChars.charCodeAt(i);
     }
     const blob = new Blob([byteArray], { type: "image/png" });
-    const fileName = `${userId}/${Date.now()}_tryon.png`;
 
+    const fileName = `${userId}/${Date.now()}_tryon.png`;
     const { error } = await supabase.storage
       .from("tryon-images")
       .upload(fileName, blob, { upsert: true });
@@ -274,7 +328,6 @@ export const uploadTryOnImage = async (
       console.error("uploadTryOnImage error:", error);
       return null;
     }
-
     const { data } = supabase.storage.from("tryon-images").getPublicUrl(fileName);
     return data.publicUrl;
   } catch (err) {
