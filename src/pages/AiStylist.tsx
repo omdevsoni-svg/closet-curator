@@ -283,10 +283,10 @@ const TryOnModal = ({ isOpen, onClose, closetItems, userId }: TryOnModalProps) =
                   Try It On
                 </motion.button>
               </div>
-            }
+            )}
 
             {/* Step 3: Generating */}
-            { step === "generating" && (
+            {step === "generating" && (
               <div className="mt-8 flex flex-col items-center py-8">
                 <div className="relative">
                   <Loader2 className="h-10 w-10 animate-spin text-ai" />
@@ -307,7 +307,7 @@ const TryOnModal = ({ isOpen, onClose, closetItems, userId }: TryOnModalProps) =
                   </div>
                 </div>
               </div>
-            }
+            )}
 
             {/* Step 4: Result */}
             {step === "result" && resultImage && (
@@ -316,7 +316,7 @@ const TryOnModal = ({ isOpen, onClose, closetItems, userId }: TryOnModalProps) =
                   <img
                     src={resultImage}
                     alt="Virtual Try-On Result"
-                    className="aw-full object-contain"
+                    className="w-full object-contain"
                   />
                 </div>
                 <div className="mt-3 flex items-center gap-2 rounded-xl bg-ai/10 px-4 py-2.5">
@@ -344,15 +344,16 @@ const TryOnModal = ({ isOpen, onClose, closetItems, userId }: TryOnModalProps) =
                   </button>
                 </div>
               </div>
-            }
+            )}
+          </motion.div>
         </motion.div>
-      </motion.div>
-    )
-  };
-}
+      )}
+    </AnimatePresence>
+  );
+};
 
-/* ------------------------------------------------------------------- */
-/*  AI Stylist component                                                */
+/* ------------------------------------------------------------------ */
+/*  AI Stylist component                                               */
 /* ------------------------------------------------------------------ */
 const AiStylist = () => {
   const { user } = useAuth();
