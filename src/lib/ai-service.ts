@@ -114,6 +114,47 @@ export const virtualTryOn = async (
 };
 
 /* ------------------------------------------------------------------ */
+/*  Virtual Try-On (Multi-Garment) — sends all outfit items at once    */
+/* ------------------------------------------------------------------ */
+export interface GarmentInput {
+  base64: string;
+  mimeType?: string;
+  label?: string;
+}
+
+export const virtualTryOnMulti = async (
+  bodyImageBase64: string,
+  garments: GarmentInput[],
+  faceImageBase64?: string
+): Promise<TryOnResult[]> => {
+  try {
+    const res = await fetch("/api/virtual-tryon", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        faceImageBase64: faceImageBase64 || undefined,
+        bodyImageBase64,
+        productImages: garments.map((g) => ({
+          base64: g.base64,
+          mimeType: g.mimeType || "image/jpeg",
+          label: g.label,
+        })),
+      }),
+    });
+
+    const data = await res.json();
+    if (data.success && data.images) {
+      return data.images as TryOnResult[];
+    }
+    console.error("Virtual try-on (multi) failed:", data.error, data.details);
+    return [];
+  } catch (err) {
+    console.error("virtualTryOnMulti error:", err);
+    return [];
+  }
+};
+
+/* ------------------------------------------------------------------ */
 /*  AI Outfit Recommendation — calls Gemini via serverless function    */
 /* ------------------------------------------------------------------ */
 
