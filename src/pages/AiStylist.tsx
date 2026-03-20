@@ -16,12 +16,20 @@ import {
   ArrowRight,
   Check,
   AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { getClosetItems, getProfile, type ClothingItem, type Profile } from "@/lib/database";
-import { virtualTryOn, fileToBase64, urlToBase64, getOutfitRecommendation } from "@/lib/ai-service";
+import {
+  virtualTryOn,
+  fileToBase64,
+  urlToBase64,
+  getOutfitRecommendation,
+  type OutfitCombination,
+} from "@/lib/ai-service";
 
 const occasions = [
   { label: "Date Night", icon: Heart, color: "bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400" },
@@ -32,8 +40,9 @@ const occasions = [
   { label: "Formal", icon: GraduationCap, color: "bg-gray-100 text-gray-700 dark:bg-gray-800/30 dark:text-gray-300" },
 ];
 
-type OutfitRecommendation = {
-  occasion: string;
+type ResolvedCombination = {
+  label: string;
+  slots: { slot: string; item: ClothingItem }[];
   items: ClothingItem[];
   tip: string;
   reasoning: string[];
@@ -41,16 +50,18 @@ type OutfitRecommendation = {
 };
 
 /* ------------------------------------------------------------------ */
-/*  Virtual Try-On Modal                                               */
+/*  Virtual Try-On Modal — now accepts specific outfit items           */
 /* ------------------------------------------------------------------ */
 interface TryOnModalProps {
   isOpen: boolean;
   onClose: () => void;
-  closetItems: ClothingItem[];
+  outfitItems: ClothingItem[];
+  allClosetItems: ClothingItem[];
   userId: string;
+  comboLabel?: string;
 }
 
-const TryOnModal = ({ isOpen, onClose, closetItems, userId }: TryOnModalProps) => {
+const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comboLabel }: TryOnModalProps) => {
   const navigate = useNavigate();
   const [step, setStep] = useState<"loading" | "no-photo" | "select" | "generating" | "result">("loading");
   const [personPhoto, setPersonPhoto] = useState<string | null>(null);
@@ -58,8 +69,8 @@ const TryOnModal = ({ isOpen, onClose, closetItems, userId }: TryOnModalProps) =
   const [selectedItem, setSelectedItem] = useState<ClothingItem | null>(null);
   const [resultImage, setResultImage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [mode, setMode] = useState<"outfit" | "closet">("outfit");
 
-  // Auto-load full-body image from profile when modal opens
   useEffect(() => {
     if (!isOpen || !userId) return;
     const loadProfilePhoto = async () => {
@@ -67,7 +78,6 @@ const TryOnModal = ({ isOpen, onClose, closetItems, userId }: TryOnModalProps) =
       try {
         const profile = await getProfile(userId);
         const bodyUrl = profile?.body_image_url;
-
         if (bodyUrl) {
           setPersonPhoto(bodyUrl);
           const bodyB64 = await urlToBase64(bodyUrl);
@@ -90,7 +100,6 @@ const TryOnModal = ({ isOpen, onClose, closetItems, userId }: TryOnModalProps) =
     setError(null);
 
     try {
-      // Get the clothing item image as base64
       let productBase64: string;
       if (selectedItem.image_url) {
         productBase64 = await urlToBase64(selectedItem.image_url);
@@ -100,14 +109,13 @@ const TryOnModal = ({ isOpen, onClose, closetItems, userId }: TryOnModalProps) =
         return;
       }
 
-      // Pass body image for virtual try-on
       const results = await virtualTryOn(bodyPhotoBase64, productBase64, 1);
 
       if (results.length > 0) {
         setResultImage(`data:${results[0].mimeType};base64,${results[0].base64}`);
         setStep("result");
       } else {
-        setError("Couldn't generate try-on. The model may not support this image combination. Try a different photo.");
+        setError("Couldn't generate try-on. Try a different item or photo.");
         setStep("select");
       }
     } catch (err) {
@@ -121,15 +129,13 @@ const TryOnModal = ({ isOpen, onClose, closetItems, userId }: TryOnModalProps) =
     setSelectedItem(null);
     setResultImage(null);
     setError(null);
-    // Go back to select step since profile photos are already loaded
-    if (bodyPhotoBase64) {
-      setStep("select");
-    } else {
-      setStep("no-photo");
-    }
+    if (bodyPhotoBase64) setStep("select");
+    else setStep("no-photo");
   };
 
-  const clothingWithImages = closetItems.filter((item) => item.image_url);
+  const displayItems = mode === "outfit"
+    ? outfitItems.filter((item) => item.image_url)
+    : allClosetItems.filter((item) => item.image_url);
 
   return (
     <AnimatePresence>
@@ -169,6 +175,9 @@ const TryOnModal = ({ isOpen, onClose, closetItems, userId }: TryOnModalProps) =
                 <X className="h-4 w-4" />
               </button>
             </div>
+            {comboLabel && step === "select" && (
+              <p className="mt-1 text-xs font-body text-ai">{comboLabel} outfit</p>
+            )}
 
             {/* Loading profile photo */}
             {step === "loading" && (
@@ -180,7 +189,7 @@ const TryOnModal = ({ isOpen, onClose, closetItems, userId }: TryOnModalProps) =
               </div>
             )}
 
-            {/* No profile photo — redirect to Profile */}
+            {/* No profile photo */}
             {step === "no-photo" && (
               <div className="mt-6 flex flex-col items-center text-center">
                 <div className="flex h-16 w-16 items-center justify-center rounded-full bg-card">
@@ -190,13 +199,10 @@ const TryOnModal = ({ isOpen, onClose, closetItems, userId }: TryOnModalProps) =
                   Full-body photo needed
                 </h3>
                 <p className="mt-1.5 text-sm font-body text-muted-foreground">
-                  Upload a full-body photo in your Profile to use Virtual Try-On. This only needs to be done once — your photo is used to generate realistic try-on images.
+                  Upload a full-body photo in your Profile to use Virtual Try-On.
                 </p>
                 <button
-                  onClick={() => {
-                    onClose();
-                    navigate("/profile");
-                  }}
+                  onClick={() => { onClose(); navigate("/profile"); }}
                   className="mt-5 flex items-center gap-2 rounded-xl bg-ai px-6 py-3 text-sm font-display font-semibold text-ai-foreground"
                 >
                   Go to Profile
@@ -205,10 +211,9 @@ const TryOnModal = ({ isOpen, onClose, closetItems, userId }: TryOnModalProps) =
               </div>
             )}
 
-            {/* Step 2: Select clothing item */}
+            {/* Select clothing item */}
             {step === "select" && (
               <div className="mt-4">
-                {/* Person photo preview */}
                 <div className="flex items-center gap-3 rounded-xl bg-card p-3">
                   <div className="h-16 w-12 shrink-0 overflow-hidden rounded-lg">
                     <img src={personPhoto!} alt="You" className="h-full w-full object-cover" />
@@ -220,10 +225,7 @@ const TryOnModal = ({ isOpen, onClose, closetItems, userId }: TryOnModalProps) =
                     </p>
                   </div>
                   <button
-                    onClick={() => {
-                      onClose();
-                      navigate("/profile");
-                    }}
+                    onClick={() => { onClose(); navigate("/profile"); }}
                     className="text-xs font-body text-ai underline"
                   >
                     Change
@@ -236,13 +238,34 @@ const TryOnModal = ({ isOpen, onClose, closetItems, userId }: TryOnModalProps) =
                   </div>
                 )}
 
-                {/* Clothing items grid */}
+                {/* Toggle between outfit items and full closet */}
+                {outfitItems.length > 0 && (
+                  <div className="mt-3 flex rounded-xl bg-card p-1">
+                    <button
+                      onClick={() => setMode("outfit")}
+                      className={`flex-1 rounded-lg py-2 text-xs font-body font-medium transition-all ${
+                        mode === "outfit" ? "bg-ai text-ai-foreground shadow-sm" : "text-muted-foreground"
+                      }`}
+                    >
+                      Outfit Items ({outfitItems.filter(i => i.image_url).length})
+                    </button>
+                    <button
+                      onClick={() => setMode("closet")}
+                      className={`flex-1 rounded-lg py-2 text-xs font-body font-medium transition-all ${
+                        mode === "closet" ? "bg-ai text-ai-foreground shadow-sm" : "text-muted-foreground"
+                      }`}
+                    >
+                      All Closet ({allClosetItems.filter(i => i.image_url).length})
+                    </button>
+                  </div>
+                )}
+
                 <div className="mt-4">
                   <p className="text-xs font-medium font-body uppercase tracking-wider text-muted-foreground">
-                    Select an item ({clothingWithImages.length} available)
+                    Select an item ({displayItems.length} available)
                   </p>
                   <div className="mt-2 grid grid-cols-3 gap-2 max-h-[40vh] overflow-y-auto">
-                    {clothingWithImages.map((item) => (
+                    {displayItems.map((item) => (
                       <button
                         key={item.id}
                         onClick={() => setSelectedItem(item)}
@@ -253,11 +276,7 @@ const TryOnModal = ({ isOpen, onClose, closetItems, userId }: TryOnModalProps) =
                         }`}
                       >
                         <div className="aspect-square overflow-hidden rounded-lg bg-background">
-                          <img
-                            src={item.image_url}
-                            alt={item.name}
-                            className="h-full w-full object-contain"
-                          />
+                          <img src={item.image_url} alt={item.name} className="h-full w-full object-contain" />
                         </div>
                         <p className="mt-1 text-[10px] font-body font-medium text-foreground truncate">
                           {item.name}
@@ -272,7 +291,6 @@ const TryOnModal = ({ isOpen, onClose, closetItems, userId }: TryOnModalProps) =
                   </div>
                 </div>
 
-                {/* Try-on button */}
                 <motion.button
                   whileTap={{ scale: 0.98 }}
                   onClick={handleTryOn}
@@ -285,12 +303,10 @@ const TryOnModal = ({ isOpen, onClose, closetItems, userId }: TryOnModalProps) =
               </div>
             )}
 
-            {/* Step 3: Generating */}
+            {/* Generating */}
             {step === "generating" && (
               <div className="mt-8 flex flex-col items-center py-8">
-                <div className="relative">
-                  <Loader2 className="h-10 w-10 animate-spin text-ai" />
-                </div>
+                <Loader2 className="h-10 w-10 animate-spin text-ai" />
                 <p className="mt-4 text-sm font-body font-medium text-foreground">
                   Creating your look...
                 </p>
@@ -309,15 +325,11 @@ const TryOnModal = ({ isOpen, onClose, closetItems, userId }: TryOnModalProps) =
               </div>
             )}
 
-            {/* Step 4: Result */}
+            {/* Result */}
             {step === "result" && resultImage && (
               <div className="mt-4">
                 <div className="overflow-hidden rounded-2xl bg-card">
-                  <img
-                    src={resultImage}
-                    alt="Virtual Try-On Result"
-                    className="w-full object-contain"
-                  />
+                  <img src={resultImage} alt="Virtual Try-On Result" className="w-full object-contain" />
                 </div>
                 <div className="mt-3 flex items-center gap-2 rounded-xl bg-ai/10 px-4 py-2.5">
                   <Sparkles className="h-4 w-4 text-ai" />
@@ -333,11 +345,7 @@ const TryOnModal = ({ isOpen, onClose, closetItems, userId }: TryOnModalProps) =
                     Try Another
                   </button>
                   <button
-                    onClick={() => {
-                      setSelectedItem(null);
-                      setResultImage(null);
-                      setStep("select");
-                    }}
+                    onClick={() => { setSelectedItem(null); setResultImage(null); setStep("select"); }}
                     className="flex-1 rounded-xl bg-ai py-3 text-sm font-body font-medium text-ai-foreground"
                   >
                     Try Different Item
@@ -353,6 +361,162 @@ const TryOnModal = ({ isOpen, onClose, closetItems, userId }: TryOnModalProps) =
 };
 
 /* ------------------------------------------------------------------ */
+/*  Combination Card                                                   */
+/* ------------------------------------------------------------------ */
+interface CombinationCardProps {
+  combo: ResolvedCombination;
+  index: number;
+  isActive: boolean;
+  onTryOn: () => void;
+}
+
+const CombinationCard = ({ combo, index, isActive, onTryOn }: CombinationCardProps) => {
+  const [expanded, setExpanded] = useState(false);
+
+  const slotLabels: Record<string, string> = {
+    topwear: "Top",
+    bottomwear: "Bottom",
+    footwear: "Shoes",
+    dress: "Dress",
+    outerwear: "Layer",
+    accessory: "Accessory",
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.12 }}
+      className={`rounded-2xl border transition-all ${
+        isActive
+          ? "border-ai/30 bg-ai/5 shadow-lg shadow-ai/5"
+          : "border-border/50 bg-card"
+      }`}
+    >
+      {/* Card header */}
+      <div className="flex items-center justify-between px-4 pt-4 pb-2">
+        <div className="flex items-center gap-2">
+          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-ai/10 text-[10px] font-bold text-ai">
+            {index + 1}
+          </div>
+          <h3 className="text-sm font-display font-semibold text-foreground">
+            {combo.label}
+          </h3>
+        </div>
+        <motion.button
+          whileTap={{ scale: 0.9 }}
+          onClick={onTryOn}
+          className="flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-[hsl(43,70%,50%)] to-[hsl(220,10%,65%)] px-3 py-1.5 text-[11px] font-display font-semibold text-white shadow-sm"
+        >
+          <Camera className="h-3 w-3" />
+          Try On
+        </motion.button>
+      </div>
+
+      {/* Outfit items — horizontal scroll with slot labels */}
+      <div className="flex gap-3 overflow-x-auto px-4 py-3 scrollbar-none">
+        {combo.slots.length > 0
+          ? combo.slots.map(({ slot, item }, i) => (
+              <motion.div
+                key={item.id + "-" + slot}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: index * 0.12 + i * 0.08 }}
+                className="shrink-0 flex flex-col items-center"
+              >
+                <p className="mb-1 text-[9px] font-body font-semibold uppercase tracking-wider text-ai/70">
+                  {slotLabels[slot] || slot}
+                </p>
+                <div className="h-28 w-22 overflow-hidden rounded-xl bg-background p-1.5">
+                  {item.image_url ? (
+                    <img src={item.image_url} alt={item.name} className="h-full w-full object-contain" />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center">
+                      <ImageIcon className="h-6 w-6 text-muted-foreground/30" />
+                    </div>
+                  )}
+                </div>
+                <p className="mt-1 text-center text-[9px] font-medium font-body text-foreground truncate w-20">
+                  {item.name}
+                </p>
+              </motion.div>
+            ))
+          : combo.items.map((item, i) => (
+              <motion.div
+                key={item.id}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: index * 0.12 + i * 0.08 }}
+                className="shrink-0"
+              >
+                <div className="h-28 w-22 overflow-hidden rounded-xl bg-background p-1.5">
+                  {item.image_url ? (
+                    <img src={item.image_url} alt={item.name} className="h-full w-full object-contain" />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center">
+                      <ImageIcon className="h-6 w-6 text-muted-foreground/30" />
+                    </div>
+                  )}
+                </div>
+                <p className="mt-1 text-center text-[9px] font-medium font-body text-foreground truncate w-20">
+                  {item.name}
+                </p>
+                <p className="text-center text-[8px] font-body text-muted-foreground">
+                  {item.category}
+                </p>
+              </motion.div>
+            ))}
+      </div>
+
+      {/* Tip */}
+      <div className="mx-4 mb-3 rounded-xl bg-ai/5 px-3 py-2">
+        <p className="text-[11px] text-ai font-body font-medium">
+          {combo.tip}
+        </p>
+      </div>
+
+      {/* Expandable reasoning */}
+      <div className="px-4 pb-4">
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="flex items-center gap-1 text-[10px] font-body text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <Sparkles className="h-2.5 w-2.5" />
+          {expanded ? "Hide" : "Why these picks"}
+          <ChevronRight className={`h-2.5 w-2.5 transition-transform ${expanded ? "rotate-90" : ""}`} />
+        </button>
+        <AnimatePresence>
+          {expanded && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="mt-2 space-y-1">
+                {combo.reasoning.map((reason, i) => (
+                  <p key={i} className="text-[10px] font-body text-muted-foreground">
+                    {reason}
+                  </p>
+                ))}
+              </div>
+              {combo.missing && (
+                <div className="mt-2 flex items-start gap-1">
+                  <AlertTriangle className="h-3 w-3 shrink-0 text-amber-500 mt-0.5" />
+                  <p className="text-[10px] font-body text-amber-600 dark:text-amber-400">
+                    {combo.missing}
+                  </p>
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </motion.div>
+  );
+};
+
+/* ------------------------------------------------------------------ */
 /*  AI Stylist component                                               */
 /* ------------------------------------------------------------------ */
 const AiStylist = () => {
@@ -363,9 +527,10 @@ const AiStylist = () => {
   const [loading, setLoading] = useState(true);
   const [selectedOccasion, setSelectedOccasion] = useState<string | null>(null);
   const [prompt, setPrompt] = useState("");
-  const [recommendation, setRecommendation] = useState<OutfitRecommendation | null>(null);
+  const [combinations, setCombinations] = useState<ResolvedCombination[]>([]);
   const [generating, setGenerating] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [tryOnCombo, setTryOnCombo] = useState<ResolvedCombination | null>(null);
   const [showTryOn, setShowTryOn] = useState(false);
 
   useEffect(() => {
@@ -382,11 +547,11 @@ const AiStylist = () => {
     load();
   }, [user]);
 
-  const fetchRecommendation = async (occasion: string) => {
+  const fetchRecommendations = async (occasion: string) => {
     setSelectedOccasion(occasion);
     setGenerating(true);
     setAiError(null);
-    setRecommendation(null);
+    setCombinations([]);
 
     try {
       const result = await getOutfitRecommendation({
@@ -411,23 +576,34 @@ const AiStylist = () => {
       });
 
       if (result.success) {
-        // Map item_ids back to full ClothingItem objects
-        const pickedItems = result.item_ids
-          .map((id) => closetItems.find((item) => item.id === id))
-          .filter(Boolean) as ClothingItem[];
+        const resolved: ResolvedCombination[] = result.combinations.map((combo) => {
+          const resolvedSlots = combo.slots
+            .map((s) => {
+              const item = closetItems.find((i) => i.id === s.item_id);
+              return item ? { slot: s.slot, item } : null;
+            })
+            .filter(Boolean) as { slot: string; item: ClothingItem }[];
 
-        const reasoning = result.reasoning.map((r) => {
-          const item = closetItems.find((i) => i.id === r.id);
-          return `${item?.name || "Item"}: ${r.reason}`;
+          const resolvedItems = combo.item_ids
+            .map((id) => closetItems.find((i) => i.id === id))
+            .filter(Boolean) as ClothingItem[];
+
+          const reasoning = combo.reasoning.map((r) => {
+            const item = closetItems.find((i) => i.id === r.id);
+            return `${item?.name || "Item"}: ${r.reason}`;
+          });
+
+          return {
+            label: combo.label,
+            slots: resolvedSlots,
+            items: resolvedItems,
+            tip: combo.tip,
+            reasoning,
+            missing: combo.missing,
+          };
         });
 
-        setRecommendation({
-          occasion,
-          items: pickedItems,
-          tip: result.tip,
-          reasoning,
-          missing: result.missing,
-        });
+        setCombinations(resolved);
       } else {
         setAiError(result.error);
       }
@@ -439,14 +615,19 @@ const AiStylist = () => {
   };
 
   const handleOccasionSelect = (label: string) => {
-    fetchRecommendation(label);
+    fetchRecommendations(label);
   };
 
   const handleSubmitPrompt = () => {
     if (prompt.trim()) {
-      fetchRecommendation(prompt.trim());
+      fetchRecommendations(prompt.trim());
       setPrompt("");
     }
+  };
+
+  const handleTryOnCombo = (combo: ResolvedCombination) => {
+    setTryOnCombo(combo);
+    setShowTryOn(true);
   };
 
   if (loading) {
@@ -489,7 +670,7 @@ const AiStylist = () => {
   }
 
   return (
-    <div className="px-5 pt-8">
+    <div className="px-5 pt-8 pb-28">
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">
@@ -497,17 +678,9 @@ const AiStylist = () => {
             <h1 className="text-2xl font-display font-bold tracking-tight">AI Stylist</h1>
           </div>
           <p className="mt-1 text-sm text-muted-foreground font-body">
-            Select an occasion or describe your vibe ({closetItems.length} items)
+            Get 3 outfit combinations for any occasion ({closetItems.length} items)
           </p>
         </div>
-        <motion.button
-          whileTap={{ scale: 0.95 }}
-          onClick={() => setShowTryOn(true)}
-          className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-[hsl(43,70%,50%)] to-[hsl(220,10%,65%)] px-4 py-2.5 text-sm font-display font-semibold text-white shadow-lg shadow-ai/20"
-        >
-          <Camera className="h-4 w-4" />
-          Virtual Try-On
-        </motion.button>
       </div>
 
       {/* Occasion presets */}
@@ -556,7 +729,7 @@ const AiStylist = () => {
         <div className="mt-8 flex flex-col items-center">
           <Loader2 className="h-6 w-6 animate-spin text-ai" />
           <p className="mt-2 text-sm font-body text-muted-foreground">
-            AI is styling your outfit...
+            AI is crafting 3 outfit combinations...
           </p>
           <p className="mt-1 text-[11px] font-body text-muted-foreground/60">
             Powered by Gemini
@@ -570,128 +743,53 @@ const AiStylist = () => {
           <AlertTriangle className="h-5 w-5 shrink-0 text-red-500 mt-0.5" />
           <div>
             <p className="text-sm font-body font-medium text-red-600 dark:text-red-400">
-              Couldn't generate recommendation
+              Couldn't generate recommendations
             </p>
             <p className="mt-0.5 text-xs font-body text-red-500/80">{aiError}</p>
           </div>
         </div>
       )}
 
-      {/* Recommendation */}
+      {/* Combinations */}
       <AnimatePresence mode="wait">
-        {!generating && recommendation && (
+        {!generating && combinations.length > 0 && (
           <motion.div
-            key={recommendation.occasion}
+            key={selectedOccasion}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
             className="mt-6"
           >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-ai" />
-                <h2 className="text-lg font-display font-semibold">
-                  {recommendation.occasion} Look
-                </h2>
-              </div>
-              <button
-                onClick={() => setShowTryOn(true)}
-                className="text-xs font-body text-ai underline"
-              >
-                Try on look
-              </button>
+            <div className="flex items-center gap-2 mb-4">
+              <Sparkles className="h-4 w-4 text-ai" />
+              <h2 className="text-lg font-display font-semibold">
+                {selectedOccasion} — {combinations.length} Looks
+              </h2>
             </div>
 
-            <div className="mt-3 flex gap-3 overflow-x-auto pb-2 scrollbar-none">
-              {recommendation.items.map((item, i) => (
-                <motion.div
-                  key={item.id}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: i * 0.1 }}
-                  className="shrink-0"
-                >
-                  <div className="h-36 w-28 overflow-hidden rounded-2xl bg-card p-2">
-                    {item.image_url ? (
-                      <img
-                        src={item.image_url}
-                        alt={item.name}
-                        className="h-full w-full object-contain"
-                      />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center">
-                        <ImageIcon className="h-8 w-8 text-muted-foreground/30" />
-                      </div>
-                    )}
-                  </div>
-                  <p className="mt-1.5 text-center text-[10px] font-medium font-body text-foreground truncate w-28">
-                    {item.name}
-                  </p>
-                  <p className="text-center text-[9px] font-body text-muted-foreground">
-                    {item.category}
-                  </p>
-                </motion.div>
+            <div className="space-y-4">
+              {combinations.map((combo, i) => (
+                <CombinationCard
+                  key={combo.label + i}
+                  combo={combo}
+                  index={i}
+                  isActive={i === 0}
+                  onTryOn={() => handleTryOnCombo(combo)}
+                />
               ))}
             </div>
-
-            <div className="mt-4 rounded-2xl bg-ai/5 p-4">
-              <p className="text-xs text-ai font-body font-medium">
-                Styling Tip
-              </p>
-              <p className="mt-1 text-sm text-foreground font-body">
-                {recommendation.tip}
-              </p>
-            </div>
-
-            {/* AI Reasoning */}
-            {recommendation.reasoning && recommendation.reasoning.length > 0 && (
-              <div className="mt-3 rounded-2xl border border-border/50 px-4 py-3">
-                <p className="text-xs font-body text-ai font-medium flex items-center gap-1">
-                  <Sparkles className="h-3 w-3 inline" />
-                  Why these picks
-                </p>
-                <div className="mt-1.5 space-y-1">
-                  {recommendation.reasoning.map((reason, i) => (
-                    <p key={i} className="text-[11px] font-body text-muted-foreground">
-                      {reason}
-                    </p>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Missing items suggestion */}
-            {recommendation.missing && (
-              <div className="mt-3 rounded-2xl bg-amber-500/10 px-4 py-3">
-                <p className="text-xs font-body font-medium text-amber-700 dark:text-amber-400 flex items-center gap-1">
-                  <AlertTriangle className="h-3 w-3 inline" />
-                  What's missing
-                </p>
-                <p className="mt-1 text-[11px] font-body text-amber-600/80 dark:text-amber-400/80">
-                  {recommendation.missing}
-                </p>
-              </div>
-            )}
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* No recommendation possible */}
-      {!generating && recommendation === null && selectedOccasion && (
-        <div className="mt-8 text-center">
-          <p className="text-sm font-body text-muted-foreground">
-            Couldn't find a good match for "{selectedOccasion}" with your current items.
-            Try adding more items with relevant tags.
-          </p>
-        </div>
-      )}
-
       {/* Virtual Try-On Modal */}
       <TryOnModal
         isOpen={showTryOn}
-        onClose={() => setShowTryOn(false)}
-        closetItems={closetItems}
+        onClose={() => { setShowTryOn(false); setTryOnCombo(null); }}
+        outfitItems={tryOnCombo?.items || []}
+        allClosetItems={closetItems}
         userId={user?.id || ""}
+        comboLabel={tryOnCombo?.label}
       />
     </div>
   );
