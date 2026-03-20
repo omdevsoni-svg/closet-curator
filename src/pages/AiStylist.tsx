@@ -85,6 +85,9 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
           const bodyB64 = await urlToBase64(bodyUrl);
           setBodyPhotoBase64(bodyB64);
           setStep("select");
+          // Auto-select the first outfit item so the Try It On button is immediately usable
+          const firstItem = outfitItems.find((i) => i.image_url);
+          if (firstItem) setSelectedItem(firstItem);
         } else {
           setStep("no-photo");
         }
@@ -294,10 +297,13 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
                 </div>
 
                 <motion.button
-                  whileTap={{ scale: 0.98 }}
-                  onClick={handleTryOn}
-                  disabled={!selectedItem}
-                  className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-ai text-ai-foreground font-display font-semibold transition-all disabled:opacity-40"
+                  whileTap={selectedItem ? { scale: 0.98 } : undefined}
+                  onClick={() => {
+                    if (selectedItem) handleTryOn();
+                  }}
+                  className={`mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-ai text-ai-foreground font-display font-semibold transition-all ${
+                    !selectedItem ? "opacity-40 cursor-not-allowed" : "cursor-pointer"
+                  }`}
                 >
                   <Sparkles className="h-4 w-4" />
                   Try It On
