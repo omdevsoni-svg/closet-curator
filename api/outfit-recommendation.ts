@@ -83,7 +83,7 @@ interface WeatherInfo {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Build the Gemini prompt                                            */
+/*  Build the Gemini prompt — now returns 3 combinations               */
 /* ------------------------------------------------------------------ */
 
 function buildPrompt(
@@ -124,24 +124,70 @@ ${itemList}
 ${personalization}${weatherContext}
 
 Your task:
-1. Pick 3-5 items from the closet that create a cohesive, stylish outfit for the occasion "${occasion}".
-2. ONLY use items from the list above — reference them by their exact ID.
-3. Try to pick items from DIFFERENT categories (e.g. a top + bottom + outerwear + footwear) to form a complete outfit.
-4. If the closet doesn't have enough variety, pick the best available items and note what's missing.
-5. Provide a concise styling tip specific to this outfit combination.
-6. Explain why each item was chosen (2-3 words per item).
+1. Create exactly 3 DIFFERENT outfit combinations for the occasion "${occasion}".
+2. Each combination should be a COMPLETE outfit with items from different categories.
+3. For each combination, structure items into SLOTS:
+   - For men or unisex: "topwear", "bottomwear", "footwear" (3 slots)
+   - For women: either "topwear"+"bottomwear"+"footwear" (3 slots) OR "dress"+"footwear" (2 slots) if a dress/gown/one-piece is chosen
+4. ONLY use items from the list above — reference them by their exact ID.
+5. Each combination should have a DISTINCT style direction (e.g. one classic, one trendy, one relaxed).
+6. Give each combination a short creative label (2-3 words, e.g. "Classic Elegance", "Street Smart").
+7. Provide a styling tip and reasoning for each combination.
+8. If the closet is missing key pieces, note what's missing.
+9. Try to avoid reusing the same item across all 3 combinations when possible.
 
 Return ONLY a valid JSON object in this exact format (no markdown, no code fences):
 {
-  "item_ids": ["id1", "id2", "id3"],
-  "tip": "A specific styling tip for this outfit combination",
-  "reasoning": [
-    {"id": "id1", "reason": "Why this item was chosen"},
-    {"id": "id2", "reason": "Why this item was chosen"},
-    {"id": "id3", "reason": "Why this item was chosen"}
-  ],
-  "missing": "Optional: what key pieces are missing from the closet for this occasion, or null if the outfit is complete"
-}`;
+  "combinations": [
+    {
+      "label": "Creative Style Label",
+      "slots": [
+        {"slot": "topwear", "item_id": "id1"},
+        {"slot": "bottomwear", "item_id": "id2"},
+        {"slot": "footwear", "item_id": "id3"}
+      ],
+      "item_ids": ["id1", "id2", "id3"],
+      "tip": "A specific styling tip for this combination",
+      "reasoning": [
+        {"id": "id1", "reason": "Why this item was chosen"},
+        {"id": "id2", "reason": "Why this item was chosen"}
+      ],
+      "missing": "What key pieces are missing, or null"
+    },
+    {
+      "label": "Another Style Label",
+      "slots": [
+        {"slot": "topwear", "item_id": "id4"},
+        {"slot": "bottomwear", "item_id": "id5"},
+        {"slot": "footwear", "item_id": "id6"}
+      ],
+      "item_ids": ["id4", "id5", "id6"],
+      "tip": "Styling tip for this combination",
+      "reasoning": [
+        {"id": "id4", "reason": "Why chosen"},
+        {"id": "id5", "reason": "Why chosen"}
+      ],
+      "missing": null
+    },
+    {
+      "label": "Third Style Label",
+      "slots": [
+        {"slot": "topwear", "item_id": "id7"},
+        {"slot": "bottomwear", "item_id": "id8"},
+        {"slot": "footwear", "item_id": "id9"}
+      ],
+      "item_ids": ["id7", "id8", "id9"],
+      "tip": "Styling tip for this combination",
+      "reasoning": [
+        {"id": "id7", "reason": "Why chosen"},
+        {"id": "id8", "reason": "Why chosen"}
+      ],
+      "missing": null
+    }
+  ]
+}
+
+IMPORTANT: If the closet has fewer items and you cannot make 3 truly different combinations, return as many distinct ones as you can (minimum 1). Each combination MUST have at least 2 items.`;
 }
 
 /* ------------------------------------------------------------------ */
@@ -205,7 +251,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
       body: JSON.stringify({
         contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.7, maxOutputTokens: 2048 },
+        generationConfig: { temperature: 0.8, maxOutputTokens: 4096 },
       }),
     });
 
@@ -228,10 +274,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const jsonStr = rawText.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
 
     let parsed: {
-      item_ids: string[];
-      tip: string;
-      reasoning: { id: string; reason: string }[];
-      missing?: string | null;
+      combinations: {
+        label: string;
+        slots: { slot: string; item_id: string }[];
+        item_ids: string[];
+        tip: string;
+        reasoning: { id: string; reason: string }[];
+        missing?: string | null;
+      }[];
     };
 
     try {
@@ -244,12 +294,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
+    // Validate we have at least one combination
+    if (!parsed.combinations || parsed.combinations.length === 0) {
+      return res.status(502).json({
+        success: false,
+        error: "AI did not return any outfit combinations.",
+      });
+    }
+
     return res.status(200).json({
       success: true,
-      item_ids: parsed.item_ids,
-      tip: parsed.tip,
-      reasoning: parsed.reasoning,
-      missing: parsed.missing || null,
+      combinations: parsed.combinations.map((c) => ({
+        label: c.label,
+        slots: c.slots,
+        item_ids: c.item_ids,
+        tip: c.tip,
+        reasoning: c.reasoning,
+        missing: c.missing || null,
+      })),
     });
   } catch (err: any) {
     console.error("Outfit recommendation error:", err);
