@@ -15,6 +15,7 @@ import {
   X,
   ImageIcon,
   Loader2,
+  Shuffle,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
@@ -36,8 +37,8 @@ interface WeatherData {
 
 const weatherTips: Record<string, string> = {
   hot: "Opt for light fabrics, breathable cotton, and open footwear.",
-  warm: "Go with light layers Ã¢ÂÂ a tee with optional light jacket works great.",
-  mild: "Perfect layering weather Ã¢ÂÂ try a shirt with a light blazer.",
+  warm: "Go with light layers — a tee with optional light jacket works great.",
+  mild: "Perfect layering weather — try a shirt with a light blazer.",
   cool: "Add a structured jacket or sweater over your outfit.",
   cold: "Bundle up with coats, scarves, and warm boots.",
 };
@@ -76,7 +77,7 @@ const useWeather = (): WeatherData | null => {
           city = geoData.city || geoData.locality || "Your Location";
         } catch {}
 
-        const res = await fetch (
+        const res = await fetch(
           `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&timezone=auto`
         );
         const data = await res.json();
@@ -90,7 +91,7 @@ const useWeather = (): WeatherData | null => {
           humidity: current.relative_humidity_2m,
           windSpeed: Math.round(current.wind_speed_10m),
           city,
-          icon: current.weather_code <= 1 ? "Ã¢ÂÂÃ¯Â¸Â" : current.weather_code <= 3 ? "Ã¢ÂÂ" : "Ã°ÂÂÂ§Ã¯Â¸Â",
+          icon: current.weather_code <= 1 ? "☀️" : current.weather_code <= 3 ? "⛅" : "🌧️",
           tip: weatherTips[cat],
         });
       } catch {
@@ -100,7 +101,7 @@ const useWeather = (): WeatherData | null => {
           humidity: 65,
           windSpeed: 12,
           city: "Your Location",
-          icon: "Ã¢ÂÂ",
+          icon: "⛅",
           tip: weatherTips.warm,
         });
       }
@@ -131,7 +132,7 @@ const useWeather = (): WeatherData | null => {
             humidity: 65,
             windSpeed: 12,
             city: "Your Location",
-            icon: "Ã¢ÂÂ",
+            icon: "⛅",
             tip: weatherTips.warm,
           });
         }
@@ -144,7 +145,7 @@ const useWeather = (): WeatherData | null => {
   return weather;
 };
 
-/* ----------------------------------------------------------------- */
+/* ------------------------------------------------------------------ */
 /*  Feature cards                                                      */
 /* ------------------------------------------------------------------ */
 const featureCards = [
@@ -216,7 +217,7 @@ const Home = () => {
     const fetchWeatherOutfit = async () => {
       setLoadingWeatherOutfit(true);
       try {
-        const occasion = `Everyday outfit for ${weather.temp}ÃÂ°C ${weather.condition} weather`;
+        const occasion = `Everyday outfit for ${weather.temp}°C ${weather.condition} weather`;
         const result = await getOutfitRecommendation({
           occasion,
           items: stats.items.map((item: ClothingItem) => ({
@@ -383,7 +384,7 @@ const Home = () => {
         >
           <Shirt className="h-5 w-5 text-ai" />
           <span className="mt-1.5 text-xl font-display font-bold text-foreground">
-            {loadingStats ? "Ã¢ÂÂ" : stats.totalItems}
+            {loadingStats ? "—" : stats.totalItems}
           </span>
           <span className="text-[10px] font-body text-muted-foreground">Total Items</span>
         </motion.div>
@@ -395,7 +396,7 @@ const Home = () => {
         >
           <Heart className="h-5 w-5 text-rose-500" />
           <span className="mt-1.5 text-xl font-display font-bold text-foreground">
-            {loadingStats ? "Ã¢ÂÂ" : stats.favorites}
+            {loadingStats ? "—" : stats.favorites}
           </span>
           <span className="text-[10px] font-body text-muted-foreground">Favorites</span>
         </motion.div>
@@ -407,7 +408,7 @@ const Home = () => {
         >
           <Star className="h-5 w-5 text-amber-500" />
           <span className="mt-1.5 text-xl font-display font-bold text-foreground">
-            {loadingStats ? "Ã¢ÂÂ" : stats.styleScore || "Ã¢ÂÂ"}
+            {loadingStats ? "—" : stats.styleScore || "—"}
           </span>
           <span className="text-[10px] font-body text-muted-foreground">Style Score</span>
         </motion.div>
@@ -462,10 +463,10 @@ const Home = () => {
                 <span className="text-3xl font-emoji">{weather.icon}</span>
                 <div>
                   <span className="text-2xl font-display font-bold text-foreground">
-                    {weather.temp}ÃÂ°C
+                    {weather.temp}°C
                   </span>
                   <p className="text-xs font-body text-muted-foreground">
-                    {weather.condition} ÃÂ· {weather.city}
+                    {weather.condition} · {weather.city}
                   </p>
                 </div>
               </div>
@@ -586,6 +587,20 @@ const Home = () => {
             <div className="text-left">
               <p className="text-sm font-body font-medium text-foreground">Get Styled</p>
               <p className="text-[10px] font-body text-muted-foreground">AI outfit picks</p>
+            </div>
+          </motion.button>
+
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            onClick={() => navigate("/stylist?tab=mix")}
+            className="flex items-center gap-3 rounded-2xl bg-card p-4 transition-colors hover:bg-card/80"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">
+              <Shuffle className="h-5 w-5" />
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-body font-medium text-foreground">Mix & Match</p>
+              <p className="text-[10px] font-body text-muted-foreground">Build your outfit</p>
             </div>
           </motion.button>
 
