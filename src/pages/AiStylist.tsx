@@ -53,7 +53,7 @@ type ResolvedCombination = {
 };
 
 /* ------------------------------------------------------------------ */
-/*  Virtual Try-On Modal — now accepts specific outfit items           */
+/*  Virtual Try-On Modal â now accepts specific outfit items           */
 /* ------------------------------------------------------------------ */
 interface TryOnModalProps {
   isOpen: boolean;
@@ -108,7 +108,7 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
     setError(null);
 
     try {
-      // Determine which items to send — prefer full outfit, fall back to selected single item
+      // Determine which items to send â prefer full outfit, fall back to selected single item
       const itemsToTry = mode === "outfit" && outfitItems.filter((i) => i.image_url).length > 0
         ? outfitItems.filter((i) => i.image_url)
         : selectedItem?.image_url ? [selectedItem] : [];
@@ -120,7 +120,7 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
       }
 
       if (itemsToTry.length === 1) {
-        // Single garment — use original endpoint for backward compatibility
+        // Single garment â use original endpoint for backward compatibility
         const productBase64 = await urlToBase64(itemsToTry[0].image_url);
         const results = await virtualTryOn(bodyPhotoBase64, productBase64, 1);
         if (results.length > 0) {
@@ -131,7 +131,7 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
           setStep("select");
         }
       } else {
-        // Multiple garments — send all at once
+        // Multiple garments â send all at once
         const garments = await Promise.all(
           itemsToTry.map(async (item) => ({
             base64: await urlToBase64(item.image_url),
@@ -139,12 +139,18 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
             label: `${item.category}: ${item.name}`,
           }))
         );
-        const results = await virtualTryOnMulti(bodyPhotoBase64, garments);
-        if (results.length > 0) {
-          setResultImage(`data:${results[0].mimeType};base64,${results[0].base64}`);
-          setStep("result");
-        } else {
-          setError("Couldn't generate try-on with full outfit. Try fewer items or different photos.");
+        try {
+          const results = await virtualTryOnMulti(bodyPhotoBase64, garments);
+          if (results.length > 0) {
+            setResultImage(`data:${results[0].mimeType};base64,${results[0].base64}`);
+            setStep("result");
+          } else {
+            setError("Couldn't generate try-on with full outfit. Try fewer items or different photos.");
+            setStep("select");
+          }
+        } catch (multiErr: any) {
+          console.error("Multi-garment try-on error:", multiErr);
+          setError(multiErr.message || "Couldn't generate try-on with full outfit. Try fewer items or different photos.");
           setStep("select");
         }
       }
@@ -376,7 +382,7 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
                 <div className="mt-3 flex items-center gap-2 rounded-xl bg-ai/10 px-4 py-2.5">
                   <Sparkles className="h-4 w-4 text-ai" />
                   <span className="text-xs font-body text-ai font-medium">
-                    AI-generated preview — {outfitItemsWithImages.length > 1 ? `${outfitItemsWithImages.length}-piece outfit` : selectedItem?.name}
+                    AI-generated preview â {outfitItemsWithImages.length > 1 ? `${outfitItemsWithImages.length}-piece outfit` : selectedItem?.name}
                   </span>
                 </div>
                 <div className="mt-4 flex gap-2">
@@ -455,7 +461,7 @@ const CombinationCard = ({ combo, index, isActive, onTryOn }: CombinationCardPro
         </motion.button>
       </div>
 
-      {/* Outfit items — horizontal scroll with slot labels */}
+      {/* Outfit items â horizontal scroll with slot labels */}
       <div className="flex gap-3 overflow-x-auto px-4 py-3 scrollbar-none">
         {combo.slots.length > 0
           ? combo.slots.map(({ slot, item }, i) => (
@@ -863,7 +869,7 @@ const AiStylist = () => {
             <div className="flex items-center gap-2 mb-4">
               <Sparkles className="h-4 w-4 text-ai" />
               <h2 className="text-lg font-display font-semibold">
-                {selectedOccasion} — {combinations.length} Looks
+                {selectedOccasion} â {combinations.length} Looks
               </h2>
             </div>
 
