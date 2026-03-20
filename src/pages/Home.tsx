@@ -36,8 +36,8 @@ interface WeatherData {
 
 const weatherTips: Record<string, string> = {
   hot: "Opt for light fabrics, breathable cotton, and open footwear.",
-  warm: "Go with light layers â a tee with optional light jacket works great.",
-  mild: "Perfect layering weather â try a shirt with a light blazer.",
+  warm: "Go with light layers Ã¢ÂÂ a tee with optional light jacket works great.",
+  mild: "Perfect layering weather Ã¢ÂÂ try a shirt with a light blazer.",
   cool: "Add a structured jacket or sweater over your outfit.",
   cold: "Bundle up with coats, scarves, and warm boots.",
 };
@@ -90,7 +90,7 @@ const useWeather = (): WeatherData | null => {
           humidity: current.relative_humidity_2m,
           windSpeed: Math.round(current.wind_speed_10m),
           city,
-          icon: current.weather_code <= 1 ? "âï¸" : current.weather_code <= 3 ? "â" : "ð§ï¸",
+          icon: current.weather_code <= 1 ? "Ã¢ÂÂÃ¯Â¸Â" : current.weather_code <= 3 ? "Ã¢ÂÂ" : "Ã°ÂÂÂ§Ã¯Â¸Â",
           tip: weatherTips[cat],
         });
       } catch {
@@ -100,7 +100,7 @@ const useWeather = (): WeatherData | null => {
           humidity: 65,
           windSpeed: 12,
           city: "Your Location",
-          icon: "â",
+          icon: "Ã¢ÂÂ",
           tip: weatherTips.warm,
         });
       }
@@ -131,7 +131,7 @@ const useWeather = (): WeatherData | null => {
             humidity: 65,
             windSpeed: 12,
             city: "Your Location",
-            icon: "â",
+            icon: "Ã¢ÂÂ",
             tip: weatherTips.warm,
           });
         }
@@ -216,7 +216,7 @@ const Home = () => {
     const fetchWeatherOutfit = async () => {
       setLoadingWeatherOutfit(true);
       try {
-        const occasion = `Everyday outfit for ${weather.temp}Â°C ${weather.condition} weather`;
+        const occasion = `Everyday outfit for ${weather.temp}ÃÂ°C ${weather.condition} weather`;
         const result = await getOutfitRecommendation({
           occasion,
           items: stats.items.map((item: ClothingItem) => ({
@@ -245,11 +245,13 @@ const Home = () => {
         });
 
         if (result.success) {
-          const picked = result.item_ids
+          // Use first combination from the new multi-combo response
+          const combo = result.combinations[0];
+          const picked = combo.item_ids
             .map((id) => stats.items.find((item: ClothingItem) => item.id === id))
             .filter(Boolean) as ClothingItem[];
           setWeatherOutfit(picked);
-          setWeatherTipAI(result.tip);
+          setWeatherTipAI(combo.tip);
         }
       } catch {
         // Silently fall back to default tip
@@ -381,7 +383,7 @@ const Home = () => {
         >
           <Shirt className="h-5 w-5 text-ai" />
           <span className="mt-1.5 text-xl font-display font-bold text-foreground">
-            {loadingStats ? "â" : stats.totalItems}
+            {loadingStats ? "Ã¢ÂÂ" : stats.totalItems}
           </span>
           <span className="text-[10px] font-body text-muted-foreground">Total Items</span>
         </motion.div>
@@ -393,7 +395,7 @@ const Home = () => {
         >
           <Heart className="h-5 w-5 text-rose-500" />
           <span className="mt-1.5 text-xl font-display font-bold text-foreground">
-            {loadingStats ? "â" : stats.favorites}
+            {loadingStats ? "Ã¢ÂÂ" : stats.favorites}
           </span>
           <span className="text-[10px] font-body text-muted-foreground">Favorites</span>
         </motion.div>
@@ -405,7 +407,7 @@ const Home = () => {
         >
           <Star className="h-5 w-5 text-amber-500" />
           <span className="mt-1.5 text-xl font-display font-bold text-foreground">
-            {loadingStats ? "â" : stats.styleScore || "â"}
+            {loadingStats ? "Ã¢ÂÂ" : stats.styleScore || "Ã¢ÂÂ"}
           </span>
           <span className="text-[10px] font-body text-muted-foreground">Style Score</span>
         </motion.div>
@@ -460,10 +462,10 @@ const Home = () => {
                 <span className="text-3xl font-emoji">{weather.icon}</span>
                 <div>
                   <span className="text-2xl font-display font-bold text-foreground">
-                    {weather.temp}Â°C
+                    {weather.temp}ÃÂ°C
                   </span>
                   <p className="text-xs font-body text-muted-foreground">
-                    {weather.condition} Â· {weather.city}
+                    {weather.condition} ÃÂ· {weather.city}
                   </p>
                 </div>
               </div>
