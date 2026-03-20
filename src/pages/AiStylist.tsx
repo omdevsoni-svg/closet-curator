@@ -18,9 +18,10 @@ import {
   AlertTriangle,
   ChevronLeft,
   ChevronRight,
+  Shuffle,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { getClosetItems, getProfile, type ClothingItem, type Profile } from "@/lib/database";
 import {
@@ -30,6 +31,7 @@ import {
   getOutfitRecommendation,
   type OutfitCombination,
 } from "@/lib/ai-service";
+import MixAndMatch from "@/components/MixAndMatch";
 
 const occasions = [
   { label: "Date Night", icon: Heart, color: "bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400" },
@@ -522,6 +524,7 @@ const CombinationCard = ({ combo, index, isActive, onTryOn }: CombinationCardPro
 const AiStylist = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [closetItems, setClosetItems] = useState<ClothingItem[]>([]);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -532,6 +535,10 @@ const AiStylist = () => {
   const [aiError, setAiError] = useState<string | null>(null);
   const [tryOnCombo, setTryOnCombo] = useState<ResolvedCombination | null>(null);
   const [showTryOn, setShowTryOn] = useState(false);
+  const [activeTab, setActiveTab] = useState<"ai" | "mix">(
+    searchParams.get("tab") === "mix" ? "mix" : "ai"
+  );
+  const [mixTryOnItems, setMixTryOnItems] = useState<ClothingItem[]>([]);
 
   useEffect(() => {
     if (!user) return;
@@ -627,6 +634,13 @@ const AiStylist = () => {
 
   const handleTryOnCombo = (combo: ResolvedCombination) => {
     setTryOnCombo(combo);
+    setMixTryOnItems([]);
+    setShowTryOn(true);
+  };
+
+  const handleMixTryOn = (items: ClothingItem[]) => {
+    setTryOnCombo(null);
+    setMixTryOnItems(items);
     setShowTryOn(true);
   };
 
@@ -678,11 +692,57 @@ const AiStylist = () => {
             <h1 className="text-2xl font-display font-bold tracking-tight">AI Stylist</h1>
           </div>
           <p className="mt-1 text-sm text-muted-foreground font-body">
-            Get 3 outfit combinations for any occasion ({closetItems.length} items)
+            {activeTab === "ai"
+              ? `Get 3 outfit combinations for any occasion (${closetItems.length} items)`
+              : "Swipe & pick items to create your own outfit"}
           </p>
         </div>
       </div>
 
+      {/* Tab toggle: AI Picks vs Mix & Match */}
+      <div className="mt-4 flex rounded-2xl bg-card p-1">
+        <button
+          onClick={() => setActiveTab("ai")}
+          className={`flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-body font-semibold transition-all ${
+            activeTab === "ai"
+              ? "bg-ai text-ai-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Sparkles className="h-3.5 w-3.5" />
+          AI Picks
+        </button>
+        <button
+          onClick={() => setActiveTab("mix")}
+          className={`flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-body font-semibold transition-all ${
+            activeTab === "mix"
+              ? "bg-ai text-ai-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Shuffle className="h-3.5 w-3.5" />
+          Mix & Match
+        </button>
+      </div>
+
+      {/* Mix & Match tab */}
+      {activeTab === "mix" && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-4"
+        >
+          <MixAndMatch
+            closetItems={closetItems}
+            onTryOn={handleMixTryOn}
+            inline
+          />
+        </motion.div>
+      )}
+
+      {/* AI Picks tab */}
+      {activeTab === "ai" && (
+        <>
       {/* Occasion presets */}
       <div className="mt-6 grid grid-cols-3 gap-2">
         {occasions.map((occ) => {
@@ -781,15 +841,17 @@ const AiStylist = () => {
           </motion.div>
         )}
       </AnimatePresence>
+        </>
+      )}
 
       {/* Virtual Try-On Modal */}
       <TryOnModal
         isOpen={showTryOn}
-        onClose={() => { setShowTryOn(false); setTryOnCombo(null); }}
-        outfitItems={tryOnCombo?.items || []}
+        onClose={() => { setShowTryOn(false); setTryOnCombo(null); setMixTryOnItems([]); }}
+        outfitItems={tryOnCombo?.items || mixTryOnItems}
         allClosetItems={closetItems}
         userId={user?.id || ""}
-        comboLabel={tryOnCombo?.label}
+        comboLabel={tryOnCombo?.label || (mixTryOnItems.length > 0 ? "Mix & Match" : undefined)}
       />
     </div>
   );
