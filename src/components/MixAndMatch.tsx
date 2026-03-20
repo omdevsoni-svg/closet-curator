@@ -299,10 +299,13 @@ const MixAndMatch = ({ closetItems, onTryOn, onClose, inline = false }: MixAndMa
         )}
 
         <motion.button
-          whileTap={{ scale: 0.98 }}
-          onClick={() => onTryOn(selectedItems)}
-          disabled={!canTryOn}
-          className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[hsl(43,70%,50%)] to-[hsl(220,10%,65%)] text-white font-display font-semibold transition-all disabled:opacity-40 shadow-sm"
+          whileTap={canTryOn ? { scale: 0.98 } : undefined}
+          onClick={() => {
+            if (canTryOn) onTryOn(selectedItems);
+          }}
+          className={`flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[hsl(43,70%,50%)] to-[hsl(220,10%,65%)] text-white font-display font-semibold transition-all shadow-sm ${
+            !canTryOn ? "opacity-40 cursor-not-allowed" : "cursor-pointer"
+          }`}
         >
           <Camera className="h-4 w-4" />
           Virtual Try-On ({selectedItems.length} items)
