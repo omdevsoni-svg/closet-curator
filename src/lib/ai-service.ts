@@ -142,7 +142,27 @@ export interface RecommendationRequest {
   };
 }
 
+export interface OutfitSlot {
+  slot: string;
+  item_id: string;
+}
+
+export interface OutfitCombination {
+  label: string;
+  slots: OutfitSlot[];
+  item_ids: string[];
+  tip: string;
+  reasoning: { id: string; reason: string }[];
+  missing: string | null;
+}
+
 export interface RecommendationResponse {
+  success: true;
+  combinations: OutfitCombination[];
+}
+
+/** @deprecated Use RecommendationResponse.combinations instead */
+export interface LegacyRecommendationResponse {
   success: true;
   item_ids: string[];
   tip: string;
@@ -162,7 +182,24 @@ export const getOutfitRecommendation = async (
 
     const data = await res.json();
     if (data.success) {
-      return data as RecommendationResponse;
+      // Handle both new (combinations) and legacy (flat) response formats
+      if (data.combinations) {
+        return data as RecommendationResponse;
+      }
+      // Legacy fallback: wrap single result into combinations array
+      return {
+        success: true,
+        combinations: [
+          {
+            label: "Recommended Look",
+            slots: [],
+            item_ids: data.item_ids,
+            tip: data.tip,
+            reasoning: data.reasoning,
+            missing: data.missing || null,
+          },
+        ],
+      };
     }
     return { success: false, error: data.error || "Recommendation failed" };
   } catch (err) {
