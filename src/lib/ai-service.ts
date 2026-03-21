@@ -125,13 +125,20 @@ export const virtualTryOn = async (
   faceImageBase64?: string
 ): Promise<TryOnResult[]> => {
   try {
+    // Compress images for quality + size balance
+    const compressedBody = await compressBase64Image(bodyImageBase64, 1280, 0.92);
+    const compressedProduct = await compressBase64Image(productImageBase64, 768, 0.80);
+    const compressedFace = faceImageBase64
+      ? await compressBase64Image(faceImageBase64, 1024, 0.92)
+      : undefined;
+
     const res = await fetch("/api/virtual-tryon", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        faceImageBase64: faceImageBase64 || undefined,
-        bodyImageBase64,
-        productImageBase64,
+        faceImageBase64: compressedFace,
+        bodyImageBase64: compressedBody,
+        productImageBase64: compressedProduct,
       }),
     });
 
@@ -167,7 +174,7 @@ export const virtualTryOnMulti = async (
     const compressedBody = await compressBase64Image(bodyImageBase64, 1280, 0.92);
     const compressedGarments = await Promise.all(
       garments.map(async (g) => ({
-        base64: await compressBase64Image(g.base64, 512, 0.70, g.mimeType || "image/jpeg"),
+        base64: await compressBase64Image(g.base64, 768, 0.80, g.mimeType || "image/jpeg"),
         mimeType: "image/jpeg",
         label: g.label,
       }))
@@ -186,7 +193,7 @@ export const virtualTryOnMulti = async (
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        faceImageBase64: faceImageBase64 ? await compressBase64Image(faceImageBase64, 512, 0.70) : undefined,
+        faceImageBase64: faceImageBase64 ? await compressBase64Image(faceImageBase64, 1024, 0.92) : undefined,
         bodyImageBase64: compressedBody,
         productImages: compressedGarments,
       }),
