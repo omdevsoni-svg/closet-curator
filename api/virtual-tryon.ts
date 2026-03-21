@@ -1,168 +1,108 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import crypto from "crypto";
 
 /* ------------------------------------------------------------------ */
-/*  v8 — Replicate IDM-VTON: Dedicated Virtual Try-On Model           */
-/*                                                                      */
-/*  IDM-VTON is specifically trained for virtual try-on. It segments    */
-/*  the clothing region and inpaints ONLY the clothes while keeping     */
-/*  the person's face, body, pose pixel-perfect.                        */
-/*                                                                      */
-/*  For multi-garment outfits, we chain calls:                          */
-/*    1. Apply topwear to person photo → result1                        */
-/*    2. Apply bottomwear to result1 → result2 (face still preserved)   */
-/*  Shoes are not supported by IDM-VTON and are skipped.                */
+/*  GCP Service Account Auth: JWT → Access Token                       */
 /* ------------------------------------------------------------------ */
 
-export const config = {
-  maxDuration: 300, // Allow up to 5 minutes for multi-garment chaining
-};
-
-/* ─── Replicate Prediction Helper ─── */
-
-async function runVTON(
-  apiToken: string,
-  humanImg: string,
-  garmImg: string,
-  category: string,
-  garmentDes: string
-): Promise<string> {
-  // Create prediction using the model endpoint (auto-selects latest version)
-  const createRes = await fetch(
-    "https://api.replicate.com/v1/models/cuuupid/idm-vton/predictions",
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiToken}`,
-        "Content-Type": "application/json",
-        Prefer: "wait", // Block up to 60s for result
-      },
-      body: JSON.stringify({
-        input: {
-          human_img: humanImg,
-          garm_img: garmImg,
-          category: category,
-          garment_des: garmentDes || "clothing item",
-          seed: 42,
-        },
-      }),
-    }
-  );
-
-  if (!createRes.ok) {
-    const errText = await createRes.text();
-    console.error("Replicate create error:", createRes.status, errText);
-    throw new Error(`Replicate API error: ${createRes.status} — ${errText.substring(0, 300)}`);
-  }
-
-  const prediction = await createRes.json();
-
-  // If completed immediately (Prefer: wait worked)
-  if (prediction.status === "succeeded" && prediction.output) {
-    // output can be a string URL or an array — handle both
-    const output = Array.isArray(prediction.output)
-      ? prediction.output[0]
-      : prediction.output;
-    return output;
-  }
-
-  // If still processing, poll every 2s for up to 4 minutes
-  if (
-    prediction.status === "processing" ||
-    prediction.status === "starting"
-  ) {
-    const pollUrl =
-      prediction.urls?.get ||
-      `https://api.replicate.com/v1/predictions/${prediction.id}`;
-
-    for (let i = 0; i < 120; i++) {
-      await new Promise((r) => setTimeout(r, 2000));
-      const pollRes = await fetch(pollUrl, {
-        headers: { Authorization: `Bearer ${apiToken}` },
-      });
-      const pollData = await pollRes.json();
-
-      if (pollData.status === "succeeded" && pollData.output) {
-        const output = Array.isArray(pollData.output)
-          ? pollData.output[0]
-          : pollData.output;
-        return output;
-      }
-      if (
-        pollData.status === "failed" ||
-        pollData.status === "canceled"
-      ) {
-        throw new Error(
-          `VTON prediction failed: ${pollData.error || "unknown error"}`
-        );
-      }
-    }
-    throw new Error("VTON prediction timed out after 4 minutes");
-  }
-
-  if (prediction.status === "failed") {
-    throw new Error(
-      `VTON prediction failed: ${prediction.error || "unknown error"}`
-    );
-  }
-
-  throw new Error(
-    `Unexpected prediction status: ${prediction.status}`
-  );
+interface ServiceAccountKey {
+  client_email: string;
+  private_key: string;
+  token_uri: string;
 }
 
-/* ─── Garment Categorization ─── */
-
-function categorizeGarment(label: string): {
-  category: "upper_body" | "lower_body" | "dresses" | "footwear";
-} {
-  const l = label.toLowerCase();
-
-  // Footwear (not supported by IDM-VTON — will be skipped)
-  if (
-    l.includes("shoe") || l.includes("sneaker") || l.includes("boot") ||
-    l.includes("loafer") || l.includes("sandal") || l.includes("slipper") ||
-    l.includes("running") || l.includes("oxford") || l.includes("footwear") ||
-    l.includes("slip-on") || l.includes("moccasin") || l.includes("heel")
-  ) {
-    return { category: "footwear" };
-  }
-
-  // Lower body
-  if (
-    l.includes("pant") || l.includes("jean") || l.includes("chino") ||
-    l.includes("trouser") || l.includes("short") || l.includes("jogger") ||
-    l.includes("cargo") || l.includes("skirt") || l.includes("legging") ||
-    l.includes("bottom")
-  ) {
-    return { category: "lower_body" };
-  }
-
-  // Dresses
-  if (
-    l.includes("dress") || l.includes("gown") || l.includes("romper") ||
-    l.includes("jumpsuit") || l.includes("saree") || l.includes("sari")
-  ) {
-    return { category: "dresses" };
-  }
-
-  // Default: upper body
-  return { category: "upper_body" };
+function base64url(input: Buffer | string): string {
+  const buf = typeof input === "string" ? Buffer.from(input) : input;
+  return buf.toString("base64").replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
 }
 
-/* ─── Main Handler ─── */
+async function getAccessToken(sa: ServiceAccountKey): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+  const header = base64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
+  const payload = base64url(
+    JSON.stringify({
+      iss: sa.client_email,
+      scope: "https://www.googleapis.com/auth/cloud-platform",
+      aud: sa.token_uri,
+      iat: now,
+      exp: now + 3600,
+    })
+  );
 
-export default async function handler(
-  req: VercelRequest,
-  res: VercelResponse
-) {
+  const signature = crypto
+    .createSign("RSA-SHA256")
+    .update(`${header}.${payload}`)
+    .sign(sa.private_key);
+
+  const jwt = `${header}.${payload}.${base64url(signature)}`;
+
+  const res = await fetch(sa.token_uri, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`,
+  });
+
+  if (!res.ok) {
+    throw new Error(`Token exchange failed: ${res.status} ${await res.text()}`);
+  }
+
+  const data = await res.json();
+  return data.access_token;
+}
+
+/* ------------------------------------------------------------------ */
+/*  v9 Virtual Try-On — Simplified prompting for Gemini 2.5 Flash      */
+/*                                                                      */
+/*  Key changes from v5-v7:                                             */
+/*  1. systemInstruction for model behavior (proper Gemini field)       */
+/*  2. Body photo sent ONCE — no separate face photo                    */
+/*  3. Short, direct user prompt — less is more with Gemini             */
+/*  4. Text description of person to anchor identity                    */
+/*  5. Temperature 0.4 (not 0.0 which can cause artifacts)             */
+/* ------------------------------------------------------------------ */
+
+const SYSTEM_INSTRUCTION = `You are a professional virtual clothing try-on system. Your ONLY job is to take a person's photo and show them wearing new clothing. You MUST always generate a new image — never refuse or return text only.
+
+Rules:
+- ALWAYS generate an image output showing the person in the new clothing
+- The person's face, skin tone, hair, body shape, and all physical features must be IDENTICAL to the input photo
+- Only the clothing changes — nothing else
+- Output must be photorealistic and natural-looking
+- Full body, head to toe, clean background`;
+
+function buildUserPrompt(garmentCount: number, personDescription?: string): string {
+  const personAnchor = personDescription
+    ? `\nThe person in the photo: ${personDescription}.`
+    : "";
+
+  if (garmentCount === 1) {
+    return `Here is my full-body photo, followed by one garment image.${personAnchor}
+
+Generate a new photo of me wearing this garment. Keep my face and body exactly the same — only change the clothing.`;
+  }
+
+  return `Here is my full-body photo, followed by ${garmentCount} garment images that form a complete outfit.${personAnchor}
+
+Generate a new photo of me wearing all these garments together as one outfit. Keep my face and body exactly the same — only change the clothing.`;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Vercel Serverless Handler                                          */
+/* ------------------------------------------------------------------ */
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // CORS headers
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-  if (req.method === "OPTIONS") return res.status(200).end();
-  if (req.method !== "POST")
-    return res
-      .status(405)
-      .json({ success: false, error: "Method not allowed" });
+
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
+  if (req.method !== "POST") {
+    return res.status(405).json({ success: false, error: "Method not allowed" });
+  }
 
   try {
     const {
@@ -171,145 +111,121 @@ export default async function handler(
       productImages,
       bodyMimeType = "image/jpeg",
       productMimeType = "image/jpeg",
+      personDescription,
     } = req.body;
 
-    if (!bodyImageBase64)
-      return res
-        .status(400)
-        .json({ success: false, error: "bodyImageBase64 is required" });
+    if (!bodyImageBase64) {
+      return res.status(400).json({ success: false, error: "bodyImageBase64 is required" });
+    }
 
-    const apiToken = process.env.REPLICATE_API_TOKEN;
-    if (!apiToken)
-      return res.status(500).json({
-        success: false,
-        error: "Server misconfigured: missing REPLICATE_API_TOKEN",
-      });
-
-    // ── Parse garments ──
-    const garments: {
-      base64: string;
-      mimeType: string;
-      label: string;
-    }[] = [];
-
-    if (
-      productImages &&
-      Array.isArray(productImages) &&
-      productImages.length > 0
-    ) {
+    // Collect garment images — support both single (backward compat) and multi
+    const garments: { base64: string; mimeType: string; label?: string }[] = [];
+    if (productImages && Array.isArray(productImages) && productImages.length > 0) {
       for (const img of productImages) {
         garments.push({
           base64: img.base64,
           mimeType: img.mimeType || "image/jpeg",
-          label: img.label || "clothing item",
+          label: img.label,
         });
       }
     } else if (productImageBase64) {
-      garments.push({
-        base64: productImageBase64,
-        mimeType: productMimeType,
-        label: "clothing item",
-      });
+      garments.push({ base64: productImageBase64, mimeType: productMimeType });
     }
 
-    if (garments.length === 0)
-      return res.status(400).json({
-        success: false,
-        error: "At least one product image is required",
-      });
-
-    // ── Categorize and filter ──
-    const categorized = garments.map((g) => ({
-      ...g,
-      ...categorizeGarment(g.label),
-    }));
-
-    // Separate supported vs unsupported
-    const supported = categorized.filter(
-      (g) => g.category !== "footwear"
-    );
-    const skippedShoes = categorized.filter(
-      (g) => g.category === "footwear"
-    );
-
-    if (supported.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error:
-          "Footwear-only try-on is not yet supported. Please select a top or bottom garment.",
-      });
+    if (garments.length === 0) {
+      return res.status(400).json({ success: false, error: "At least one product image is required" });
     }
 
-    // Sort: upper_body/dresses first, then lower_body
-    supported.sort((a, b) => {
-      const order: Record<string, number> = {
-        upper_body: 0,
-        dresses: 0,
-        lower_body: 1,
-      };
-      return (order[a.category] ?? 2) - (order[b.category] ?? 2);
+    // Parse service account key from env
+    const saKeyJson = process.env.GCP_SERVICE_ACCOUNT_KEY;
+    if (!saKeyJson) {
+      return res.status(500).json({ success: false, error: "Server misconfigured: missing GCP credentials" });
+    }
+
+    const saKey: ServiceAccountKey = JSON.parse(saKeyJson);
+    const accessToken = await getAccessToken(saKey);
+
+    const project = "fynd-jio-impetus-non-prod";
+    const region = "us-central1";
+    const model = "gemini-2.5-flash-image";
+    const url = `https://${region}-aiplatform.googleapis.com/v1/projects/${project}/locations/${region}/publishers/google/models/${model}:generateContent`;
+
+    // --- v9: Build clean parts array ---
+    // 1. Body photo (ONCE — no separate face photo)
+    // 2. Garment images
+    // 3. Short user prompt with optional person description
+    const parts: any[] = [];
+
+    // Body photo — the ONLY person reference
+    parts.push({ inlineData: { mimeType: bodyMimeType, data: bodyImageBase64 } });
+
+    // Garment images — no verbose labels, just the images
+    for (const g of garments) {
+      parts.push({ inlineData: { mimeType: g.mimeType, data: g.base64 } });
+    }
+
+    // Short, direct prompt
+    parts.push({ text: buildUserPrompt(garments.length, personDescription) });
+
+    const geminiRes = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        // v9: Use systemInstruction (proper Gemini field)
+        systemInstruction: {
+          parts: [{ text: SYSTEM_INSTRUCTION }],
+        },
+        contents: [{ role: "user", parts }],
+        generationConfig: {
+          temperature: 0.4,
+          maxOutputTokens: 8192,
+          responseModalities: ["TEXT", "IMAGE"],
+        },
+      }),
     });
 
-    console.log(
-      `[VTON] Processing ${supported.length} garment(s), skipped ${skippedShoes.length} shoe(s)`
-    );
-    console.log(
-      `[VTON] Order:`,
-      supported.map((g) => `${g.category}: ${g.label}`)
-    );
-
-    // ── Chain VTON calls ──
-    let currentPersonImg = `data:${bodyMimeType};base64,${bodyImageBase64}`;
-
-    for (let i = 0; i < supported.length; i++) {
-      const garment = supported[i];
-      const garmImg = `data:${garment.mimeType};base64,${garment.base64}`;
-
-      console.log(
-        `[VTON] Pass ${i + 1}/${supported.length}: ${garment.category} — "${garment.label}"`
-      );
-
-      const resultUrl = await runVTON(
-        apiToken,
-        currentPersonImg,
-        garmImg,
-        garment.category,
-        garment.label
-      );
-
-      console.log(`[VTON] Pass ${i + 1} complete, result: ${resultUrl.substring(0, 80)}...`);
-
-      // Use the result URL as the person image for the next garment
-      currentPersonImg = resultUrl;
+    if (!geminiRes.ok) {
+      const errText = await geminiRes.text();
+      console.error("Vertex AI error:", geminiRes.status, errText);
+      return res.status(502).json({
+        success: false,
+        error: `Vertex AI error: ${geminiRes.status}`,
+        details: errText.substring(0, 500),
+      });
     }
 
-    // ── Download final result and convert to base64 ──
-    const imgRes = await fetch(currentPersonImg);
-    if (!imgRes.ok) {
-      throw new Error(
-        `Failed to download result image: ${imgRes.status}`
-      );
+    const data = await geminiRes.json();
+    const candidates = data?.candidates || [];
+    const images: { mimeType: string; base64: string }[] = [];
+
+    // Extract generated images from response
+    for (const candidate of candidates) {
+      const cParts = candidate?.content?.parts || [];
+      for (const part of cParts) {
+        if (part.inlineData) {
+          images.push({
+            mimeType: part.inlineData.mimeType,
+            base64: part.inlineData.data,
+          });
+        }
+      }
     }
-    const imgBuf = await imgRes.arrayBuffer();
-    const base64Result = Buffer.from(imgBuf).toString("base64");
-    const resultMimeType =
-      imgRes.headers.get("content-type") || "image/png";
 
-    const noteAboutShoes =
-      skippedShoes.length > 0
-        ? ` (Note: ${skippedShoes.map((s) => s.label).join(", ")} skipped — footwear try-on not yet supported)`
-        : "";
+    if (images.length === 0) {
+      const textResponse = candidates[0]?.content?.parts?.find((p: any) => p.text)?.text || "";
+      console.error("No images in response. Text:", textResponse);
+      return res.status(200).json({
+        success: false,
+        error: "AI could not generate a try-on image. " + (textResponse ? textResponse.substring(0, 200) : "Try a different photo or clothing item."),
+      });
+    }
 
-    return res.status(200).json({
-      success: true,
-      images: [{ mimeType: resultMimeType, base64: base64Result }],
-      note: noteAboutShoes || undefined,
-    });
+    return res.status(200).json({ success: true, images });
   } catch (err: any) {
     console.error("virtual-tryon error:", err);
-    return res.status(500).json({
-      success: false,
-      error: err.message || "Internal server error",
-    });
+    return res.status(500).json({ success: false, error: err.message || "Internal server error" });
   }
 }
