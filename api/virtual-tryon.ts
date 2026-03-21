@@ -2,9 +2,8 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import crypto from "crypto";
 
 /* ------------------------------------------------------------------ */
-/*  GCP Service Account Auth: JWT → Access Token                       */
+/*  GCP Service Account Auth: JWT → Access Token                      */
 /* ------------------------------------------------------------------ */
-
 interface ServiceAccountKey {
   client_email: string;
   private_key: string;
@@ -36,8 +35,8 @@ async function getAccessToken(sa: ServiceAccountKey): Promise<string> {
     .createSign("RSA-SHA256")
     .update(`${header}.${payload}`)
     .sign(sa.private_key);
-  const jwt = `${header}.${payload}.${base64url(signature)}`;
 
+  const jwt = `${header}.${payload}.${base64url(signature)}`;
   const res = await fetch(sa.token_uri, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -53,81 +52,47 @@ async function getAccessToken(sa: ServiceAccountKey): Promise<string> {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Virtual Try-On Prompts                                              */
+/*  Image Editing Prompts (NOT generation — editing preserves identity)*/
 /* ------------------------------------------------------------------ */
 
-const TRYON_PROMPT_SINGLE = `VIRTUAL TRY-ON — IDENTITY-LOCKED IMAGE GENERATION
+const EDIT_PROMPT_SINGLE = `You are a photo editor. You will receive a photo of a real person followed by a photo of a clothing item.
 
-TASK: Generate a photo of the SAME person wearing the provided garment.
+YOUR TASK: Edit the person's photo to replace ONLY their clothing with the provided garment.
 
-IDENTITY CONTRACT (NON-NEGOTIABLE):
-You have been given MULTIPLE reference photos of the SAME real person.
-The face photos (Images 1, 3, and the final image) are the GROUND TRUTH.
-The output MUST pass a face-recognition check against these references.
+CRITICAL RULES:
+1. The output must be an EDITED VERSION of the input photo — NOT a new photo of a different person.
+2. The person's face MUST remain COMPLETELY UNCHANGED — same face, same expression, same skin tone, same features.
+3. The person's body shape, posture, and proportions MUST remain EXACTLY the same.
+4. The person's hair MUST remain EXACTLY the same — color, style, length.
+5. The background should remain similar or be a clean neutral background.
+6. ONLY the clothing changes. Everything else stays identical to the input photo.
 
-FACE REPRODUCTION CHECKLIST — every point is mandatory:
-- Exact same skin tone and complexion (NO lightening, NO darkening, NO color shift)
-- Exact same facial bone structure (forehead, cheekbones, jawline, chin)
-- Exact same nose (bridge width, tip shape, nostril size)
-- Exact same eyes (shape, size, spacing, color, eyelid crease)
-- Exact same eyebrows (thickness, arch, spacing)
-- Exact same lips (fullness, shape, width)
-- Exact same facial hair pattern (if any)
-- Exact same hair (color, texture, length, style, parting)
-- Exact same ear shape and size
+Think of this as Photoshop — you are cutting out the old clothes and pasting the new garment onto the SAME person in the SAME photo. The face and body are LOCKED and cannot be modified.
 
-BODY REPRODUCTION — from the full-body reference:
-- Same height, build, weight, shoulder width
-- Same posture and proportions
+OUTPUT: The same person from the input photo, with only their clothing changed to the provided garment.`;
 
-CLOTHING CHANGE:
-- Replace ONLY the clothing with the garment shown
-- Keep pose natural and similar to reference
-- Use a clean, neutral background
+function buildEditPromptMulti(count: number): string {
+  return `You are a photo editor. You will receive a photo of a real person followed by ${count} photos of clothing items.
 
-QUALITY GATE: Before outputting, verify the generated face matches Image 1 pixel-for-pixel. If it does not, regenerate.
+YOUR TASK: Edit the person's photo to replace ONLY their clothing with ALL ${count} provided garments worn together as one outfit.
 
-OUTPUT: One photorealistic full-body image of this EXACT person in the new garment.`;
+CRITICAL RULES:
+1. The output must be an EDITED VERSION of the input photo — NOT a new photo of a different person.
+2. The person's face MUST remain COMPLETELY UNCHANGED — same face, same expression, same skin tone, same features.
+3. The person's body shape, posture, and proportions MUST remain EXACTLY the same.
+4. The person's hair MUST remain EXACTLY the same — color, style, length.
+5. The background should remain similar or be a clean neutral background.
+6. ONLY the clothing changes. Everything else stays identical to the input photo.
+7. Combine all ${count} garments into one cohesive outfit on the person.
 
-function buildMultiGarmentPrompt(count: number): string {
-  return `VIRTUAL TRY-ON — IDENTITY-LOCKED IMAGE GENERATION
+Think of this as Photoshop — you are cutting out the old clothes and pasting the new garments onto the SAME person in the SAME photo. The face and body are LOCKED and cannot be modified.
 
-TASK: Generate a photo of the SAME person wearing ${count} garments as one complete outfit.
-
-IDENTITY CONTRACT (NON-NEGOTIABLE):
-You have been given MULTIPLE reference photos of the SAME real person.
-The face photos (Images 1, 3, and the final image) are the GROUND TRUTH.
-The output MUST pass a face-recognition check against these references.
-
-FACE REPRODUCTION CHECKLIST — every point is mandatory:
-- Exact same skin tone and complexion (NO lightening, NO darkening, NO color shift)
-- Exact same facial bone structure (forehead, cheekbones, jawline, chin)
-- Exact same nose (bridge width, tip shape, nostril size)
-- Exact same eyes (shape, size, spacing, color, eyelid crease)
-- Exact same eyebrows (thickness, arch, spacing)
-- Exact same lips (fullness, shape, width)
-- Exact same facial hair pattern (if any)
-- Exact same hair (color, texture, length, style, parting)
-- Exact same ear shape and size
-
-BODY REPRODUCTION — from the full-body reference:
-- Same height, build, weight, shoulder width
-- Same posture and proportions
-
-CLOTHING CHANGE:
-- Replace ONLY the clothing with ALL ${count} garments combined as one outfit
-- Keep pose natural and similar to reference
-- Use a clean, neutral background
-
-QUALITY GATE: Before outputting, verify the generated face matches Image 1 pixel-for-pixel. If it does not, regenerate.
-
-OUTPUT: One photorealistic full-body image of this EXACT person wearing all ${count} garments.`;
+OUTPUT: The same person from the input photo, with only their clothing changed to all ${count} garments combined as one outfit.`;
 }
 
 /* ------------------------------------------------------------------ */
-/*  Vercel Serverless Handler                                           */
+/*  Vercel Serverless Handler                                         */
 /* ------------------------------------------------------------------ */
-
 export default async function handler(
   req: VercelRequest,
   res: VercelResponse
@@ -165,6 +130,7 @@ export default async function handler(
     // Support both single product image (backward compat) and multiple product images
     const garments: { base64: string; mimeType: string; label?: string }[] =
       [];
+
     if (
       productImages &&
       Array.isArray(productImages) &&
@@ -178,13 +144,19 @@ export default async function handler(
         });
       }
     } else if (productImageBase64) {
-      garments.push({ base64: productImageBase64, mimeType: productMimeType });
+      garments.push({
+        base64: productImageBase64,
+        mimeType: productMimeType,
+      });
     }
 
     if (garments.length === 0) {
       return res
         .status(400)
-        .json({ success: false, error: "At least one product image is required" });
+        .json({
+          success: false,
+          error: "At least one product image is required",
+        });
     }
 
     // Parse service account key from env
@@ -192,7 +164,10 @@ export default async function handler(
     if (!saKeyJson) {
       return res
         .status(500)
-        .json({ success: false, error: "Server misconfigured: missing GCP credentials" });
+        .json({
+          success: false,
+          error: "Server misconfigured: missing GCP credentials",
+        });
     }
     const saKey: ServiceAccountKey = JSON.parse(saKeyJson);
     const accessToken = await getAccessToken(saKey);
@@ -202,70 +177,62 @@ export default async function handler(
     const model = "gemini-2.5-flash-image";
     const url = `https://${region}-aiplatform.googleapis.com/v1/projects/${project}/locations/${region}/publishers/google/models/${model}:generateContent`;
 
-    // Build the parts array: TRIPLE-FACE SANDWICH for identity lock
-    // Strategy: Face(1) → Body(2) → Garments → Face(3 repeat) → Prompt → Face(4 final anchor)
+    // ────────────────────────────────────────────────────────
+    // IMAGE EDITING APPROACH (not generation)
+    // Key insight: User's photo is the BASE being edited.
+    // Face image provides the identity ground truth.
+    // We frame this as "edit the photo" not "generate a person".
+    // ────────────────────────────────────────────────────────
+
     const parts: any[] = [];
     const hasFace = !!faceImageBase64;
 
-    // ── IMAGE 1: Face close-up (PRIMARY identity anchor) ──
+    // STEP 1: Establish the editing task with the instruction prompt FIRST
+    const prompt =
+      garments.length > 1
+        ? buildEditPromptMulti(garments.length)
+        : EDIT_PROMPT_SINGLE;
+    parts.push({ text: prompt });
+
+    // STEP 2: The person's photo (THIS IS THE BASE IMAGE TO EDIT)
+    parts.push({
+      text: "Here is the person's photo. This is the photo you must EDIT. The person in your output MUST be this EXACT same person — same face, same skin, same hair, same body. You are only changing their clothes:",
+    });
+    parts.push({
+      inlineData: { mimeType: bodyMimeType, data: bodyImageBase64 },
+    });
+
+    // STEP 3: Face close-up for identity verification
     if (hasFace) {
       parts.push({
-        text: "IMAGE 1 — PRIMARY FACE REFERENCE (CRITICAL): This is the real customer. MEMORIZE this face exactly. Every feature in your output MUST match this photo: skin tone, facial structure, nose, eyes, eyebrows, lips, jawline, hair. This face is the GROUND TRUTH. Any deviation = failure.",
+        text: "Here is a close-up of this person's face for reference. Your output face MUST match this exactly — same skin tone, same facial features, same facial hair, same everything. Use this to verify your output:",
       });
       parts.push({
         inlineData: { mimeType: faceMimeType, data: faceImageBase64 },
       });
     }
 
-    // ── IMAGE 2: Full body reference ──
-    parts.push({
-      text: `IMAGE ${hasFace ? "2" : "1"} — FULL BODY REFERENCE: ${hasFace ? "This is the SAME person as Image 1" : "This is the real customer"}. Match their exact body shape, height, weight, build, proportions, posture, and skin tone:`,
-    });
-    parts.push({
-      inlineData: { mimeType: bodyMimeType, data: bodyImageBase64 },
-    });
-
-    // ── GARMENT IMAGES ──
-    const garmentStartNum = hasFace ? 3 : 2;
+    // STEP 4: Garment image(s) — what to dress them in
     for (let i = 0; i < garments.length; i++) {
       const g = garments[i];
       const label = g.label || `Garment ${i + 1}`;
-      const imgNum = i + garmentStartNum;
       parts.push({
-        text: `IMAGE ${imgNum} — CLOTHING ITEM: ${label}. Dress the person in this garment:`,
+        text: `Here is the clothing item to put on them: ${label}. Replace their current clothing with this:`,
       });
       parts.push({
         inlineData: { mimeType: g.mimeType, data: g.base64 },
       });
     }
 
-    // ── FACE REINFORCEMENT (post-garment) — reminds model of identity ──
-    if (hasFace) {
-      const reinforceNum = garments.length + garmentStartNum;
-      parts.push({
-        text: `IMAGE ${reinforceNum} — IDENTITY CHECK: This is the SAME face from Image 1 again. Before generating, compare your planned output against this face. The person you generate MUST be THIS person — same skin color, same facial features, same hair. If your output face differs from this reference, you MUST correct it:`,
-      });
-      parts.push({
-        inlineData: { mimeType: faceMimeType, data: faceImageBase64 },
-      });
-    }
+    // STEP 5: Final instruction — reinforce editing, not generation
+    parts.push({
+      text: "Now edit the person's photo. Change ONLY their clothing to the garment(s) shown above. The person's face, skin tone, hair, and body must remain IDENTICAL to the original photo. Output the edited photo:",
+    });
 
-    // ── TEXT PROMPT ──
-    const prompt =
-      garments.length > 1
-        ? buildMultiGarmentPrompt(garments.length)
-        : TRYON_PROMPT_SINGLE;
-    parts.push({ text: prompt });
-
-    // ── FINAL FACE ANCHOR (last image = strongest recency signal) ──
-    if (hasFace) {
-      parts.push({
-        text: "FINAL IDENTITY ANCHOR — The output face MUST match this photo exactly. Generate now:",
-      });
-      parts.push({
-        inlineData: { mimeType: faceMimeType, data: faceImageBase64 },
-      });
-    }
+    // STEP 6: Send the person's photo AGAIN as the last image (recency bias)
+    parts.push({
+      inlineData: { mimeType: bodyMimeType, data: bodyImageBase64 },
+    });
 
     const geminiRes = await fetch(url, {
       method: "POST",
