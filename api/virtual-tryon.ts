@@ -102,86 +102,112 @@ export default async function handler(
     const url = `https://${region}-aiplatform.googleapis.com/v1/projects/${project}/locations/${region}/publishers/google/models/${model}:generateContent`;
 
     /* ─────────────────────────────────────────────────────────────
-       BUILD PROMPT + PARTS
+       BUILD PROMPT + PARTS — v5 Triple-Face Identity Anchor
+
        Strategy:
-       1. Show the person FIRST (body + face) as the identity anchor
-       2. Show EACH garment with explicit slot label
-       3. Build a detailed text prompt that references every garment
-          by its slot and describes exactly what to put where
-       4. End with explicit verification checklist
+       1. FACE first as primary identity anchor (face close-up)
+       2. Body photo as pose/build reference
+       3. Each garment with slot labels
+       4. FACE again as mid-prompt reinforcement
+       5. Main instruction with strong identity language
+       6. FACE a third time at the end as final anchor
+
+       The key insight: Gemini tends to "forget" the face when it
+       sees many garment images. By repeating the face 3 times
+       (beginning, middle, end), we force identity preservation.
     ───────────────────────────────────────────────────────────── */
 
     const parts: any[] = [];
     const hasFace = !!faceImageBase64;
 
-    // ── PERSON REFERENCE ──
-    parts.push({
-      text: "[PERSON REFERENCE — do not change this person's identity]\nBelow is the customer. Your output MUST show this EXACT same person: same face, same skin tone, same hair, same body shape.",
-    });
-    parts.push({ inlineData: { mimeType: bodyMimeType, data: bodyImageBase64 } });
-
+    // ── FACE ANCHOR #1 — The very first thing the model sees ──
     if (hasFace) {
       parts.push({
-        text: "[FACE CLOSE-UP — identity verification]\nSame person's face close-up. Preserve every facial detail exactly.",
+        text: `[IDENTITY LOCK — THIS IS THE MOST IMPORTANT IMAGE IN THIS ENTIRE REQUEST]
+This is the customer's face. You MUST memorize every detail: face shape, jawline, nose shape, eye shape, eyebrows, lips, skin tone, facial hair, hairline, hair color, hair style. The output image MUST show THIS EXACT face — not a similar face, not an approximation, but THIS person's actual face reproduced with photographic accuracy.`,
       });
       parts.push({ inlineData: { mimeType: faceMimeType, data: faceImageBase64 } });
     }
+
+    // ── BODY REFERENCE — pose and build ──
+    parts.push({
+      text: `[BODY REFERENCE — same person's full body]
+This shows the customer's full body. Match their exact body proportions, height, build, and skin tone. ${hasFace ? "This is the SAME person whose face you just saw above." : "Preserve this person's identity exactly."}`,
+    });
+    parts.push({ inlineData: { mimeType: bodyMimeType, data: bodyImageBase64 } });
 
     // ── GARMENT IMAGES with explicit slot labels ──
     const garmentDescriptions: string[] = [];
     for (let i = 0; i < garments.length; i++) {
       const g = garments[i];
       const label = g.label || `Garment ${i + 1}`;
-      // Determine slot from label
       const labelLower = label.toLowerCase();
       let slot = "";
-      if (labelLower.includes("top") || labelLower.includes("shirt") || labelLower.includes("tee") || labelLower.includes("polo") || labelLower.includes("hoodie") || labelLower.includes("jacket") || labelLower.includes("blazer") || labelLower.includes("sweater") || labelLower.includes("linen") || labelLower.includes("henley")) {
+      if (labelLower.includes("top") || labelLower.includes("shirt") || labelLower.includes("tee") || labelLower.includes("polo") || labelLower.includes("hoodie") || labelLower.includes("jacket") || labelLower.includes("blazer") || labelLower.includes("sweater") || labelLower.includes("linen") || labelLower.includes("henley") || labelLower.includes("kurta") || labelLower.includes("vest")) {
         slot = "TOPWEAR";
-      } else if (labelLower.includes("bottom") || labelLower.includes("pant") || labelLower.includes("jean") || labelLower.includes("chino") || labelLower.includes("trouser") || labelLower.includes("short") || labelLower.includes("jogger")) {
+      } else if (labelLower.includes("bottom") || labelLower.includes("pant") || labelLower.includes("jean") || labelLower.includes("chino") || labelLower.includes("trouser") || labelLower.includes("short") || labelLower.includes("jogger") || labelLower.includes("cargo")) {
         slot = "BOTTOMWEAR";
-      } else if (labelLower.includes("shoe") || labelLower.includes("sneaker") || labelLower.includes("boot") || labelLower.includes("loafer") || labelLower.includes("sandal") || labelLower.includes("leather c") || labelLower.includes("running") || labelLower.includes("oxford") || labelLower.includes("footwear")) {
+      } else if (labelLower.includes("shoe") || labelLower.includes("sneaker") || labelLower.includes("boot") || labelLower.includes("loafer") || labelLower.includes("sandal") || labelLower.includes("leather c") || labelLower.includes("running") || labelLower.includes("oxford") || labelLower.includes("footwear") || labelLower.includes("slip-on") || labelLower.includes("moccasin")) {
         slot = "FOOTWEAR";
       } else {
         slot = `GARMENT ${i + 1}`;
       }
 
       parts.push({
-        text: `[${slot}: "${label}"]\nStudy this garment image carefully. Note its exact color, pattern, texture, design details, logos, prints, collar style, and fit. The person MUST wear this EXACT garment — not a simplified version of it.`,
+        text: `[${slot}: "${label}"]\nStudy this garment carefully. Note its exact color, pattern, texture, design details, logos, prints, collar style, and fit. The person MUST wear this EXACT garment — not a simplified version.`,
       });
       parts.push({ inlineData: { mimeType: g.mimeType, data: g.base64 } });
-      garmentDescriptions.push(`- ${slot}: "${label}" — reproduce this garment exactly as shown, including all design details, patterns, logos, and colors`);
+      garmentDescriptions.push(`- ${slot}: "${label}" — reproduce exactly as shown with ALL design details, patterns, logos, and colors`);
+    }
+
+    // ── FACE ANCHOR #2 — Mid-prompt reinforcement after garments ──
+    if (hasFace) {
+      parts.push({
+        text: `[FACE REMINDER — Same customer as above. Do NOT forget this face.]
+Here is the customer's face again. After seeing all the garments above, remember: the person wearing these clothes MUST have THIS EXACT face. Do not generate a generic model or a different person.`,
+      });
+      parts.push({ inlineData: { mimeType: faceMimeType, data: faceImageBase64 } });
     }
 
     // ── MAIN INSTRUCTION PROMPT ──
     const garmentList = garmentDescriptions.join("\n");
-    const mainPrompt = `[VIRTUAL TRY-ON INSTRUCTION]
+    const mainPrompt = `[VIRTUAL TRY-ON — PHOTO EDITING TASK]
 
-Generate a photorealistic full-body image of the person shown above wearing ALL of the following garments together as one complete outfit:
+You are a photo editor. Your task is to create a photorealistic image showing the SPECIFIC customer from the reference photos wearing a new outfit. This is NOT about generating a random model — it is about dressing THIS SPECIFIC PERSON in new clothes.
 
+OUTFIT TO APPLY:
 ${garmentList}
 
-GARMENT ACCURACY (CRITICAL — read carefully):
-- Each garment MUST be reproduced with FULL DETAIL: exact colors, exact patterns, exact logos, exact textures, exact collar/neckline style, exact fit
-- Do NOT simplify any garment to just its base color — you must include prints, graphics, text, stripes, patterns, stitching details, and any design elements visible in the garment photos
-- ALL garments must appear in the output — topwear on the upper body, bottomwear on the lower body, footwear on the feet
-- If 3 garments are provided (top + bottom + shoes), ALL 3 must be visible in the output image. Do NOT skip any.
+RULE #1 — FACE IDENTITY (HIGHEST PRIORITY):
+- The generated person MUST be the SAME person from the face and body reference photos
+- Reproduce their EXACT facial features: face shape, nose, eyes, eyebrows, lips, jawline, facial hair, hairline
+- Reproduce their EXACT skin tone, hair color, and hair style
+- If the output face looks even slightly different from the reference, REGENERATE
+- Think of it as: you are photoshopping clothes onto the customer's existing photo
 
-PERSON IDENTITY (CRITICAL):
-- The person MUST be the same person from the reference photo — same face, same skin tone, same hair, same body build
-- Do NOT substitute a different person or model
-- Keep a natural standing pose, full body visible from head to toe
-- Use a clean neutral background
+RULE #2 — GARMENT ACCURACY:
+- Each garment must be reproduced with FULL DETAIL: exact colors, patterns, logos, textures, collar/neckline style, fit
+- Do NOT simplify any garment to just its base color — include prints, graphics, text, stripes, stitching details
+- ALL garments must appear: topwear on upper body, bottomwear on lower body, footwear on feet
+- If 3 garments are provided, ALL 3 must be visible. Do NOT skip any.
 
-VERIFICATION BEFORE OUTPUT:
-1. Is the person's face identical to the reference? If no, fix it.
-2. Is the topwear garment shown with all its details (not just base color)? If no, fix it.
-3. Is the bottomwear garment shown correctly? If no, fix it.
-4. Is the footwear visible and correct? If no, fix it.
-5. Are ALL provided garments present in the image? If no, fix it.
+RULE #3 — COMPOSITION:
+- Natural standing pose, full body visible from head to toe
+- Clean neutral background (light gray or white studio backdrop)
+- Professional fashion photography style lighting
 
 Generate the image now.`;
 
     parts.push({ text: mainPrompt });
+
+    // ── FACE ANCHOR #3 — Final reminder right before generation ──
+    if (hasFace) {
+      parts.push({
+        text: `[FINAL IDENTITY CHECK — Last look at the customer's face before you generate]
+This face MUST appear in your output. Generate now.`,
+      });
+      parts.push({ inlineData: { mimeType: faceMimeType, data: faceImageBase64 } });
+    }
 
     // ── Call Gemini ──
     const geminiRes = await fetch(url, {
@@ -193,7 +219,7 @@ Generate the image now.`;
       body: JSON.stringify({
         contents: [{ role: "user", parts }],
         generationConfig: {
-          temperature: 0.4,
+          temperature: 0.3,
           maxOutputTokens: 8192,
           responseModalities: ["TEXT", "IMAGE"],
         },
