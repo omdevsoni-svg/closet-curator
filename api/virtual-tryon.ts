@@ -102,41 +102,37 @@ export default async function handler(
     const url = `https://${region}-aiplatform.googleapis.com/v1/projects/${project}/locations/${region}/publishers/google/models/${model}:generateContent`;
 
     /* ─────────────────────────────────────────────────────────────
-       BUILD PROMPT + PARTS — v5 Triple-Face Identity Anchor
+       v6 — IMAGE EDITING APPROACH
 
-       Strategy:
-       1. FACE first as primary identity anchor (face close-up)
-       2. Body photo as pose/build reference
-       3. Each garment with slot labels
-       4. FACE again as mid-prompt reinforcement
-       5. Main instruction with strong identity language
-       6. FACE a third time at the end as final anchor
+       Instead of asking Gemini to GENERATE a new person, we ask
+       it to EDIT the existing body photo — only replacing clothes.
+       This preserves the original face/body pixels.
 
-       The key insight: Gemini tends to "forget" the face when it
-       sees many garment images. By repeating the face 3 times
-       (beginning, middle, end), we force identity preservation.
+       Structure:
+       1. "Here is a photo of a person" [body image]
+       2. "Here are the new clothes" [garment images]
+       3. "Edit the photo: replace ONLY the clothes, keep the
+          person's face, body, skin, hair EXACTLY as they are"
     ───────────────────────────────────────────────────────────── */
 
     const parts: any[] = [];
     const hasFace = !!faceImageBase64;
 
-    // ── FACE ANCHOR #1 — The very first thing the model sees ──
+    // ── THE PHOTO TO EDIT — this is the primary input ──
+    parts.push({
+      text: `Edit this photo of a person. You will replace ONLY their clothing — everything else about the person (face, skin, hair, body shape, pose) must remain EXACTLY as it appears in this photo. Do NOT change, alter, or regenerate the person's face in any way. Treat the face as frozen pixels that cannot be modified.`,
+    });
+    parts.push({ inlineData: { mimeType: bodyMimeType, data: bodyImageBase64 } });
+
+    // ── Face reference for extra identity anchoring ──
     if (hasFace) {
       parts.push({
-        text: `[IDENTITY LOCK — THIS IS THE MOST IMPORTANT IMAGE IN THIS ENTIRE REQUEST]
-This is the customer's face. You MUST memorize every detail: face shape, jawline, nose shape, eye shape, eyebrows, lips, skin tone, facial hair, hairline, hair color, hair style. The output image MUST show THIS EXACT face — not a similar face, not an approximation, but THIS person's actual face reproduced with photographic accuracy.`,
+        text: `This is a close-up of the same person's face. The edited output MUST have this IDENTICAL face — same features, same skin tone, same facial hair, same expression. Do NOT alter any facial features.`,
       });
       parts.push({ inlineData: { mimeType: faceMimeType, data: faceImageBase64 } });
     }
 
-    // ── BODY REFERENCE — pose and build ──
-    parts.push({
-      text: `[BODY REFERENCE — same person's full body]
-This shows the customer's full body. Match their exact body proportions, height, build, and skin tone. ${hasFace ? "This is the SAME person whose face you just saw above." : "Preserve this person's identity exactly."}`,
-    });
-    parts.push({ inlineData: { mimeType: bodyMimeType, data: bodyImageBase64 } });
-
-    // ── GARMENT IMAGES with explicit slot labels ──
+    // ── NEW CLOTHES TO DRESS THEM IN ──
     const garmentDescriptions: string[] = [];
     for (let i = 0; i < garments.length; i++) {
       const g = garments[i];
@@ -154,57 +150,43 @@ This shows the customer's full body. Match their exact body proportions, height,
       }
 
       parts.push({
-        text: `[${slot}: "${label}"]\nStudy this garment carefully. Note its exact color, pattern, texture, design details, logos, prints, collar style, and fit. The person MUST wear this EXACT garment — not a simplified version.`,
+        text: `[NEW ${slot}: "${label}"] — Replace their current ${slot.toLowerCase()} with this exact garment. Reproduce every detail: color, pattern, logos, prints, texture, fit.`,
       });
       parts.push({ inlineData: { mimeType: g.mimeType, data: g.base64 } });
-      garmentDescriptions.push(`- ${slot}: "${label}" — reproduce exactly as shown with ALL design details, patterns, logos, and colors`);
+      garmentDescriptions.push(`${slot}: "${label}"`);
     }
 
-    // ── FACE ANCHOR #2 — Mid-prompt reinforcement after garments ──
+    // ── EDITING INSTRUCTIONS ──
+    const garmentList = garmentDescriptions.join(", ");
+    parts.push({
+      text: `[EDITING INSTRUCTIONS]
+
+Edit the original photo by replacing the person's current clothes with: ${garmentList}.
+
+WHAT TO CHANGE:
+- Replace the clothing ONLY with the new garments shown above
+- Each garment must be rendered with FULL detail — exact colors, patterns, logos, prints, textures
+- All garments must appear: topwear on upper body, bottomwear on lower body, footwear on feet
+
+WHAT MUST NOT CHANGE (CRITICAL):
+- The person's FACE must be pixel-perfect identical to the original photo — same eyes, nose, mouth, jawline, skin tone, facial hair, expression
+- The person's HAIR must be identical — same style, color, length
+- The person's BODY PROPORTIONS must be identical — same height, build, weight
+- The person's SKIN TONE must be identical everywhere
+- Think of this as Photoshop: you are selecting ONLY the clothing regions and replacing them. The face and body are on a locked layer that cannot be edited.
+
+OUTPUT:
+- Full body photo, head to toe, same person, new clothes only
+- Clean neutral background
+- Natural lighting
+
+Edit the photo now — change clothes only, preserve everything else exactly.`,
+    });
+
+    // ── Face anchor at the very end ──
     if (hasFace) {
       parts.push({
-        text: `[FACE REMINDER — Same customer as above. Do NOT forget this face.]
-Here is the customer's face again. After seeing all the garments above, remember: the person wearing these clothes MUST have THIS EXACT face. Do not generate a generic model or a different person.`,
-      });
-      parts.push({ inlineData: { mimeType: faceMimeType, data: faceImageBase64 } });
-    }
-
-    // ── MAIN INSTRUCTION PROMPT ──
-    const garmentList = garmentDescriptions.join("\n");
-    const mainPrompt = `[VIRTUAL TRY-ON — PHOTO EDITING TASK]
-
-You are a photo editor. Your task is to create a photorealistic image showing the SPECIFIC customer from the reference photos wearing a new outfit. This is NOT about generating a random model — it is about dressing THIS SPECIFIC PERSON in new clothes.
-
-OUTFIT TO APPLY:
-${garmentList}
-
-RULE #1 — FACE IDENTITY (HIGHEST PRIORITY):
-- The generated person MUST be the SAME person from the face and body reference photos
-- Reproduce their EXACT facial features: face shape, nose, eyes, eyebrows, lips, jawline, facial hair, hairline
-- Reproduce their EXACT skin tone, hair color, and hair style
-- If the output face looks even slightly different from the reference, REGENERATE
-- Think of it as: you are photoshopping clothes onto the customer's existing photo
-
-RULE #2 — GARMENT ACCURACY:
-- Each garment must be reproduced with FULL DETAIL: exact colors, patterns, logos, textures, collar/neckline style, fit
-- Do NOT simplify any garment to just its base color — include prints, graphics, text, stripes, stitching details
-- ALL garments must appear: topwear on upper body, bottomwear on lower body, footwear on feet
-- If 3 garments are provided, ALL 3 must be visible. Do NOT skip any.
-
-RULE #3 — COMPOSITION:
-- Natural standing pose, full body visible from head to toe
-- Clean neutral background (light gray or white studio backdrop)
-- Professional fashion photography style lighting
-
-Generate the image now.`;
-
-    parts.push({ text: mainPrompt });
-
-    // ── FACE ANCHOR #3 — Final reminder right before generation ──
-    if (hasFace) {
-      parts.push({
-        text: `[FINAL IDENTITY CHECK — Last look at the customer's face before you generate]
-This face MUST appear in your output. Generate now.`,
+        text: `[FINAL CHECK] The output face must match this face exactly. Change nothing about the person — only their clothes.`,
       });
       parts.push({ inlineData: { mimeType: faceMimeType, data: faceImageBase64 } });
     }
@@ -219,7 +201,7 @@ This face MUST appear in your output. Generate now.`,
       body: JSON.stringify({
         contents: [{ role: "user", parts }],
         generationConfig: {
-          temperature: 0.3,
+          temperature: 0.2,
           maxOutputTokens: 8192,
           responseModalities: ["TEXT", "IMAGE"],
         },
