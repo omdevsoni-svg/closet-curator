@@ -131,6 +131,7 @@ const Profile = () => {
   const [skinTone, setSkinTone] = useState("Medium");
   const [modelGender, setModelGender] = useState<"women" | "men" | "neutral">("neutral");
   const [bodyPhoto, setBodyPhoto] = useState<string | null>(null);
+  const [facePhoto, setFacePhoto] = useState<string | null>(null);
   const [notifOutfits, setNotifOutfits] = useState(true);
   const [notifGaps, setNotifGaps] = useState(true);
   const [personalization, setPersonalization] = useState(true);
@@ -165,6 +166,7 @@ const Profile = () => {
         setSkinTone(p.skin_tone || "Medium");
         setModelGender((p.model_gender as any) || "neutral");
         setBodyPhoto(p.body_image_url || null);
+        setFacePhoto(p.face_image_url || null);
         setNotifOutfits(p.notif_outfits);
         setNotifGaps(p.notif_gaps);
         setPersonalization(p.personalization);
@@ -180,6 +182,34 @@ const Profile = () => {
     setSaving(true);
     await updateProfile(user.id, updates);
     setSaving(false);
+  };
+
+  const handleFacePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    const localUrl = URL.createObjectURL(file);
+    setFacePreview(localUrl);
+    setFaceUploading(true);
+
+    try {
+      const url = await uploadImage("profile-images", user.id + "/face", file);
+      if (url) {
+        setFacePhoto(url);
+        await savePreferences({ face_image_url: url });
+        showToast("Face photo uploaded successfully", "success");
+      } else {
+        showToast("Failed to upload face photo. Please try again.", "error");
+      }
+    } catch (err) {
+      console.error("Face upload error:", err);
+      showToast("Upload failed. Please try a different image.", "error");
+    } finally {
+      setFaceUploading(false);
+      URL.revokeObjectURL(localUrl);
+      setFacePreview(null);
+      e.target.value = "";
+    }
   };
 
   const handleBodyPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -228,6 +258,7 @@ const Profile = () => {
 
   // Decide which image src to show (local preview during upload, or saved URL)
   const bodyImageSrc = bodyPreview || bodyPhoto;
+  const faceImageSrc = facePreview || facePhoto;
 
   if (loading) {
     return (
@@ -278,7 +309,77 @@ const Profile = () => {
         </button>
       </motion.div>
 
-      {/* Full-Body Image */}
+      {/* Face Close-Up Image */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.12 }}
+          className="mt-4 rounded-2xl bg-card p-5"
+        >
+          <div className="flex items-center justify-between gap-4 py-2">
+            <div className="flex items-center gap-2">
+              <User className="h-4 w-4 text-muted-foreground" />
+              <div>
+                <h3 className="text-sm font-display font-semibold text-foreground">
+                  Face Close-Up
+                </h3>
+                <p className="text-xs text-muted-foreground font-body">
+                  Clear face photo for accurate virtual try-on
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="mt-4 flex items-start gap-4">
+            <div className="relative h-28 w-24 shrink-0 overflow-hidden rounded-xl bg-background ring-2 ring-border">
+              {faceImageSrc ? (
+                <img
+                  src={faceImageSrc}
+                  alt="Face close-up"
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center">
+                  <User className="h-8 w-8 text-muted-foreground/30" />
+                </div>
+              )}
+              {faceUploading && (
+                <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/40">
+                  <Loader2 className="h-6 w-6 animate-spin text-white" />
+                </div>
+              )}
+            </div>
+            <div className="flex-1">
+              <p className="text-xs text-muted-foreground font-body">
+                Upload a clear, well-lit selfie or face photo. This is used to preserve your identity in virtual try-on results.
+              </p>
+              <div className="mt-3 flex gap-2">
+                <label className="flex cursor-pointer items-center gap-1.5 rounded-full bg-background px-3 py-1.5 text-[11px] font-medium text-foreground ring-1 ring-border transition-colors hover:bg-muted">
+                  <Camera className="h-3.5 w-3.5" />
+                  Camera
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="user"
+                    className="hidden"
+                    onChange={handleFacePhotoUpload}
+                  />
+                </label>
+                <label className="flex cursor-pointer items-center gap-1.5 rounded-full bg-background px-3 py-1.5 text-[11px] font-medium text-foreground ring-1 ring-border transition-colors hover:bg-muted">
+                  <ImageIcon className="h-3.5 w-3.5" />
+                  Gallery
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleFacePhotoUpload}
+                  />
+                </label>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Full-Body Image */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
