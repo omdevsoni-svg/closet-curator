@@ -53,7 +53,7 @@ type ResolvedCombination = {
 };
 
 /* ------------------------------------------------------------------ */
-/*  Virtual Try-On Modal ÃÂ¢ÃÂÃÂ now accepts specific outfit items           */
+/*  Virtual Try-On Modal ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ now accepts specific outfit items           */
 /* ------------------------------------------------------------------ */
 interface TryOnModalProps {
   isOpen: boolean;
@@ -69,6 +69,7 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
   const [step, setStep] = useState<"loading" | "no-photo" | "select" | "generating" | "result">("loading");
   const [personPhoto, setPersonPhoto] = useState<string | null>(null);
   const [bodyPhotoBase64, setBodyPhotoBase64] = useState<string | null>(null);
+  const [personDescription, setPersonDescription] = useState<string | undefined>(undefined);
   const [selectedItem, setSelectedItem] = useState<ClothingItem | null>(null);
   const [resultImage, setResultImage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -90,50 +91,14 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
         if (cancelled) return;
         setBodyPhotoBase64(bodyB64);
 
-        // Get dedicated face reference from profile (mandatory)
-        const faceUrl = profile?.face_image_url;
-        if (!faceUrl) {
-          setStep("no-photo");
-          setError("Please upload a face photo in your Profile to use Virtual Try-On.");
-          return;
-        }
-        let faceCropB64: string | undefined;
-        try {
-          faceCropB64 = await urlToBase64(faceUrl);
-          console.log("[TryOn] Face photo loaded:", Math.round(faceCropB64.length / 1024) + "KB");
-        } catch (e) {
-          console.warn("[TryOn] Failed to load face photo:", e);
-          setStep("no-photo");
-          setError("Could not load your face photo. Please re-upload it in Profile.");
-          return;
-        }
+          // v9: Build text description to anchor identity
+          const descParts: string[] = [];
+          if (profile?.model_gender) descParts.push(profile.model_gender === "neutral" ? "person" : profile.model_gender === "men" ? "male" : "female");
+          if (profile?.skin_tone) descParts.push(`${profile.skin_tone} skin tone`);
+          if (profile?.body_type) descParts.push(`${profile.body_type} body type`);
+          if (descParts.length > 0) setPersonDescription(descParts.join(", "));
 
-        // Auto-generate with all outfit items â skip the selection screen
-        const itemsWithImages = outfitItems.filter((i) => i.image_url);
-        if (itemsWithImages.length > 0) {
-          setStep("generating");
-          try {
-            let results: any[] = [];
-            if (itemsWithImages.length === 1) {
-              const productB64 = await urlToBase64(itemsWithImages[0].image_url);
-              results = await virtualTryOn(bodyB64, productB64, 1, faceCropB64);
-            } else {
-              const garments = await Promise.all(
-                itemsWithImages.map(async (item) => ({
-                  base64: await urlToBase64(item.image_url),
-                  mimeType: "image/jpeg",
-                  label: `${item.category}: ${item.name}`,
-                }))
-              );
-              results = await virtualTryOnMulti(bodyB64, garments, faceCropB64);
-            }
-            if (cancelled) return;
-            if (results && results.length > 0) {
-              setResultImage(`data:${results[0].mimeType};base64,${results[0].base64}`);
-              setStep("result");
-            } else {
-              setError("Couldn\u2019t generate try-on. Try different items or update your profile photo.");
-              setStep("select");
+          setStep("select");
             }
           } catch (genErr: any) {
             if (cancelled) return;
@@ -164,7 +129,7 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
     setError(null);
 
     try {
-      // Determine which items to send ÃÂ¢ÃÂÃÂ prefer full outfit, fall back to selected single item
+      // Determine which items to send ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ prefer full outfit, fall back to selected single item
       const itemsToTry = mode === "outfit" && outfitItems.filter((i) => i.image_url).length > 0
         ? outfitItems.filter((i) => i.image_url)
         : selectedItem?.image_url ? [selectedItem] : [];
@@ -176,9 +141,9 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
       }
 
       if (itemsToTry.length === 1) {
-        // Single garment ÃÂ¢ÃÂÃÂ use original endpoint for backward compatibility
+        // Single garment ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ use original endpoint for backward compatibility
         const productBase64 = await urlToBase64(itemsToTry[0].image_url);
-        const results = await virtualTryOn(bodyPhotoBase64, productBase64, 1);
+        const results = await virtualTryOn(bodyPhotoBase64, productBase64, 1, personDescription);
         if (results.length > 0) {
           setResultImage(`data:${results[0].mimeType};base64,${results[0].base64}`);
           setStep("result");
@@ -187,7 +152,7 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
           setStep("select");
         }
       } else {
-        // Multiple garments ÃÂ¢ÃÂÃÂ send all at once
+        // Multiple garments ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ send all at once
         const garments = await Promise.all(
           itemsToTry.map(async (item) => ({
             base64: await urlToBase64(item.image_url),
@@ -196,7 +161,7 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
           }))
         );
         try {
-          const results = await virtualTryOnMulti(bodyPhotoBase64, garments);
+          const results = await virtualTryOnMulti(bodyPhotoBase64, garments, personDescription);
           if (results.length > 0) {
             setResultImage(`data:${results[0].mimeType};base64,${results[0].base64}`);
             setStep("result");
@@ -440,7 +405,7 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
                 <div className="mt-3 flex items-center gap-2 rounded-xl bg-ai/10 px-4 py-2.5">
                   <Sparkles className="h-4 w-4 text-ai" />
                   <span className="text-xs font-body text-ai font-medium">
-                    AI-generated preview ÃÂ¢ÃÂÃÂ {outfitItemsWithImages.length > 1 ? `${outfitItemsWithImages.length}-piece outfit` : selectedItem?.name}
+                    AI-generated preview ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ {outfitItemsWithImages.length > 1 ? `${outfitItemsWithImages.length}-piece outfit` : selectedItem?.name}
                   </span>
                 </div>
                 <div className="mt-4 flex gap-2">
@@ -519,7 +484,7 @@ const CombinationCard = ({ combo, index, isActive, onTryOn }: CombinationCardPro
         </motion.button>
       </div>
 
-      {/* Outfit items ÃÂ¢ÃÂÃÂ horizontal scroll with slot labels */}
+      {/* Outfit items ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ horizontal scroll with slot labels */}
       <div className="flex gap-3 overflow-x-auto px-4 py-3 scrollbar-none">
         {combo.slots.length > 0
           ? combo.slots.map(({ slot, item }, i) => (
@@ -927,7 +892,7 @@ const AiStylist = () => {
             <div className="flex items-center gap-2 mb-4">
               <Sparkles className="h-4 w-4 text-ai" />
               <h2 className="text-lg font-display font-semibold">
-                {selectedOccasion} ÃÂ¢ÃÂÃÂ {combinations.length} Looks
+                {selectedOccasion} ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ {combinations.length} Looks
               </h2>
             </div>
 
