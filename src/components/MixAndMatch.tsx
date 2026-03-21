@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import {
   Sparkles,
   ChevronUp,
@@ -46,6 +46,8 @@ interface SwipeColumnProps {
 
 const SwipeColumn = ({ slot, items, selectedItem, onSelect }: SwipeColumnProps) => {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const isUserScrolling = useRef(false);
+  const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const scrollTo = (dir: "up" | "down") => {
     if (!scrollRef.current) return;
@@ -54,6 +56,54 @@ const SwipeColumn = ({ slot, items, selectedItem, onSelect }: SwipeColumnProps) 
       behavior: "smooth",
     });
   };
+
+  // Find the item closest to the vertical center of the scroll container
+  const findCenteredItem = useCallback(() => {
+    const container = scrollRef.current;
+    if (!container || items.length === 0) return;
+    const containerRect = container.getBoundingClientRect();
+    const centerY = containerRect.top + containerRect.height / 2;
+    let closestItem: ClothingItem | null = null;
+    let closestDist = Infinity;
+    for (const item of items) {
+      const el = container.querySelector(`[data-item-id="${item.id}"]`);
+      if (!el) continue;
+      const rect = el.getBoundingClientRect();
+      const itemCenterY = rect.top + rect.height / 2;
+      const dist = Math.abs(itemCenterY - centerY);
+      if (dist < closestDist) {
+        closestDist = dist;
+        closestItem = item;
+      }
+    }
+    if (closestItem && closestItem.id !== selectedItem?.id) {
+      onSelect(closestItem);
+    }
+  }, [items, selectedItem?.id, onSelect]);
+
+  // Auto-select on scroll (debounced)
+  useEffect(() => {
+    const container = scrollRef.current;
+    if (!container) return;
+    const handleScroll = () => {
+      if (scrollTimer.current) clearTimeout(scrollTimer.current);
+      scrollTimer.current = setTimeout(() => {
+        findCenteredItem();
+      }, 120);
+    };
+    container.addEventListener("scroll", handleScroll, { passive: true });
+    return () => {
+      container.removeEventListener("scroll", handleScroll);
+      if (scrollTimer.current) clearTimeout(scrollTimer.current);
+    };
+  }, [findCenteredItem]);
+
+  // Auto-select first item on mount if nothing selected
+  useEffect(() => {
+    if (!selectedItem && items.length > 0) {
+      onSelect(items[0]);
+    }
+  }, []);
 
   // Auto-scroll to selected item on mount
   useEffect(() => {
@@ -204,7 +254,7 @@ const MixAndMatch = ({
   const handleSelect = (slotKey: string, item: ClothingItem) => {
     setSelections((prev) => ({
       ...prev,
-      [slotKey]: prev[slotKey]?.id === item.id ? null : item,
+      [slotKey]: item,
     }));
   };
 
@@ -257,7 +307,7 @@ const MixAndMatch = ({
       </div>
 
       <p className="mt-1 text-[11px] font-body text-muted-foreground">
-        Swipe up & down in each column to pick items
+        Scroll to browse — center item is auto-selected
       </p>
 
       {/* Mode toggle (show only if dresses exist) */}
