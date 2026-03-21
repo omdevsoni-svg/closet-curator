@@ -198,27 +198,38 @@ export default async function handler(
     // Build the parts array with all reference images + prompt
     const parts: any[] = [];
 
-    // ALWAYS send body image TWICE — once as face reference, once as full body reference
-    // This gives the model a stronger identity signal regardless of garment count
+    // IMAGE 1: Dedicated face close-up (if provided) — highest priority identity signal
+    if (faceImageBase64) {
+      parts.push({
+        text: "IMAGE 1 — FACE CLOSE-UP REFERENCE: This is the REAL CUSTOMER's face. This is the MOST IMPORTANT reference. You MUST reproduce this EXACT face in the output. Study every pixel: exact skin tone and complexion, facial structure, jawline, nose, eyes, eyebrows, lips, facial hair, hair color and style. DO NOT change ANY facial feature. DO NOT lighten or darken the skin. The output MUST look like THIS person:",
+      });
+      parts.push({
+        inlineData: { mimeType: faceMimeType, data: faceImageBase64 },
+      });
+    }
+
+    // IMAGE 2: Full body reference — body shape, proportions, and pose
     parts.push({
-      text: "IMAGE 1 — FACE & IDENTITY REFERENCE: This is the REAL CUSTOMER. You MUST reproduce this EXACT face, skin color, and features. Study every detail of this face — skin tone, facial structure, hair, facial hair. This person's identity MUST be preserved in the output:",
+      text: `IMAGE ${faceImageBase64 ? "2" : "1"} — FULL BODY REFERENCE: ${faceImageBase64 ? "Same customer as the face photo above" : "This is the REAL CUSTOMER"}. Match their exact body shape, height, weight, proportions, and skin tone. The output person MUST look like THIS person, not a model:`,
     });
     parts.push({
       inlineData: { mimeType: bodyMimeType, data: bodyImageBase64 },
     });
 
+    // IMAGE 3: Send body image again for reinforcement
     parts.push({
-      text: "IMAGE 2 — FULL BODY REFERENCE: Same customer as Image 1. Match their exact body shape, height, weight, proportions, and skin tone. The output person must look like THIS person, not a model:",
+      text: `IMAGE ${faceImageBase64 ? "3" : "2"} — IDENTITY REINFORCEMENT: Same person again. Use this to verify you have the correct skin tone, face, and body. Every detail must match:`,
     });
     parts.push({
       inlineData: { mimeType: bodyMimeType, data: bodyImageBase64 },
     });
 
-    // Add all garment images
+    // Add all garment images (numbering continues after reference images)
+    const garmentStartNum = faceImageBase64 ? 4 : 3;
     for (let i = 0; i < garments.length; i++) {
       const g = garments[i];
       const label = g.label || `Garment ${i + 1}`;
-      const imgNum = i + 3;
+      const imgNum = i + garmentStartNum;
       parts.push({
         text: `IMAGE ${imgNum} — CLOTHING ITEM ${i + 1}: ${label} (dress the person in this exact garment):`,
       });
