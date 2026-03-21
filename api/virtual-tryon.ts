@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import crypto from "crypto";
 
 /* ------------------------------------------------------------------ */
-/*  GCP Service Account Auth: JWT ÃÂ¢ÃÂÃÂ Access Token                       */
+/*  GCP Service Account Auth: JWT → Access Token                       */
 /* ------------------------------------------------------------------ */
 
 interface ServiceAccountKey {
@@ -13,7 +13,11 @@ interface ServiceAccountKey {
 
 function base64url(input: Buffer | string): string {
   const buf = typeof input === "string" ? Buffer.from(input) : input;
-  return buf.toString("base64").replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+  return buf
+    .toString("base64")
+    .replace(/=/g, "")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_");
 }
 
 async function getAccessToken(sa: ServiceAccountKey): Promise<string> {
@@ -28,12 +32,10 @@ async function getAccessToken(sa: ServiceAccountKey): Promise<string> {
       exp: now + 3600,
     })
   );
-
   const signature = crypto
     .createSign("RSA-SHA256")
     .update(`${header}.${payload}`)
     .sign(sa.private_key);
-
   const jwt = `${header}.${payload}.${base64url(signature)}`;
 
   const res = await fetch(sa.token_uri, {
@@ -41,88 +43,99 @@ async function getAccessToken(sa: ServiceAccountKey): Promise<string> {
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`,
   });
-
   if (!res.ok) {
-    throw new Error(`Token exchange failed: ${res.status} ${await res.text()}`);
+    throw new Error(
+      `Token exchange failed: ${res.status} ${await res.text()}`
+    );
   }
-
   const data = await res.json();
   return data.access_token;
 }
 
 /* ------------------------------------------------------------------ */
-/*  Virtual Try-On Prompt                                              */
+/*  Virtual Try-On Prompts                                              */
 /* ------------------------------------------------------------------ */
 
 const TRYON_PROMPT_SINGLE = `VIRTUAL TRY-ON: Dress the person in the provided garment.
 
-CRITICAL RULE — IDENTITY LOCK:
-The person in the OUTPUT must be IDENTICAL to the person in Image 1.
-This is NON-NEGOTIABLE. Do NOT generate a different person, model, or face.
+ABSOLUTE RULE — IDENTITY LOCK (HIGHEST PRIORITY):
+The OUTPUT image MUST show the EXACT SAME PERSON from the reference photos.
+This means: same face, same skin color, same ethnicity, same body type, same hair.
+Violation of identity is a FAILURE. The person must be recognizable as the same individual.
 
 IMAGE MAP:
-- Image 1: THE PERSON — replicate this person exactly. Copy every facial detail: jawline, nose, eyes, eyebrows, lips, ears, facial hair, skin texture, complexion, hair color, hair length, hair style. Match their body type, height, build, and skin tone.
-- Image 2: THE GARMENT — the clothing item to dress them in.
+- Image 1: FACE & IDENTITY REFERENCE — Study this face carefully. Memorize every detail: exact skin tone and complexion (DO NOT lighten or darken), facial structure, jawline shape, nose shape, eye shape and color, eyebrow thickness and shape, lip shape, facial hair pattern, hair color and style, forehead size, cheekbone structure.
+- Image 2: FULL BODY REFERENCE — Same person. Match their exact body type, height, build, weight, posture, and proportions.
+- Image 3: THE GARMENT — dress the person in this clothing item.
 
-WHAT TO DO:
-1. Take the exact person from Image 1 — their real face, real body, real skin.
-2. Dress them in the garment from Image 2, replacing only the relevant clothing.
-3. Keep the same pose and background style as Image 1.
+STRICT PROCESS:
+1. Start with the EXACT person from Images 1-2 — do NOT create a new person.
+2. Keep their EXACT skin color (critical — do not make lighter or darker).
+3. Keep their EXACT face (critical — do not substitute a model).
+4. Only change their clothing to the garment from Image 3.
+5. Maintain a similar pose and neutral background.
 
-FORBIDDEN:
-- Do NOT change the face in any way.
-- Do NOT change skin color or tone.
-- Do NOT change hair color, style, or length.
-- Do NOT use a stock model or generic person.
-- Do NOT alter age, ethnicity, or body type.
+ABSOLUTELY FORBIDDEN:
+- Changing the person's skin color or complexion in ANY way
+- Substituting a different face or model
+- Making the person thinner, taller, or different body type
+- Changing hair color, style, length, or facial hair
+- Altering ethnicity, age, or any identifying features
+- Using a stock photo model instead of the actual person
 
-OUTPUT: One photorealistic full-body photo showing the EXACT same person wearing the garment.`
+OUTPUT: One photorealistic full-body photo showing this EXACT person wearing the garment.`;
 
 function buildMultiGarmentPrompt(count: number): string {
-  return `VIRTUAL TRY-ON: Dress the person in ${count} garments.
+  return `VIRTUAL TRY-ON: Dress the person in ${count} garments as one complete outfit.
 
-CRITICAL RULE — IDENTITY LOCK:
-The person in the OUTPUT must be IDENTICAL to the person in Images 1 and 2.
-This is NON-NEGOTIABLE. Do NOT generate a different person, model, or face.
+ABSOLUTE RULE — IDENTITY LOCK (HIGHEST PRIORITY):
+The OUTPUT image MUST show the EXACT SAME PERSON from the reference photos.
+This means: same face, same skin color, same ethnicity, same body type, same hair.
+Violation of identity is a FAILURE. The person must be recognizable as the same individual.
 
 IMAGE MAP:
-- Image 1: FACE REFERENCE — replicate this face pixel-for-pixel. Every detail matters: jawline, nose, eyes, eyebrows, lips, ears, facial hair, skin texture, complexion, hair color, hair length, hair style.
-- Image 2: BODY REFERENCE — same person full body. Match height, build, posture, skin tone, body proportions exactly.
+- Image 1: FACE & IDENTITY REFERENCE — Study this face carefully. Memorize every detail: exact skin tone and complexion (DO NOT lighten or darken), facial structure, jawline shape, nose shape, eye shape and color, eyebrow thickness and shape, lip shape, facial hair pattern, hair color and style, forehead size, cheekbone structure.
+- Image 2: FULL BODY REFERENCE — Same person full body. Match their exact body type, height, build, weight, posture, and proportions.
 - Images 3–${count + 2}: The ${count} garment(s) to dress them in.
 
-WHAT TO DO:
-1. Start with the exact person from Images 1–2 — their real face, real body, real skin.
-2. Remove their current clothes.
-3. Dress them in ALL ${count} provided garments combined as one complete outfit.
-4. Keep the same pose and background style as Image 2.
+STRICT PROCESS:
+1. Start with the EXACT person from Images 1-2 — do NOT create a new person.
+2. Keep their EXACT skin color (critical — do not make lighter or darker).
+3. Keep their EXACT face (critical — do not substitute a model).
+4. Remove their current clothes.
+5. Dress them in ALL ${count} garments combined as one outfit.
+6. Maintain a similar pose and neutral background.
 
-FORBIDDEN:
-- Do NOT change the face in any way.
-- Do NOT change skin color or tone.
-- Do NOT change hair color, style, or length.
-- Do NOT use a stock model or generic person.
-- Do NOT alter age, ethnicity, or body type.
-- Do NOT add or remove glasses, beard, or accessories from the face.
+ABSOLUTELY FORBIDDEN:
+- Changing the person's skin color or complexion in ANY way
+- Substituting a different face or model
+- Making the person thinner, taller, or different body type
+- Changing hair color, style, length, or facial hair
+- Altering ethnicity, age, or any identifying features
+- Using a stock photo model instead of the actual person
 
-OUTPUT: One photorealistic full-body photo showing the EXACT same person wearing all ${count} garments.`;
-  }
+OUTPUT: One photorealistic full-body photo showing this EXACT person wearing all ${count} garments.`;
+}
 
 /* ------------------------------------------------------------------ */
-/*  Vercel Serverless Handler                                          */
+/*  Vercel Serverless Handler                                           */
 /* ------------------------------------------------------------------ */
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(
+  req: VercelRequest,
+  res: VercelResponse
+) {
   // CORS headers
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
-
   if (req.method !== "POST") {
-    return res.status(405).json({ success: false, error: "Method not allowed" });
+    return res
+      .status(405)
+      .json({ success: false, error: "Method not allowed" });
   }
 
   try {
@@ -137,12 +150,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } = req.body;
 
     if (!bodyImageBase64) {
-      return res.status(400).json({ success: false, error: "bodyImageBase64 is required" });
+      return res
+        .status(400)
+        .json({ success: false, error: "bodyImageBase64 is required" });
     }
 
     // Support both single product image (backward compat) and multiple product images
-    const garments: { base64: string; mimeType: string; label?: string }[] = [];
-    if (productImages && Array.isArray(productImages) && productImages.length > 0) {
+    const garments: { base64: string; mimeType: string; label?: string }[] =
+      [];
+    if (
+      productImages &&
+      Array.isArray(productImages) &&
+      productImages.length > 0
+    ) {
       for (const img of productImages) {
         garments.push({
           base64: img.base64,
@@ -155,15 +175,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (garments.length === 0) {
-      return res.status(400).json({ success: false, error: "At least one product image is required" });
+      return res
+        .status(400)
+        .json({ success: false, error: "At least one product image is required" });
     }
 
     // Parse service account key from env
     const saKeyJson = process.env.GCP_SERVICE_ACCOUNT_KEY;
     if (!saKeyJson) {
-      return res.status(500).json({ success: false, error: "Server misconfigured: missing GCP credentials" });
+      return res
+        .status(500)
+        .json({ success: false, error: "Server misconfigured: missing GCP credentials" });
     }
-
     const saKey: ServiceAccountKey = JSON.parse(saKeyJson);
     const accessToken = await getAccessToken(saKey);
 
@@ -175,27 +198,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Build the parts array with all reference images + prompt
     const parts: any[] = [];
 
-    // For multi-garment: send body image TWICE (as face ref + body ref) for stronger identity signal
-    if (garments.length > 1) {
-      parts.push({ text: "FACE CLOSE-UP REFERENCE Ã¢ÂÂ this is the customer. You MUST reproduce this EXACT face, hair, and skin tone:" });
-      parts.push({ inlineData: { mimeType: bodyMimeType, data: bodyImageBase64 } });
-      parts.push({ text: "FULL BODY REFERENCE Ã¢ÂÂ same customer. Match their body shape, height, proportions, and pose:" });
-      parts.push({ inlineData: { mimeType: bodyMimeType, data: bodyImageBase64 } });
-    } else {
-      parts.push({ text: "PERSON REFERENCE IMAGE (match this person's face, body, proportions, and skin tone exactly):" });
-      parts.push({ inlineData: { mimeType: bodyMimeType, data: bodyImageBase64 } });
-    }
+    // ALWAYS send body image TWICE — once as face reference, once as full body reference
+    // This gives the model a stronger identity signal regardless of garment count
+    parts.push({
+      text: "IMAGE 1 — FACE & IDENTITY REFERENCE: This is the REAL CUSTOMER. You MUST reproduce this EXACT face, skin color, and features. Study every detail of this face — skin tone, facial structure, hair, facial hair. This person's identity MUST be preserved in the output:",
+    });
+    parts.push({
+      inlineData: { mimeType: bodyMimeType, data: bodyImageBase64 },
+    });
+
+    parts.push({
+      text: "IMAGE 2 — FULL BODY REFERENCE: Same customer as Image 1. Match their exact body shape, height, weight, proportions, and skin tone. The output person must look like THIS person, not a model:",
+    });
+    parts.push({
+      inlineData: { mimeType: bodyMimeType, data: bodyImageBase64 },
+    });
 
     // Add all garment images
     for (let i = 0; i < garments.length; i++) {
       const g = garments[i];
       const label = g.label || `Garment ${i + 1}`;
-      parts.push({ text: `CLOTHING ITEM ${i + 1}: ${label} (dress the person in this exact garment):` });
+      const imgNum = i + 3;
+      parts.push({
+        text: `IMAGE ${imgNum} — CLOTHING ITEM ${i + 1}: ${label} (dress the person in this exact garment):`,
+      });
       parts.push({ inlineData: { mimeType: g.mimeType, data: g.base64 } });
     }
 
-    // Add the instruction prompt ÃÂ¢ÃÂÃÂ use multi-garment prompt when more than 1 item
-    const prompt = garments.length > 1 ? buildMultiGarmentPrompt(garments.length) : TRYON_PROMPT_SINGLE;
+    // Add the instruction prompt
+    const prompt =
+      garments.length > 1
+        ? buildMultiGarmentPrompt(garments.length)
+        : TRYON_PROMPT_SINGLE;
     parts.push({ text: prompt });
 
     const geminiRes = await fetch(url, {
@@ -207,7 +241,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       body: JSON.stringify({
         contents: [{ role: "user", parts }],
         generationConfig: {
-          temperature: 0.5,
+          temperature: 0.1,
           maxOutputTokens: 8192,
           responseModalities: ["TEXT", "IMAGE"],
         },
@@ -242,18 +276,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (images.length === 0) {
-      // If no images returned, check if there's a text response explaining why
-      const textResponse = candidates[0]?.content?.parts?.find((p: any) => p.text)?.text || "";
+      const textResponse =
+        candidates[0]?.content?.parts?.find((p: any) => p.text)?.text || "";
       console.error("No images in response. Text:", textResponse);
       return res.status(200).json({
         success: false,
-        error: "AI could not generate a try-on image. " + (textResponse ? textResponse.substring(0, 200) : "Try a different photo or clothing item."),
+        error:
+          "AI could not generate a try-on image. " +
+          (textResponse
+            ? textResponse.substring(0, 200)
+            : "Try a different photo or clothing item."),
       });
     }
 
     return res.status(200).json({ success: true, images });
   } catch (err: any) {
     console.error("virtual-tryon error:", err);
-    return res.status(500).json({ success: false, error: err.message || "Internal server error" });
+    return res
+      .status(500)
+      .json({ success: false, error: err.message || "Internal server error" });
   }
 }
