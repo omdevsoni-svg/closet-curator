@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import crypto from "crypto";
 
 /* ------------------------------------------------------------------ */
-/*  GCP Service Account Auth: JWT Ã¢ÂÂ Access Token                       */
+/*  GCP Service Account Auth: JWT ÃÂ¢ÃÂÃÂ Access Token                       */
 /* ------------------------------------------------------------------ */
 
 interface ServiceAccountKey {
@@ -54,51 +54,57 @@ async function getAccessToken(sa: ServiceAccountKey): Promise<string> {
 /*  Virtual Try-On Prompt                                              */
 /* ------------------------------------------------------------------ */
 
-const TRYON_PROMPT_SINGLE = `You are a virtual try-on system. You MUST generate a NEW image showing this person wearing the garment from the last image.
+const TRYON_PROMPT_SINGLE = `VIRTUAL TRY-ON: Dress the person in the provided garment.
 
-IMPORTANT: You MUST change the person's clothing. Do NOT return the original photo unchanged. The output MUST show the person wearing the NEW garment.
+CRITICAL RULE — IDENTITY LOCK:
+The person in the OUTPUT must be IDENTICAL to the person in Image 1.
+This is NON-NEGOTIABLE. Do NOT generate a different person, model, or face.
 
-IMAGES PROVIDED:
-- Image 1: Customer's full body photo (BASE IMAGE to edit)
-- Image 2: Clean garment image (the clothing to dress them in)
+IMAGE MAP:
+- Image 1: THE PERSON — replicate this person exactly. Copy every facial detail: jawline, nose, eyes, eyebrows, lips, ears, facial hair, skin texture, complexion, hair color, hair length, hair style. Match their body type, height, build, and skin tone.
+- Image 2: THE GARMENT — the clothing item to dress them in.
 
-TASK: Replace the person's current clothing with the garment shown in Image 2.
+WHAT TO DO:
+1. Take the exact person from Image 1 — their real face, real body, real skin.
+2. Dress them in the garment from Image 2, replacing only the relevant clothing.
+3. Keep the same pose and background style as Image 1.
 
-CRITICAL RULES:
-1. You MUST generate a NEW image - NOT return any input image unchanged.
-2. The person MUST be wearing the NEW garment from Image 2 in your output.
-3. Preserve the person's EXACT face, skin color, hair, body shape, and all distinctive features.
-4. PRESERVE EYE DETAILS EXACTLY: eye color, contact lenses, glasses - do NOT change or remove them.
-5. ONLY change their clothing - everything else stays identical.
-6. Render the garment with FULL detail: exact color, pattern, fabric texture, buttons, embroidery, design elements as shown in the garment image.
-7. The output must look like a NATURAL PHOTOGRAPH - photorealistic, not a composite.
+FORBIDDEN:
+- Do NOT change the face in any way.
+- Do NOT change skin color or tone.
+- Do NOT change hair color, style, or length.
+- Do NOT use a stock model or generic person.
+- Do NOT alter age, ethnicity, or body type.
 
-OUTPUT: One single photorealistic full-body photo (head to toe), clean background, natural pose. The person MUST be wearing the new garment.`;
+OUTPUT: One photorealistic full-body photo showing the EXACT same person wearing the garment.`
 
 function buildMultiGarmentPrompt(count: number): string {
-  return `IDENTITY-PRESERVING VIRTUAL TRY-ON â ${count} GARMENTS
+  return `VIRTUAL TRY-ON: Dress the person in ${count} garments.
 
-You are an expert virtual try-on system. Your #1 priority is IDENTITY PRESERVATION.
+CRITICAL RULE — IDENTITY LOCK:
+The person in the OUTPUT must be IDENTICAL to the person in Images 1 and 2.
+This is NON-NEGOTIABLE. Do NOT generate a different person, model, or face.
 
-IMAGES PROVIDED:
-- Image 1 (FACE CLOSE-UP): The customer's face â you MUST reproduce this EXACT face.
-- Image 2 (FULL BODY): The same customer's body â match proportions, skin tone, pose.
-- Images 3 through ${count + 2}: Individual garment images to dress them in.
+IMAGE MAP:
+- Image 1: FACE REFERENCE — replicate this face pixel-for-pixel. Every detail matters: jawline, nose, eyes, eyebrows, lips, ears, facial hair, skin texture, complexion, hair color, hair length, hair style.
+- Image 2: BODY REFERENCE — same person full body. Match height, build, posture, skin tone, body proportions exactly.
+- Images 3–${count + 2}: The ${count} garment(s) to dress them in.
 
-ABSOLUTE REQUIREMENTS FOR IDENTITY:
-- The output person MUST be the SAME person from Images 1 and 2 â same face, same skin tone, same hair style, same facial features, same ethnicity, same age.
-- Copy the face EXACTLY â jawline, nose shape, eye shape, eyebrows, lips, facial hair, forehead.
-- Copy the hair EXACTLY â color, length, style, texture, parting.
-- Copy skin tone EXACTLY â do NOT lighten, darken, or change the complexion.
-- If the person wears glasses, keep them. If they have a beard, keep it. If they have tattoos, keep them.
-- Do NOT replace the person with a model or stock photo. The output MUST look like the SAME individual.
+WHAT TO DO:
+1. Start with the exact person from Images 1–2 — their real face, real body, real skin.
+2. Remove their current clothes.
+3. Dress them in ALL ${count} provided garments combined as one complete outfit.
+4. Keep the same pose and background style as Image 2.
 
-CLOTHING TASK:
-- Replace ALL current clothing with the ${count} provided garments combined as one outfit.
-- Render each garment with exact colors, patterns, fabric texture, logos, and design details.
-- Layer garments naturally (shirt under jacket, pants over shoes, etc.)
+FORBIDDEN:
+- Do NOT change the face in any way.
+- Do NOT change skin color or tone.
+- Do NOT change hair color, style, or length.
+- Do NOT use a stock model or generic person.
+- Do NOT alter age, ethnicity, or body type.
+- Do NOT add or remove glasses, beard, or accessories from the face.
 
-OUTPUT: One photorealistic full-body photo, head to toe. The SAME person from the reference, wearing the complete ${count}-piece outfit.`;
+OUTPUT: One photorealistic full-body photo showing the EXACT same person wearing all ${count} garments.`;
   }
 
 /* ------------------------------------------------------------------ */
@@ -171,9 +177,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // For multi-garment: send body image TWICE (as face ref + body ref) for stronger identity signal
     if (garments.length > 1) {
-      parts.push({ text: "FACE CLOSE-UP REFERENCE â this is the customer. You MUST reproduce this EXACT face, hair, and skin tone:" });
+      parts.push({ text: "FACE CLOSE-UP REFERENCE Ã¢ÂÂ this is the customer. You MUST reproduce this EXACT face, hair, and skin tone:" });
       parts.push({ inlineData: { mimeType: bodyMimeType, data: bodyImageBase64 } });
-      parts.push({ text: "FULL BODY REFERENCE â same customer. Match their body shape, height, proportions, and pose:" });
+      parts.push({ text: "FULL BODY REFERENCE Ã¢ÂÂ same customer. Match their body shape, height, proportions, and pose:" });
       parts.push({ inlineData: { mimeType: bodyMimeType, data: bodyImageBase64 } });
     } else {
       parts.push({ text: "PERSON REFERENCE IMAGE (match this person's face, body, proportions, and skin tone exactly):" });
@@ -188,7 +194,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       parts.push({ inlineData: { mimeType: g.mimeType, data: g.base64 } });
     }
 
-    // Add the instruction prompt Ã¢ÂÂ use multi-garment prompt when more than 1 item
+    // Add the instruction prompt ÃÂ¢ÃÂÃÂ use multi-garment prompt when more than 1 item
     const prompt = garments.length > 1 ? buildMultiGarmentPrompt(garments.length) : TRYON_PROMPT_SINGLE;
     parts.push({ text: prompt });
 
