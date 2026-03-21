@@ -127,7 +127,7 @@ export const virtualTryOn = async (
   try {
     // Compress images for quality + size balance
     const compressedBody = await compressBase64Image(bodyImageBase64, 1280, 0.92);
-    const compressedProduct = await compressBase64Image(productImageBase64, 768, 0.80);
+    const compressedProduct = await compressBase64Image(productImageBase64, 1024, 0.90);
     const compressedFace = faceImageBase64
       ? await compressBase64Image(faceImageBase64, 1024, 0.92)
       : undefined;
@@ -174,7 +174,7 @@ export const virtualTryOnMulti = async (
     const compressedBody = await compressBase64Image(bodyImageBase64, 1280, 0.92);
     const compressedGarments = await Promise.all(
       garments.map(async (g) => ({
-        base64: await compressBase64Image(g.base64, 768, 0.80, g.mimeType || "image/jpeg"),
+        base64: await compressBase64Image(g.base64, 1024, 0.90, g.mimeType || "image/jpeg"),
         mimeType: "image/jpeg",
         label: g.label,
       }))
