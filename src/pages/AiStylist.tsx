@@ -94,10 +94,51 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
           if (profile?.body_type) descParts.push(`${profile.body_type} body type`);
           if (descParts.length > 0) setPersonDescription(descParts.join(", "));
 
-          setStep("select");
-          // Auto-select the first outfit item so the Try It On button is immediately usable
+          // Auto-select the first outfit item
           const firstItem = outfitItems.find((i) => i.image_url);
           if (firstItem) setSelectedItem(firstItem);
+
+          // If we have outfit items with images, skip selection and go straight to generating
+          const itemsWithImages = outfitItems.filter((i) => i.image_url);
+          if (itemsWithImages.length > 0) {
+            setStep("generating");
+            // Auto-trigger try-on
+            try {
+              if (itemsWithImages.length === 1) {
+                const productBase64 = await urlToBase64(itemsWithImages[0].image_url);
+                const results = await virtualTryOn(bodyB64, productBase64, 1, descParts.length > 0 ? descParts.join(", ") : undefined);
+                if (results.length > 0) {
+                  setResultImage(`data:${results[0].mimeType};base64,${results[0].base64}`);
+                  setStep("result");
+                } else {
+                  setError("Couldn't generate try-on. Try a different item or photo.");
+                  setStep("select");
+                }
+              } else {
+                const garments = await Promise.all(
+                  itemsWithImages.map(async (item) => ({
+                    base64: await urlToBase64(item.image_url),
+                    mimeType: "image/jpeg",
+                    label: `${item.category}: ${item.name}`,
+                  }))
+                );
+                const results = await virtualTryOnMulti(bodyB64, garments, descParts.length > 0 ? descParts.join(", ") : undefined);
+                if (results.length > 0) {
+                  setResultImage(`data:${results[0].mimeType};base64,${results[0].base64}`);
+                  setStep("result");
+                } else {
+                  setError("Couldn't generate try-on with full outfit. Try fewer items or different photos.");
+                  setStep("select");
+                }
+              }
+            } catch (err) {
+              console.error("Auto try-on error:", err);
+              setError("Something went wrong. Please try again.");
+              setStep("select");
+            }
+          } else {
+            setStep("select");
+          }
         } else {
           setStep("no-photo");
         }
