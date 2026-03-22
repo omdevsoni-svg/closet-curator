@@ -61,14 +61,15 @@ async function getAccessToken(sa: ServiceAccountKey): Promise<string> {
 /*  5. Temperature 0.4 (not 0.0 which can cause artifacts)             */
 /* ------------------------------------------------------------------ */
 
-const SYSTEM_INSTRUCTION = `You are a professional virtual clothing try-on system. Your ONLY job is to take a person's photo and show them wearing new clothing. You MUST always generate a new image — never refuse or return text only.
+const SYSTEM_INSTRUCTION = `You are a professional virtual clothing try-on system. Your ONLY job is to take a person's photo and show them wearing new clothing. You MUST always generate exactly one new image — never refuse, never return text only, never explain why you cannot do it.
 
 Rules:
-- ALWAYS generate an image output showing the person in the new clothing
+- ALWAYS generate an image output — this is mandatory, no exceptions
 - The person's face, skin tone, hair, body shape, and all physical features must be IDENTICAL to the input photo
-- Only the clothing changes — nothing else
-- Output must be photorealistic and natural-looking
-- Full body, head to toe, clean background`;
+- Only the clothing changes — nothing else about the person changes
+- When multiple garments are provided, dress the person in ALL of them together as a complete outfit
+- Output must be photorealistic, natural-looking, full body head to toe, clean background
+- Never skip any garment — every provided clothing item must appear on the person`;
 
 function buildUserPrompt(garmentCount: number, personDescription?: string): string {
   const personAnchor = personDescription
@@ -81,9 +82,9 @@ function buildUserPrompt(garmentCount: number, personDescription?: string): stri
 Generate a new photo of me wearing this garment. Keep my face and body exactly the same — only change the clothing.`;
   }
 
-  return `Here is my full-body photo, followed by ${garmentCount} garment images that form a complete outfit.${personAnchor}
+  return `Here is my full-body photo, followed by ${garmentCount} garment images (topwear, bottomwear, and footwear) that form a complete outfit.${personAnchor}
 
-Generate a new photo of me wearing all these garments together as one outfit. Keep my face and body exactly the same — only change the clothing.`;
+Generate exactly one new photo of me wearing ALL ${garmentCount} garments together as one complete outfit. Every garment must be visible on me. Keep my face and body exactly the same — only change the clothing. You must output an image.`;
 }
 
 /* ------------------------------------------------------------------ */
