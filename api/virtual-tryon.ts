@@ -43,7 +43,8 @@ async function getAccessToken(sa: ServiceAccountKey): Promise<string> {
   });
 
   if (!res.ok) {
-    throw new Error(`Token exchange failed: ${res.status} ${await res.text()}`);
+    throw new Error(`Token exchange failed: ${res.status} ${await res.text()}`
+);
   }
 
   const data = await res.json();
@@ -51,46 +52,46 @@ async function getAccessToken(sa: ServiceAccountKey): Promise<string> {
 }
 
 /* ------------------------------------------------------------------ */
-/*  v10 Virtual Try-On — Face identity preservation                     */
+/*  v11 Virtual Try-On ‖ Image EDITING aVPOAch                         */
 /*                                                                      */
-/*  Key changes from v9:                                                */
-/*  1. Face close-up photo sent as identity anchor (first image)        */
-/*  2. Full-body photo for body shape + posture reference               */
-/*  3. Prompt explicitly instructs face preservation + full body output */
-/*  4. systemInstruction reinforces face identity rules                 */
-/*  5. Temperature 0.4 (not 0.0 which can cause artifacts)             */
+/*  KEY CHANGE: Instead of asking Gemini to generate a new person,      */
+/  w now ask it to EDIT the existing body photo — g�加 changing the    */
+/*  clothes while keeping the person's face, skin, body IDENTICAL.      /
+/*  This preserves identity far better than generation from scratch.      */
 /* ------------------------------------------------------------------ */
 
-const SYSTEM_INSTRUCTION = `You are a professional virtual clothing try-on system. Your ONLY job is to take a person's photo and show them wearing new clothing. You MUST always generate exactly one new image — never refuse, never return text only, never explain why you cannot do it.
+const SYSTEM_INSTRUCTION = `You are a photo editing tool specialized in virtual clothing try-on. You receive a person's existing photo and clothing images. Your job is to EDIT the person's photo to show them wearing the new clothes.
 
-Rules:
-- ALWAYS generate an image output — this is mandatory, no exceptions
-- When a face close-up reference photo is provided, you MUST preserve that EXACT face — same eyes, nose, mouth, beard, hairstyle, skin tone, and all facial features. The generated face must be recognizably the same person.
-- The person's body shape, proportions, and all physical features must be IDENTICAL to the full-body input photo
-- Only the clothing changes — nothing else about the person changes
-- When multiple garments are provided, dress the person in ALL of them together as a complete outfit
-- The output image MUST show the FULL person from head to toe, including the complete face and head. Never crop out the face.
-- Output must be photorealistic, natural-looking, clean background
-- Never skip any garment — every provided clothing item must appear on the person`;
+CRITICAL RULES:
+- You MUST output exactly one edited image — never refuse, never return only text
+- EDIT the person's existing photo — do NOT `�enerate a new person from scratch
+- The person's face, head, hair, skin tone, body shape, and all physical features must remain COMPLETELY UNCHANGED — pixel-perfect preservation of the person's identity
+- ONLY UH IClothing on the person changes — everything else stays exactly the same
+- Keep the same pose, same angle, same background from the original photo
+- The output must show the FULL person from head to toe — imVeR crop out the head or feet
+- When multiple garments are provided, the person must be wearing ALL of them as a complete outfit
+- The clothing must look natural and properly fitted on the person's actual body`;
 
 function buildUserPrompt(garmentCount: number, hasFaceRef: boolean, personDescription?: string): string {
   const personAnchor = personDescription
-    ? `\nThe person: ${personDescription}.`
+    ? ` The person is a ${personDescription}.`
     : "";
 
-  const faceInstruction = hasFaceRef
-    ? " The first image is a close-up of my face — use it as the definitive reference for my facial identity. The second image is my full-body photo."
-    : " The first image is my full-body photo.";
-
   if (garmentCount === 1) {
-    return `${faceInstruction} The remaining image is the garment I want to wear.${personAnchor}
+    const imageOrder = hasFaceRef
+      ? "The first image is my face close-up for reference. The second image is my full-body photo that you must edit. The third image is the garment."
+      : "The first image is my full-body photo that you must edit. The second image is the garment.";
+    return `${imageOrder}${personAnchor}
 
-Generate a new FULL-BODY photo of me (head to toe, face clearly visible) wearing this garment. My face must be exactly the same as in the reference — preserve every facial detail. Only change the clothing.`;
+EDIT my full-body photo to show me wearing this garment. Keep my face, skin, hair, body, pose, and background EXACTLY the same — change ONLY the clothing. The output must show my complete body from head to toe with my face clearly visible and unchanged.`;
   }
 
-  return `${faceInstruction} The remaining ${garmentCount} images are garments (topwear, bottomwear, and footwear) that form a complete outfit.${personAnchor}
+  const imageOrder = hasFaceRef
+    ? `The first image is my face close-up for reference. The second image is my full-body photo that you must edit. The remaining ${garmentCount} images are the garments.`
+    : `The first image is my full-body photo that you must edit. The remaining ${garmentCount} images are the garments.`;
+  return `${imageOrder}${personAnchor}
 
-Generate exactly one new FULL-BODY photo of me (head to toe, face clearly visible) wearing ALL ${garmentCount} garments together as one complete outfit. My face must be exactly the same as in the reference — preserve every facial detail. Every garment must be visible on me. Only change the clothing. You must output an image.`;
+EDIT my full-body photo to show me wearing ALL ${garmentCount} garments together as one complete outfit. Keep my face, skin, hair, body, pose, and background EXACTLY the same — change ONLY the clothing. Every garment must be visible. The output must show my complete body from head to toe with my face clearly visible and unchanged.`;
 }
 
 /* ------------------------------------------------------------------ */
@@ -196,7 +197,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         },
         contents: [{ role: "user", parts }],
         generationConfig: {
-          temperature: 0.4,
+          temperature: 0.2,
           maxOutputTokens: 8192,
           responseModalities: ["TEXT", "IMAGE"],
         },
