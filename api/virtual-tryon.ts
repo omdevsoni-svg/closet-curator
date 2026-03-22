@@ -43,8 +43,7 @@ async function getAccessToken(sa: ServiceAccountKey): Promise<string> {
   });
 
   if (!res.ok) {
-    throw new Error(`Token exchange failed: ${res.status} ${await res.text()}`
-);
+    throw new Error(`Token exchange failed: ${res.status} ${await res.text()}`);
   }
 
   const data = await res.json();
@@ -52,46 +51,42 @@ async function getAccessToken(sa: ServiceAccountKey): Promise<string> {
 }
 
 /* ------------------------------------------------------------------ */
-/*  v11 Virtual Try-On ‖ Image EDITING aVPOAch                         */
+/*  v11 Virtual Try-On — Image EDITING approach                         */
 /*                                                                      */
 /*  KEY CHANGE: Instead of asking Gemini to generate a new person,      */
-/  w now ask it to EDIT the existing body photo — g�加 changing the    */
-/*  clothes while keeping the person's face, skin, body IDENTICAL.      /
-/*  This preserves identity far better than generation from scratch.      */
+/*  we now ask it to EDIT the existing body photo — only changing the    */
+/*  clothes while keeping the person's face, skin, body IDENTICAL.      */
+/*  This preserves identity far better than generation from scratch.     */
 /* ------------------------------------------------------------------ */
 
-const SYSTEM_INSTRUCTION = `You are a photo editing tool specialized in virtual clothing try-on. You receive a person's existing photo and clothing images. Your job is to EDIT the person's photo to show them wearing the new clothes.
+const SYSTEM_INSTRUCTION = `You are a photo editor. You receive a person's photo and one or more clothing item images. You MUST edit the person's photo so they appear wearing the new clothing. Do NOT create a new person — keep the EXACT same person from the input photo.
 
-CRITICAL RULES:
-- You MUST output exactly one edited image — never refuse, never return only text
-- EDIT the person's existing photo — do NOT `�enerate a new person from scratch
-- The person's face, head, hair, skin tone, body shape, and all physical features must remain COMPLETELY UNCHANGED — pixel-perfect preservation of the person's identity
-- ONLY UH IClothing on the person changes — everything else stays exactly the same
-- Keep the same pose, same angle, same background from the original photo
-- The output must show the FULL person from head to toe — imVeR crop out the head or feet
-- When multiple garments are provided, the person must be wearing ALL of them as a complete outfit
-- The clothing must look natural and properly fitted on the person's actual body`;
+ABSOLUTE RULES:
+- Output exactly one image — never refuse, never return only text
+- The person's face MUST be identical to the input photo — same face shape, same eyes, same nose, same mouth, same beard/facial hair, same skin color, same hair. Do NOT alter the face in any way.
+- The person's skin tone and complexion MUST remain exactly the same as the input
+- Keep the same body shape, same pose, same camera angle
+- ONLY replace the clothing — nothing else changes
+- Show the FULL person from head to toe in the output — never crop the head
+- When given multiple garments, dress the person in ALL of them`;
 
 function buildUserPrompt(garmentCount: number, hasFaceRef: boolean, personDescription?: string): string {
   const personAnchor = personDescription
-    ? ` The person is a ${personDescription}.`
+    ? ` I am a ${personDescription}.`
     : "";
 
+  // v11b: Only use body photo — skip face close-up to avoid confusing the model
+  // The body photo already contains the face, so sending a separate face photo
+  // can cause the model to blend/average the two, producing a different face.
   if (garmentCount === 1) {
-    const imageOrder = hasFaceRef
-      ? "The first image is my face close-up for reference. The second image is my full-body photo that you must edit. The third image is the garment."
-      : "The first image is my full-body photo that you must edit. The second image is the garment.";
-    return `${imageOrder}${personAnchor}
+    return `The first image is MY photo — this is what I actually look like. The second image is a garment.${personAnchor}
 
-EDIT my full-body photo to show me wearing this garment. Keep my face, skin, hair, body, pose, and background EXACTLY the same — change ONLY the clothing. The output must show my complete body from head to toe with my face clearly visible and unchanged.`;
+Edit my photo to show me wearing this garment. My face, skin tone, hair, beard, and body must stay EXACTLY as they are in my photo — do not change my appearance at all. Only swap the clothes. Show my full body head to toe.`;
   }
 
-  const imageOrder = hasFaceRef
-    ? `The first image is my face close-up for reference. The second image is my full-body photo that you must edit. The remaining ${garmentCount} images are the garments.`
-    : `The first image is my full-body photo that you must edit. The remaining ${garmentCount} images are the garments.`;
-  return `${imageOrder}${personAnchor}
+  return `The first image is MY photo — this is what I actually look like. The remaining ${garmentCount} images are garments that form a complete outfit.${personAnchor}
 
-EDIT my full-body photo to show me wearing ALL ${garmentCount} garments together as one complete outfit. Keep my face, skin, hair, body, pose, and background EXACTLY the same — change ONLY the clothing. Every garment must be visible. The output must show my complete body from head to toe with my face clearly visible and unchanged.`;
+Edit my photo to show me wearing ALL ${garmentCount} garments together. My face, skin tone, hair, beard, and body must stay EXACTLY as they are in my photo — do not change my appearance at all. Only swap the clothes. Every garment must be visible. Show my full body head to toe.`;
 }
 
 /* ------------------------------------------------------------------ */
@@ -160,20 +155,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const model = "gemini-2.5-flash-image";
     const url = `https://${region}-aiplatform.googleapis.com/v1/projects/${project}/locations/${region}/publishers/google/models/${model}:generateContent`;
 
-    // --- v10: Build parts array with face reference ---
-    // 1. Face close-up (if available — for identity preservation)
-    // 2. Body photo (full body reference)
-    // 3. Garment images
-    // 4. User prompt referencing face + body + garments
+    // --- v11b: Build parts array — body photo only (no face close-up) ---
+    // Sending a separate face close-up confuses the model into blending faces.
+    // The body photo already contains the face, so just send:
+    // 1. Body photo (the person to edit)
+    // 2. Garment images
+    // 3. User prompt
     const parts: any[] = [];
-    const hasFaceRef = !!faceImageBase64;
+    const hasFaceRef = false; // v11b: deliberately skip face photo
 
-    // Face close-up — identity anchor (sent first so model sees face details)
-    if (faceImageBase64) {
-      parts.push({ inlineData: { mimeType: faceMimeType, data: faceImageBase64 } });
-    }
-
-    // Body photo — posture and body shape reference
+    // Body photo — THE person reference (contains face + body)
     parts.push({ inlineData: { mimeType: bodyMimeType, data: bodyImageBase64 } });
 
     // Garment images
@@ -242,7 +233,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     return res.status(200).json({ success: true, images });
   } catch (err: any) {
-    console.error("virtual-tryon error:", err);
+    console.error("Virtual-tryon error:", err);
     return res.status(500).json({ success: false, error: err.message || "Internal server error" });
   }
 }
