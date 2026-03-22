@@ -4,7 +4,7 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 /* ------------------------------------------------------------------ */
-/*  Helper: convert File â base64 string (no data: prefix)            */
+/*  Helper: convert File → base64 string (no data: prefix)            */
 /* ------------------------------------------------------------------ */
 export const fileToBase64 = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -19,7 +19,7 @@ export const fileToBase64 = (file: File): Promise<string> =>
   });
 
 /* ------------------------------------------------------------------ */
-/*  Helper: convert image URL â base64 string                         */
+/*  Helper: convert image URL → base64 string                         */
 /* ------------------------------------------------------------------ */
 export const urlToBase64 = async (url: string): Promise<string> => {
   const res = await fetch(url);
@@ -51,7 +51,7 @@ export const urlToBase64 = async (url: string): Promise<string> => {
 };
 
 /* ------------------------------------------------------------------ */
-/*  AI Attribute Detection â calls Gemini API directly                 */
+/*  AI Attribute Detection — calls Gemini API directly                 */
 /* ------------------------------------------------------------------ */
 export interface DetectedAttributes {
   name: string;
@@ -100,7 +100,7 @@ export const detectClothingAttributes = async (
 };
 
 /* ------------------------------------------------------------------ */
-/*  Virtual Try-On â calls Vercel serverless function with face + body */
+/*  Virtual Try-On — calls Vercel serverless function with face + body */
 /* ------------------------------------------------------------------ */
 export interface TryOnResult {
   mimeType: string;
@@ -111,7 +111,8 @@ export const virtualTryOn = async (
   bodyImageBase64: string,
   productImageBase64: string,
   sampleCount = 1,
-  personDescription?: string
+  personDescription?: string,
+  faceImageBase64?: string
 ): Promise<TryOnResult[]> => {
   try {
     const res = await fetch("/api/virtual-tryon", {
@@ -119,6 +120,7 @@ export const virtualTryOn = async (
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         bodyImageBase64,
+        faceImageBase64: faceImageBase64 || undefined,
         productImageBase64,
         personDescription: personDescription || undefined,
       }),
@@ -137,7 +139,7 @@ export const virtualTryOn = async (
 };
 
 /* ------------------------------------------------------------------ */
-/*  Virtual Try-On (Multi-Garment) â sends all outfit items at once    */
+/*  Virtual Try-On (Multi-Garment) — sends all outfit items at once    */
 /* ------------------------------------------------------------------ */
 export interface GarmentInput {
   base64: string;
@@ -148,7 +150,8 @@ export interface GarmentInput {
 export const virtualTryOnMulti = async (
   bodyImageBase64: string,
   garments: GarmentInput[],
-  personDescription?: string
+  personDescription?: string,
+  faceImageBase64?: string
 ): Promise<TryOnResult[]> => {
   try {
     const res = await fetch("/api/virtual-tryon", {
@@ -156,6 +159,7 @@ export const virtualTryOnMulti = async (
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         bodyImageBase64,
+        faceImageBase64: faceImageBase64 || undefined,
         productImages: garments.map((g) => ({
           base64: g.base64,
           mimeType: g.mimeType || "image/jpeg",
@@ -178,7 +182,7 @@ export const virtualTryOnMulti = async (
 };
 
 /* ------------------------------------------------------------------ */
-/*  AI Outfit Recommendation â calls Gemini via serverless function    */
+/*  AI Outfit Recommendation — calls Gemini via serverless function    */
 /* ------------------------------------------------------------------ */
 
 export interface RecommendationRequest {
