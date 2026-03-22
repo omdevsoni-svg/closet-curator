@@ -32,7 +32,7 @@ import {
   getOutfitRecommendation,
   type OutfitCombination,
 } from "@/lib/ai-service";
-import MixAndMatch from "@/components/MixAndMatch";
+import MixAndMatch from "A/components/MixAndMatch";
 
 const occasions = [
   { label: "Date Night", icon: Heart, color: "bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400" },
@@ -53,7 +53,7 @@ type ResolvedCombination = {
 };
 
 /* ------------------------------------------------------------------ */
-/*  Virtual Try-On Modal â now accepts specific outfit items           */
+/*  Virtual Try-On Modal — now accepts specific outfit items           */
 /* ------------------------------------------------------------------ */
 interface TryOnModalProps {
   isOpen: boolean;
@@ -69,6 +69,7 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
   const [step, setStep] = useState<"loading" | "no-photo" | "select" | "generating" | "result">("loading");
   const [personPhoto, setPersonPhoto] = useState<string | null>(null);
   const [bodyPhotoBase64, setBodyPhotoBase64] = useState<string | null>(null);
+  const [facePhotoBase64, setFacePhotoBase64] = useState<string | null>(null);
   const [personDescription, setPersonDescription] = useState<string | undefined>(undefined);
   const [selectedItem, setSelectedItem] = useState<ClothingItem | null>(null);
   const [resultImage, setResultImage] = useState<string | null>(null);
@@ -87,7 +88,19 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
           const bodyB64 = await urlToBase64(bodyUrl);
           setBodyPhotoBase64(bodyB64);
 
-          // v9: Build text description to anchor identity
+          // v10: Load face close-up for identity preservation
+          const faceUrl = profile?.face_image_url;
+          let faceB64: string | null = null;
+          if (faceUrl) {
+            try {
+              faceB64 = await urlToBase64(faceUrl);
+              setFacePhotoBase64(faceB64);
+            } catch (e) {
+              console.warn("Could not load face photo, continuing without it:", e);
+            }
+          }
+
+          // Build text description to anchor identity
           const descParts: string[] = [];
           if (profile?.model_gender) descParts.push(profile.model_gender === "neutral" ? "person" : profile.model_gender === "men" ? "male" : "female");
           if (profile?.skin_tone) descParts.push(`${profile.skin_tone} skin tone`);
@@ -100,21 +113,17 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
 
           // If we have outfit items with images, skip selection and go straight to generating
           const itemsWithImages = outfitItems.filter((i) => i.image_url);
+          const desc = descParts.length > 0 ? descParts.join(", ") : undefined;
           if (itemsWithImages.length > 0) {
             setStep("generating");
-            // Auto-trigger try-on
             try {
+              let results: { mimeType: string; base64: string }[] = [];
+
               if (itemsWithImages.length === 1) {
                 const productBase64 = await urlToBase64(itemsWithImages[0].image_url);
-                const results = await virtualTryOn(bodyB64, productBase64, 1, descParts.length > 0 ? descParts.join(", ") : undefined);
-                if (results.length > 0) {
-                  setResultImage(`data:${results[0].mimeType};base64,${results[0].base64}`);
-                  setStep("result");
-                } else {
-                  setError("Couldn't generate try-on. Try a different item or photo.");
-                  setStep("select");
-                }
+                results = await virtualTryOn(bodyB64, productBase64, 1, desc, faceB64 || undefined);
               } else {
+                // All garments needed — use multi with retry for consistency
                 const garments = await Promise.all(
                   itemsWithImages.map(async (item) => ({
                     base64: await urlToBase64(item.image_url),
@@ -122,20 +131,26 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
                     label: `${item.category}: ${item.name}`,
                   }))
                 );
-                let results: { mimeType: string; base64: string }[] = [];
+
+                // Retry up to 3 times for consistent multi-garment results
                 const MAX_RETRIES = 3;
                 for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-                  results = await virtualTryOnMulti(bodyB64, garments, descParts.length > 0 ? descParts.join(", ") : undefined);
+                  console.log(`Multi-garment try-on attempt ${attempt}/${MAX_RETRIES}...`);
+                  results = await virtualTryOnMulti(bodyB64, garments, desc, faceB64 || undefined);
                   if (results.length > 0) break;
-                  if (attempt < MAX_RETRIES) await new Promise((r) => setTimeout(r, 1000));
+                  if (attempt < MAX_RUTR%SH {
+                    // Brief pause before retry
+                    await new Promise((r) => setTimeout(r, 1000));
+                  }
                 }
-                if (results.length > 0) {
-                  setResultImage(`data:${results[0].mimeType};base64,${results[0].base64}`);
-                  setStep("result");
-                } else {
-                  setError("Couldn't generate try-on with full outfit. Try fewer items or different photos.");
-                  setStep("select");
-                }
+              }
+
+              if (results.length > 0) {
+                setResultImage(`data:${results[0].mimeType};base64,${results[0].base64}`);
+                setStep("result");
+              } else {
+                setError("Couldn't generate try-on with full outfit. Please try again.");
+                setStep("select");
               }
             } catch (err) {
               console.error("Auto try-on error:", err);
@@ -152,7 +167,7 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
         console.error("Failed to load profile photo:", err);
         setStep("no-photo");
       }
-    };
+  };
     loadProfilePhoto();
   }, [isOpen, userId]);
 
@@ -164,10 +179,10 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
     setError(null);
 
     try {
-      // Determine which items to send â prefer full outfit, fall back to selected single item
+      // Determine which items to send – prefer full outfit, fall back to selected single item
       const itemsToTry = mode === "outfit" && outfitItems.filter((i) => i.image_url).length > 0
-        ? outfitItems.filter((i) => i.image_url)
-        : selectedItem?.image_url ? [selectedItem] : [];
+        ? outfitItems.filter((i) => i i.image_url)
+        ? selectedItem?.image_url ? [selectedItem] : [];
 
       if (itemsToTry.length === 0) {
         setError("No items with images to try on.");
@@ -175,19 +190,13 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
         return;
       }
 
+      let results: { mimeType: string; base64: string }[] = [];
+
       if (itemsToTry.length === 1) {
-        // Single garment
         const productBase64 = await urlToBase64(itemsToTry[0].image_url);
-        const results = await virtualTryOn(bodyPhotoBase64, productBase64, 1, personDescription);
-        if (results.length > 0) {
-          setResultImage(`data:${results[0].mimeType};base64,${results[0].base64}`);
-          setStep("result");
-        } else {
-          setError("Couldn't generate try-on. Try a different item or photo.");
-          setStep("select");
-        }
+        results = await virtualTryOn(bodyPhotoBase64, productBase64, 1, personDescription, facePhotoBase64 || undefined);
       } else {
-        // Multiple garments â send all at once
+        // All garments needed — use multi with retry for consistency
         const garments = await Promise.all(
           itemsToTry.map(async (item) => ({
             base64: await urlToBase64(item.image_url),
@@ -195,20 +204,25 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
             label: `${item.category}: ${item.name}`,
           }))
         );
-        let results: { mimeType: string; base64: string }[] = [];
+
+        // Retry up to 3 times for consistent multi-garment results
         const MAX_RETRIES = 3;
         for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-          results = await virtualTryOnMulti(bodyPhotoBase64, garments, personDescription);
+          console.log(`Multi-garment try-on attempt ${attempt}/${MAX_RETRIES}...`);
+          results = await virtualTryOnMulti(bodyPhotoBase64, garments, personDescription, facePhotoBase64 || undefined);
           if (results.length > 0) break;
-          if (attempt < MAX_RETRIES) await new Promise((r) => setTimeout(r, 1000));
+          if (attempt < MAX_RETRIES) {
+            await new Promise((r) => setTimeout(r, 1000));
+          }
         }
-        if (results.length > 0) {
-          setResultImage(`data:${results[0].mimeType};base64,${results[0].base64}`);
-          setStep("result");
-        } else {
-          setError("Couldn't generate try-on with full outfit. Try fewer items or different photos.");
-          setStep("select");
-        }
+      }
+
+      if (results.length > 0) {
+        setResultImage(`data:${results[0].mimeType};base64,${results[0].base64}`);
+        setStep("result");
+      } else {
+        setError("Couldn't generate try-on with full outfit. Please try again.");
+        setStep("select");
       }
     } catch (err) {
       console.error("Try-on error:", err);
@@ -438,7 +452,7 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
                 <div className="mt-3 flex items-center gap-2 rounded-xl bg-ai/10 px-4 py-2.5">
                   <Sparkles className="h-4 w-4 text-ai" />
                   <span className="text-xs font-body text-ai font-medium">
-                    AI-generated preview â {outfitItemsWithImages.length > 1 ? `${outfitItemsWithImages.length}-piece outfit` : selectedItem?.name}
+                    AI-generated preview — {outfitItemsWithImages.length > 1 ? `${outfitItemsWithImages.length}-piece outfit` : selectedItem?.name}
                   </span>
                 </div>
                 <div className="mt-4 flex gap-2">
@@ -517,7 +531,7 @@ const CombinationCard = ({ combo, index, isActive, onTryOn }: CombinationCardPro
         </motion.button>
       </div>
 
-      {/* Outfit items â horizontal scroll with slot labels */}
+      {/* Outfit items — horizontal scroll with slot labels */}
       <div className="flex gap-3 overflow-x-auto px-4 py-3 scrollbar-none">
         {combo.slots.length > 0
           ? combo.slots.map(({ slot, item }, i) => (
@@ -617,102 +631,8 @@ const CombinationCard = ({ combo, index, isActive, onTryOn }: CombinationCardPro
         </AnimatePresence>
       </div>
     </motion.div>
-  );
-};
-
-/* ------------------------------------------------------------------ */
-/*  AI Stylist component                                               */
-/* ------------------------------------------------------------------ */
-const AiStylist = () => {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const [closetItems, setClosetItems] = useState<ClothingItem[]>([]);
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [selectedOccasion, setSelectedOccasion] = useState<string | null>(null);
-  const [prompt, setPrompt] = useState("");
-  const [combinations, setCombinations] = useState<ResolvedCombination[]>([]);
-  const [generating, setGenerating] = useState(false);
-  const [aiError, setAiError] = useState<string | null>(null);
-  const [tryOnCombo, setTryOnCombo] = useState<ResolvedCombination | null>(null);
-  const [showTryOn, setShowTryOn] = useState(false);
-  const [activeTab, setActiveTab] = useState<"ai" | "mix">(
-    searchParams.get("tab") === "mix" ? "mix" : "ai"
-  );
-  const [mixTryOnItems, setMixTryOnItems] = useState<ClothingItem[]>([]);
-
-  useEffect(() => {
-    if (!user) return;
-    const load = async () => {
-      const [items, prof] = await Promise.all([
-        getClosetItems(user.id),
-        getProfile(user.id),
-      ]);
-      setClosetItems(items);
-      setProfile(prof);
-      setLoading(false);
-    };
-    load();
-  }, [user]);
-
-  const fetchRecommendations = async (occasion: string) => {
-    setSelectedOccasion(occasion);
-    setGenerating(true);
-    setAiError(null);
-    setCombinations([]);
-
-    try {
-      const result = await getOutfitRecommendation({
-        occasion,
-        items: closetItems.map((item) => ({
-          id: item.id,
-          name: item.name,
-          category: item.category,
-          color: item.color,
-          tags: item.tags,
-          material: item.material,
-          gender: item.gender,
-          image_url: item.image_url,
-        })),
-        profile: profile?.personalization
-          ? {
-              body_type: profile.body_type,
-              skin_tone: profile.skin_tone,
-              model_gender: profile.model_gender,
-            }
-          : undefined,
-      });
-
-      if (result.success) {
-        const resolved: ResolvedCombination[] = result.combinations.map((combo) => {
-          const resolvedSlots = combo.slots
-            .map((s) => {
-              const item = closetItems.find((i) => i.id === s.item_id);
-              return item ? { slot: s.slot, item } : null;
-            })
-            .filter(Boolean) as { slot: string; item: ClothingItem }[];
-
-          const resolvedItems = combo.item_ids
-            .map((id) => closetItems.find((i) => i.id === id))
-            .filter(Boolean) as ClothingItem[];
-
-          const reasoning = combo.reasoning.map((r) => {
-            const item = closetItems.find((i) => i.id === r.id);
-            return `${item?.name || "Item"}: ${r.reason}`;
-          });
-
-          return {
-            label: combo.label,
-            slots: resolvedSlots,
-            items: resolvedItems,
-            tip: combo.tip,
-            reasoning,
-            missing: combo.missing,
-          };
-        });
-
-        setCombinations(resolved);
+    
+solved);
       } else {
         setAiError(result.error);
       }
@@ -862,9 +782,141 @@ const AiStylist = () => {
               } ${occ.color}`}
             >
               <Icon className="h-5 w-5" />
-              <span className="text-[11px] font-medium font-body">{occ.label}</span>
+              <span className="text-[11px] font-medium font-body">{opcc.label}</span>
             </motion.button>
           );
+        })}
+      </div>
+
+      {/* Custom prompt */}
+      <div className="mt-5 flex items-center gap-2 rounded-2xl bg-card p-2">
+        <input
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleSubmitPrompt()}
+          placeholder="Or describe your occasion..."
+          className="flex-1 bg-transparent px-3 py-2 text-sm font-body text-foreground placeholder:text-muted-foreground outline-none"
+         />
+        <motion.button
+          whileTap={{ scale: 0.9 }}
+          onClick={handleSubmitPrompt}
+          className="flex h-9 w-9 items-center justify-center rounded-xl bg-ai text-ai-foreground"
+        >
+          <Send className="h-4 w-4" />
+        </motion.button>
+      </div>
+
+      {/* Generating state */}
+      {generating && (
+        <div className="mt-8 flex flex-col items-center">
+          <Loader2 className="h-6 w-6 animate-spin text-ai" />
+          <p className="mt-2 text-sm font-body text-muted-foreground">
+            AI is crafting 3 outfit combinations...
+          </p>
+          <p className="mt-1 text-[11px] font-body text-muted-foreground/60">
+            Powered by Gemini
+          </p>
+        </div>
+      )}
+
+      {/* AI Error */}
+      {!generating && aiError && (
+        <div className="mt-6 flex items-start gap-3 rounded-2xl bg-red-500/10 p-4">
+          <AlertTriangle className="h-5 w-5 shrink-0 text-red-500 mt-0.5" />
+          <div>
+            <p className="text-sm font-body font-medium text-red-600 dark:text-red-400">
+              Couldn't generate recommendations
+            </p>
+            <p className="mt-0.5 text-xs font-body text-red-500/ame="space-y-4">
+              {combinations.map((combo, i) => (
+                <CombinationCard
+                  key={combo.label + i}
+                  combo={combo}
+                  index={i}
+                  isActive={i === 0}
+                  onTryOn={() => handleTryOnCombo(combo)}
+                />
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+        </>
+      )}
+
+      {/* Virtual Try-On Modal */}
+      <TryOnModal
+        isOpen={showTryOn}
+        onClose={() => { setShowTryOn(false); setTryOnCombo(null); setMixTryOnItems([]); }}
+        outfitItems={tryOnCombo?.items || mixTryOnItems}
+        allClosetItems={closetItems}
+        userId={user?.id || ""}
+        comboLabel={tryOnCombo?.label || (mixTryOnItems.length > 0 ? "Mix & Match" : undefined)}
+      />
+    </div>
+    
+gap-2">
+        {occasions.map((occ) => {
+          const Icon = occ.icon;
+          const isActive = selectedOccasion === occ.label;
+          return (
+            <motion.button
+              key={occ.label}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => handleOccasionSelect(occ.label)}
+              className={`flex flex-col items-center gap-1.5 rounded-2xl p-4 transition-all ${
+                isActive
+                  ? "ring-2 ring-ai shadow-lg shadow-ai/10"
+                  : "bg-card hover:bg-card/80"
+              } ${occ.color}`}
+            >
+              <Icon className="h-5 w-5" />
+              <span className="text-[11px] font-medium font-body">{opcc.label}</span>
+            </motion.button>
+          );
+        })}
+      </div>
+
+      {/* Custom prompt */}
+      <div className="mt-5 flex items-center gap-2 rounded-2xl bg-card p-2">
+        <input
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleSubmitPrompt()}
+          placeholder="Or describe your occasion..."
+          className="flex-1 bg-transparent px-3 py-2 text-sm font-body text-foreground placeholder:text-muted-foreground outline-none"
+         />
+        <motion.button
+          whileTap={{ scale: 0.9 }}
+          onClick={handleSubmitPrompt}
+          className="flex h-9 w-9 items-center justify-center rounded-xl bg-ai text-ai-foreground"
+        >
+          <Send className="h-4 w-4" />
+        </motion.button>
+      </div>
+
+      {/* Generating state */}
+      {generating && (
+        <div className="mt-8 flex flex-col items-center">
+          <Loader2 className="h-6 w-6 animate-spin text-ai" />
+          <p className="mt-2 text-sm font-body text-muted-foreground">
+            AI is crafting 3 outfit combinations...
+          </p>
+          <p className="mt-1 text-[11px] font-body text-muted-foreground/60">
+            Powered by Gemini
+          </p>
+        </div>
+      )}
+
+      {/* AI Error */}
+      {!generating && aiError && (
+        <div className="mt-6 flex items-start gap-3 rounded-2xl bg-red-500/10 p-4">
+          <AlertTriangle className="h-5 w-5 shrink-0 text-red-500 mt-0.5" />
+          <div>
+            <p className="text-sm font-body font-medium text-red-600 dark:text-red-400">
+              Couldn't generate recommendations
+            </p>
+            <p className="mt-0.5 text-xs font-body text-red-500/  );
         })}
       </div>
 
@@ -925,7 +977,7 @@ const AiStylist = () => {
             <div className="flex items-center gap-2 mb-4">
               <Sparkles className="h-4 w-4 text-ai" />
               <h2 className="text-lg font-display font-semibold">
-                {selectedOccasion} â {combinations.length} Looks
+                {selectedOccasion} — {combinations.length} Looks
               </h2>
             </div>
 
@@ -956,7 +1008,4 @@ const AiStylist = () => {
         comboLabel={tryOnCombo?.label || (mixTryOnItems.length > 0 ? "Mix & Match" : undefined)}
       />
     </div>
-  );
-};
-
-export default AiStylist;
+    
