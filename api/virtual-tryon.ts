@@ -51,13 +51,13 @@ async function getAccessToken(sa: ServiceAccountKey): Promise<string> {
 }
 
 /* ------------------------------------------------------------------ */
-/*  v9 Virtual Try-On — Simplified prompting for Gemini 2.5 Flash      */
+/*  v10 Virtual Try-On — Face identity preservation                     */
 /*                                                                      */
-/*  Key changes from v5-v7:                                             */
-/*  1. systemInstruction for model behavior (proper Gemini field)       */
-/*  2. Body photo sent ONCE — no separate face photo                    */
-/*  3. Short, direct user prompt — less is more with Gemini             */
-/*  4. Text description of person to anchor identity                    */
+/*  Key changes from v9:                                                */
+/*  1. Face close-up photo sent as identity anchor (first image)        */
+/*  2. Full-body photo for body shape + posture reference               */
+/*  3. Prompt explicitly instructs face preservation + full body output */
+/*  4. systemInstruction reinforces face identity rules                 */
 /*  5. Temperature 0.4 (not 0.0 which can cause artifacts)             */
 /* ------------------------------------------------------------------ */
 
@@ -65,26 +65,32 @@ const SYSTEM_INSTRUCTION = `You are a professional virtual clothing try-on syste
 
 Rules:
 - ALWAYS generate an image output — this is mandatory, no exceptions
-- The person's face, skin tone, hair, body shape, and all physical features must be IDENTICAL to the input photo
+- When a face close-up reference photo is provided, you MUST preserve that EXACT face — same eyes, nose, mouth, beard, hairstyle, skin tone, and all facial features. The generated face must be recognizably the same person.
+- The person's body shape, proportions, and all physical features must be IDENTICAL to the full-body input photo
 - Only the clothing changes — nothing else about the person changes
 - When multiple garments are provided, dress the person in ALL of them together as a complete outfit
-- Output must be photorealistic, natural-looking, full body head to toe, clean background
+- The output image MUST show the FULL person from head to toe, including the complete face and head. Never crop out the face.
+- Output must be photorealistic, natural-looking, clean background
 - Never skip any garment — every provided clothing item must appear on the person`;
 
-function buildUserPrompt(garmentCount: number, personDescription?: string): string {
+function buildUserPrompt(garmentCount: number, hasFaceRef: boolean, personDescription?: string): string {
   const personAnchor = personDescription
-    ? `\nThe person in the photo: ${personDescription}.`
+    ? `\nThe person: ${personDescription}.`
     : "";
 
-  if (garmentCount === 1) {
-    return `Here is my full-body photo, followed by one garment image.${personAnchor}
+  const faceInstruction = hasFaceRef
+    ? " The first image is a close-up of my face — use it as the definitive reference for my facial identity. The second image is my full-body photo."
+    : " The first image is my full-body photo.";
 
-Generate a new photo of me wearing this garment. Keep my face and body exactly the same — only change the clothing.`;
+  if (garmentCount === 1) {
+    return `${faceInstruction} The remaining image is the garment I want to wear.${personAnchor}
+
+Generate a new FULL-BODY photo of me (head to toe, face clearly visible) wearing this garment. My face must be exactly the same as in the reference — preserve every facial detail. Only change the clothing.`;
   }
 
-  return `Here is my full-body photo, followed by ${garmentCount} garment images (topwear, bottomwear, and footwear) that form a complete outfit.${personAnchor}
+  return `${faceInstruction} The remaining ${garmentCount} images are garments (topwear, bottomwear, and footwear) that form a complete outfit.${personAnchor}
 
-Generate exactly one new photo of me wearing ALL ${garmentCount} garments together as one complete outfit. Every garment must be visible on me. Keep my face and body exactly the same — only change the clothing. You must output an image.`;
+Generate exactly one new FULL-BODY photo of me (head to toe, face clearly visible) wearing ALL ${garmentCount} garments together as one complete outfit. My face must be exactly the same as in the reference — preserve every facial detail. Every garment must be visible on me. Only change the clothing. You must output an image.`;
 }
 
 /* ------------------------------------------------------------------ */
@@ -108,9 +114,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const {
       bodyImageBase64,
+      faceImageBase64,
       productImageBase64,
       productImages,
       bodyMimeType = "image/jpeg",
+      faceMimeType = "image/jpeg",
       productMimeType = "image/jpeg",
       personDescription,
     } = req.body;
@@ -151,22 +159,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const model = "gemini-2.5-flash-image";
     const url = `https://${region}-aiplatform.googleapis.com/v1/projects/${project}/locations/${region}/publishers/google/models/${model}:generateContent`;
 
-    // --- v9: Build clean parts array ---
-    // 1. Body photo (ONCE — no separate face photo)
-    // 2. Garment images
-    // 3. Short user prompt with optional person description
+    // --- v10: Build parts array with face reference ---
+    // 1. Face close-up (if available — for identity preservation)
+    // 2. Body photo (full body reference)
+    // 3. Garment images
+    // 4. User prompt referencing face + body + garments
     const parts: any[] = [];
+    const hasFaceRef = !!faceImageBase64;
 
-    // Body photo — the ONLY person reference
+    // Face close-up — identity anchor (sent first so model sees face details)
+    if (faceImageBase64) {
+      parts.push({ inlineData: { mimeType: faceMimeType, data: faceImageBase64 } });
+    }
+
+    // Body photo — posture and body shape reference
     parts.push({ inlineData: { mimeType: bodyMimeType, data: bodyImageBase64 } });
 
-    // Garment images — no verbose labels, just the images
+    // Garment images
     for (const g of garments) {
       parts.push({ inlineData: { mimeType: g.mimeType, data: g.base64 } });
     }
 
-    // Short, direct prompt
-    parts.push({ text: buildUserPrompt(garments.length, personDescription) });
+    // Prompt that references both face and body
+    parts.push({ text: buildUserPrompt(garments.length, hasFaceRef, personDescription) });
 
     const geminiRes = await fetch(url, {
       method: "POST",
