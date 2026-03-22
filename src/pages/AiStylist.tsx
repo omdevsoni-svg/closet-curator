@@ -53,7 +53,7 @@ type ResolvedCombination = {
 };
 
 /* ------------------------------------------------------------------ */
-/*  Virtual Try-On Modal — now accepts specific outfit items           */
+/*  Virtual Try-On Modal â now accepts specific outfit items           */
 /* ------------------------------------------------------------------ */
 interface TryOnModalProps {
   isOpen: boolean;
@@ -100,17 +100,21 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
 
           // If we have outfit items with images, skip selection and go straight to generating
           const itemsWithImages = outfitItems.filter((i) => i.image_url);
-          const desc = descParts.length > 0 ? descParts.join(", ") : undefined;
           if (itemsWithImages.length > 0) {
             setStep("generating");
+            // Auto-trigger try-on
             try {
-              let results: { mimeType: string; base64: string }[] = [];
-
               if (itemsWithImages.length === 1) {
                 const productBase64 = await urlToBase64(itemsWithImages[0].image_url);
-                results = await virtualTryOn(bodyB64, productBase64, 1, desc);
+                const results = await virtualTryOn(bodyB64, productBase64, 1, descParts.length > 0 ? descParts.join(", ") : undefined);
+                if (results.length > 0) {
+                  setResultImage(`data:${results[0].mimeType};base64,${results[0].base64}`);
+                  setStep("result");
+                } else {
+                  setError("Couldn't generate try-on. Try a different item or photo.");
+                  setStep("select");
+                }
               } else {
-                // All garments needed — use multi with retry for consistency
                 const garments = await Promise.all(
                   itemsWithImages.map(async (item) => ({
                     base64: await urlToBase64(item.image_url),
@@ -118,26 +122,20 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
                     label: `${item.category}: ${item.name}`,
                   }))
                 );
-
-                // Retry up to 3 times for consistent multi-garment results
+                let results: { mimeType: string; base64: string }[] = [];
                 const MAX_RETRIES = 3;
                 for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-                  console.log(`Multi-garment try-on attempt ${attempt}/${MAX_RETRIES}...`);
-                  results = await virtualTryOnMulti(bodyB64, garments, desc);
+                  results = await virtualTryOnMulti(bodyB64, garments, descParts.length > 0 ? descParts.join(", ") : undefined);
                   if (results.length > 0) break;
-                  if (attempt < MAX_RETRIES) {
-                    // Brief pause before retry
-                    await new Promise((r) => setTimeout(r, 1000));
-                  }
+                  if (attempt < MAX_RETRIES) await new Promise((r) => setTimeout(r, 1000));
                 }
-              }
-
-              if (results.length > 0) {
-                setResultImage(`data:${results[0].mimeType};base64,${results[0].base64}`);
-                setStep("result");
-              } else {
-                setError("Couldn't generate try-on with full outfit. Please try again.");
-                setStep("select");
+                if (results.length > 0) {
+                  setResultImage(`data:${results[0].mimeType};base64,${results[0].base64}`);
+                  setStep("result");
+                } else {
+                  setError("Couldn't generate try-on with full outfit. Try fewer items or different photos.");
+                  setStep("select");
+                }
               }
             } catch (err) {
               console.error("Auto try-on error:", err);
@@ -166,7 +164,7 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
     setError(null);
 
     try {
-      // Determine which items to send — prefer full outfit, fall back to selected single item
+      // Determine which items to send â prefer full outfit, fall back to selected single item
       const itemsToTry = mode === "outfit" && outfitItems.filter((i) => i.image_url).length > 0
         ? outfitItems.filter((i) => i.image_url)
         : selectedItem?.image_url ? [selectedItem] : [];
@@ -177,13 +175,19 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
         return;
       }
 
-      let results: { mimeType: string; base64: string }[] = [];
-
       if (itemsToTry.length === 1) {
+        // Single garment
         const productBase64 = await urlToBase64(itemsToTry[0].image_url);
-        results = await virtualTryOn(bodyPhotoBase64, productBase64, 1, personDescription);
+        const results = await virtualTryOn(bodyPhotoBase64, productBase64, 1, personDescription);
+        if (results.length > 0) {
+          setResultImage(`data:${results[0].mimeType};base64,${results[0].base64}`);
+          setStep("result");
+        } else {
+          setError("Couldn't generate try-on. Try a different item or photo.");
+          setStep("select");
+        }
       } else {
-        // All garments needed — use multi with retry for consistency
+        // Multiple garments â send all at once
         const garments = await Promise.all(
           itemsToTry.map(async (item) => ({
             base64: await urlToBase64(item.image_url),
@@ -191,25 +195,20 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
             label: `${item.category}: ${item.name}`,
           }))
         );
-
-        // Retry up to 3 times for consistent multi-garment results
+        let results: { mimeType: string; base64: string }[] = [];
         const MAX_RETRIES = 3;
         for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-          console.log(`Multi-garment try-on attempt ${attempt}/${MAX_RETRIES}...`);
           results = await virtualTryOnMulti(bodyPhotoBase64, garments, personDescription);
           if (results.length > 0) break;
-          if (attempt < MAX_RETRIES) {
-            await new Promise((r) => setTimeout(r, 1000));
-          }
+          if (attempt < MAX_RETRIES) await new Promise((r) => setTimeout(r, 1000));
         }
-      }
-
-      if (results.length > 0) {
-        setResultImage(`data:${results[0].mimeType};base64,${results[0].base64}`);
-        setStep("result");
-      } else {
-        setError("Couldn't generate try-on with full outfit. Please try again.");
-        setStep("select");
+        if (results.length > 0) {
+          setResultImage(`data:${results[0].mimeType};base64,${results[0].base64}`);
+          setStep("result");
+        } else {
+          setError("Couldn't generate try-on with full outfit. Try fewer items or different photos.");
+          setStep("select");
+        }
       }
     } catch (err) {
       console.error("Try-on error:", err);
@@ -439,7 +438,7 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
                 <div className="mt-3 flex items-center gap-2 rounded-xl bg-ai/10 px-4 py-2.5">
                   <Sparkles className="h-4 w-4 text-ai" />
                   <span className="text-xs font-body text-ai font-medium">
-                    AI-generated preview — {outfitItemsWithImages.length > 1 ? `${outfitItemsWithImages.length}-piece outfit` : selectedItem?.name}
+                    AI-generated preview â {outfitItemsWithImages.length > 1 ? `${outfitItemsWithImages.length}-piece outfit` : selectedItem?.name}
                   </span>
                 </div>
                 <div className="mt-4 flex gap-2">
@@ -518,7 +517,7 @@ const CombinationCard = ({ combo, index, isActive, onTryOn }: CombinationCardPro
         </motion.button>
       </div>
 
-      {/* Outfit items — horizontal scroll with slot labels */}
+      {/* Outfit items â horizontal scroll with slot labels */}
       <div className="flex gap-3 overflow-x-auto px-4 py-3 scrollbar-none">
         {combo.slots.length > 0
           ? combo.slots.map(({ slot, item }, i) => (
@@ -624,7 +623,6 @@ const CombinationCard = ({ combo, index, isActive, onTryOn }: CombinationCardPro
 /* ------------------------------------------------------------------ */
 /*  AI Stylist component                                               */
 /* ------------------------------------------------------------------ */
------------------------------------------------------ */
 const AiStylist = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -927,7 +925,7 @@ const AiStylist = () => {
             <div className="flex items-center gap-2 mb-4">
               <Sparkles className="h-4 w-4 text-ai" />
               <h2 className="text-lg font-display font-semibold">
-                {selectedOccasion} — {combinations.length} Looks
+                {selectedOccasion} â {combinations.length} Looks
               </h2>
             </div>
 
