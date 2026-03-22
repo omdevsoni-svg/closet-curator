@@ -21,7 +21,12 @@ export const fileToBase64 = (file: File): Promise<string> =>
 /* ------------------------------------------------------------------ */
 /*  Helper: convert image URL → base64 string                         */
 /* ------------------------------------------------------------------ */
-export const urlToBase64 = async (url: string): Promise<string> => {
+export const urlToBase64 = async (
+  url: string,
+  opts?: { maxDim?: number; quality?: number }
+): Promise<string> => {
+  const MAX = opts?.maxDim ?? 512;
+  const quality = opts?.quality ?? 0.7;
   const res = await fetch(url);
   const blob = await res.blob();
   // Compress via canvas to keep payload under Vercel 4.5MB limit
@@ -29,7 +34,6 @@ export const urlToBase64 = async (url: string): Promise<string> => {
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.onload = () => {
-      const MAX = 512;
       let w = img.width;
       let h = img.height;
       if (w > MAX || h > MAX) {
@@ -41,7 +45,7 @@ export const urlToBase64 = async (url: string): Promise<string> => {
       canvas.height = h;
       const ctx = canvas.getContext("2d")!;
       ctx.drawImage(img, 0, 0, w, h);
-      const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
+      const dataUrl = canvas.toDataURL("image/jpeg", quality);
       resolve(dataUrl.split(",")[1]);
       URL.revokeObjectURL(img.src);
     };
@@ -291,7 +295,7 @@ export const uploadTryOnImage = async (
       byteArray[i] = byteChars.charCodeAt(i);
     }
     const blob = new Blob([byteArray], { type: "image/png" });
-    const fileName = `${userId}/${Date.now()}_tryon.png`;
+    const fileName = \`\${userId}/\${Date.now()}_tryon.png\`;
 
     const { error } = await supabase.storage
       .from("tryon-images")
