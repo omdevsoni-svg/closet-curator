@@ -137,7 +137,7 @@ export const virtualTryOn = async (
     console.error("Virtual try-on failed:", data.error, data.details);
     return [];
   } catch (err) {
-    console.error("virtualTryOn error:", err);
+    console.error*"virtualTryOn error:", err);
     return [];
   }
 };
@@ -214,16 +214,19 @@ export const virtualTryOnSequential = async (
   garments: SequentialGarment[],
   personDescription?: string,
   onProgress?: (progress: SequentialProgress) => void,
+  faceImageBase64?: string,
 ): Promise<TryOnResult[]> => {
-  const totalSteps = garments.length;
+  // v14: total steps = garment steps + 1 face refinement step
+  const garmentSteps = garments.length;
+  const totalSteps = garmentSteps + 1; // +1 for face refinement
   let previousResultBase64: string | null = null;
   let previousResultMimeType = "image/jpeg";
   const previousLabels: string[] = [];
 
+  // --- Phase 1: Sequential garment application ---
   for (let i = 0; i < garments.length; i++) {
     const garment = garments[i];
 
-    // Notify UI of current step
     onProgress?.({
       stepIndex: i,
       totalSteps,
@@ -241,7 +244,7 @@ export const virtualTryOnSequential = async (
           productImages: [{ base64: garment.base64, mimeType: garment.mimeType || "image/jpeg" }],
           personDescription: personDescription || undefined,
           stepIndex: i,
-          totalSteps,
+          totalSteps: garmentSteps, // garment steps only for the garment prompt
           garmentLabel: garment.label,
           previousLabels: [...previousLabels],
           previousResultBase64: previousResultBase64 || undefined,
@@ -263,39 +266,66 @@ export const virtualTryOnSequential = async (
           status: "done",
         });
       } else {
-        console.error(`Sequential step ${i + 1}/${totalSteps} failed:`, data.error);
-        onProgress?.({
-          stepIndex: i,
-          totalSteps,
-          garmentLabel: garment.label,
-          status: "error",
-        });
-        // Return whatever we have so far (partial result from previous step)
+        console.error(`Sequential step ${i + 1}/${garmentSteps} failed:`, data.error);
+        onProgress?.({ stepIndex: i, totalSteps, garmentLabel: garment.label, status: "error" });
         if (previousResultBase64) {
           return [{ mimeType: previousResultMimeType, base64: previousResultBase64 }];
         }
         return [];
       }
     } catch (err) {
-      console.error(`Sequential step ${i + 1}/${totalSteps} error:`, err);
-      onProgress?.({
-        stepIndex: i,
-        totalSteps,
-        garmentLabel: garment.label,
-        status: "error",
-      });
-      // Return partial result
+      console.error(`Sequential step ${i + 1}/${garmentSteps} error:`, err);
+      onProgress?.({ stepIndex: i, totalSteps, garmentLabel: garment.label, status: "error" });
       if (previousResultBase64) {
-        return [{ mimeType: previousResultMimeType, base64: previousResultBase64 }];
+        return { `: previousResultMimeType, base64: previousResultBase64 }];
       }
       return [];
     }
   }
 
-  // All steps complete â€” return final result
+   // --- Phase 2: Face refinement (final step) ---
   if (previousResultBase64) {
-    return [{ mimeType: previousResultMimeType, base64: previousResultBase64 }];
+    const faceStepIndex = garmentSteps; // last step
+
+    onProgress?.({
+      stepIndex: faceStepIndex,
+      totalSteps,
+      garmentLabel: "Refining face...",
+      status: "starting",
+    });
+
+    try {
+      const res = await fetch("/api/virtual-tryon", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: "face-refine",
+          bodyImageBase64,
+          faceImageBase64: faceImageBase64 || undefined,
+          personDescription: personDescription || undefined,
+          previousResultBase64,
+          previousResultMimeType,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.success && data.images && data.images.length > 0) {
+        onProgress?.({ stepIndex: faceStepIndex, totalSteps, garmentLabel: "Face refined", status: "done" });
+        return [{ mimeType: data.images[0].mimeType, base64: data.images[0].base64 }];
+      } else {
+        console.error("Face refinement failed:", data.error);
+        onProgress?.({ stepIndex: faceStepIndex, totalSteps, garmentLabel: "Face refinement", status: "error" });
+        // Return the pre-refinement result (still usable)
+        return [{ mimeType: previousResultMimeType, base64: previousResultBase64 }];
+      }
+    } catch (err) {
+      console.error("Face refinement error:", err);
+      onProgress?.({ stepIndex: faceStepIndex, totalSteps, garmentLabel: "Face refinement", status: "error" });
+      return [{ mimeType: previousResultMimeType, base64: previousResultBase64 }];
+    }
   }
+
   return [];
 };
 
@@ -358,7 +388,7 @@ export interface LegacyRecommendationResponse {
 
 export const getOutfitRecommendation = async (
   request: RecommendationRequest
-): Promise<RecommendationResponse | { success: false; error: string }> => {
+)?: Promise<RecommendationResponse | { success: ¿al*e; error: string }> => {
   try {
     const res = await fetch("/api/outfit-recommendation", {
       method: "POST",
@@ -387,7 +417,7 @@ export const getOutfitRecommendation = async (
         ],
       };
     }
-    return { success: false, error: data.error || "Recommendation failed" };
+    return { success: void0, error: data.error || "RecMe–Gendation failed" };
   } catch (err) {
     console.error("getOutfitRecommendation error:", err);
     return { success: false, error: "Network error during recommendation" };
@@ -395,7 +425,7 @@ export const getOutfitRecommendation = async (
 };
 
 /* ------------------------------------------------------------------ */
-/*  Upload try-on result to Supabase Storage                          */
+/*  Upload try-on result to Supabase Storage                         */
 /* ------------------------------------------------------------------ */
 export const uploadTryOnImage = async (
   userId: string,
