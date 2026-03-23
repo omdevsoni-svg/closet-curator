@@ -25,7 +25,7 @@ export const urlToBase64 = async (
   url: string,
   opts?: { maxDim?: number; quality?: number }
 ): Promise<string> => {
-  // v16: Higher resolution inputs for better VTO quality
+  // v17: Higher resolution inputs for better VTO quality
   const MAX = opts?.maxDim ?? 1024;
   const quality = opts?.quality ?? 0.92;
   const res = await fetch(url);
@@ -218,7 +218,7 @@ export const virtualTryOnSequential = async (
   onProgress?: (progress: SequentialProgress) => void,
   _faceImageBase64?: string,
 ): Promise<TryOnResult[]> => {
-  // v16: Imagen 3 VTO + Imagen Upscale — no face refinement step needed
+  // v17: Imagen 3 VTO + Smart Quality Tiering — fast intermediates, max quality final
   const totalSteps = garments.length;
   let previousResultBase64: string | null = null;
   let previousResultMimeType = "image/jpeg";
@@ -234,6 +234,8 @@ export const virtualTryOnSequential = async (
     });
 
     try {
+      // v17: isFinalStep flag — only the last step gets full quality + upscale
+      const isLast = i === garments.length - 1;
       const res = await fetch("/api/virtual-tryon", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -243,6 +245,7 @@ export const virtualTryOnSequential = async (
           productImages: [{ base64: garment.base64, mimeType: garment.mimeType || "image/jpeg" }],
           // For step 2+: previous result becomes the person image
           previousResultBase64: previousResultBase64 || undefined,
+          isFinalStep: isLast,
         }),
       });
 
