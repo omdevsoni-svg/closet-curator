@@ -25,8 +25,9 @@ export const urlToBase64 = async (
   url: string,
   opts?: { maxDim?: number; quality?: number }
 ): Promise<string> => {
-  const MAX = opts?.maxDim ?? 512;
-  const quality = opts?.quality ?? 0.7;
+  // v16: Higher resolution inputs for better VTO quality
+  const MAX = opts?.maxDim ?? 1024;
+  const quality = opts?.quality ?? 0.92;
   const res = await fetch(url);
   const blob = await res.blob();
   // Compress via canvas to keep payload under Vercel 4.5MB limit
@@ -217,7 +218,7 @@ export const virtualTryOnSequential = async (
   onProgress?: (progress: SequentialProgress) => void,
   _faceImageBase64?: string,
 ): Promise<TryOnResult[]> => {
-  // v15: Imagen 3 VTO — no face refinement step needed
+  // v16: Imagen 3 VTO + Imagen Upscale — no face refinement step needed
   const totalSteps = garments.length;
   let previousResultBase64: string | null = null;
   let previousResultMimeType = "image/jpeg";
