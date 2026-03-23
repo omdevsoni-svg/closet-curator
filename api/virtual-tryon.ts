@@ -264,6 +264,82 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
+    // --- v18: Gemini Face Refinement ---
+    // The Imagen 3 VTO model distorts facial features (skin tone shift,
+    // eye asymmetry, beard softening, expression change). Use Gemini 2.5
+    // Flash Image to restore the original face onto the VTO result.
+    // Only runs on final step when we have the original body photo.
+    const shouldRefineFace = useFinalQuality && images.length > 0 && bodyImageBase64;
+    if (shouldRefineFace) {
+      try {
+        const faceRefineModel = "gemini-2.5-flash-image";
+        const faceRefineUrl = `https://${REGION}-aiplatform.googleapis.com/v1/projects/${PROJECT}/locations/${REGION}/publishers/google/models/${faceRefineModel}:generateContent`;
+
+        const faceRefinePrompt = `You are given two images:
+1. FIRST IMAGE: A virtual try-on result where the person is wearing new clothes. The clothing, body pose, and background look great, but the FACE has been distorted by the AI model.
+2. SECOND IMAGE: The ORIGINAL unedited photo of the same person showing their real face.
+
+YOUR TASK: Fix ONLY the face in the first image to match the original face from the second image. Specifically restore:
+- Exact skin tone and complexion (match the warmth and shade precisely)
+- Eye shape, gaze direction, and expression
+- Facial hair (beard/mustache) with crisp, defined edges
+- Natural nose and cheek contours and shadows
+- The person's natural expression and confidence
+
+CRITICAL RULES:
+- Keep the CLOTHING exactly as it appears in the first image — do NOT change any garment
+- Keep the BODY POSE exactly as it appears in the first image
+- Keep the BACKGROUND exactly as it appears in the first image
+- ONLY modify the face and neck/jawline area to match the original
+- The transition between the restored face and the rest of the image must be seamless and natural
+- Output the complete full-body image with the corrected face`;
+
+        const faceRefineRes = await fetch(faceRefineUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            contents: [{ role: "user", parts: [
+              { inlineData: { mimeType: images[0].mimeType || "image/png", data: images[0].base64 } },
+              { inlineData: { mimeType: "image/jpeg", data: bodyImageBase64 } },
+              { text: faceRefinePrompt },
+            ]}],
+            generationConfig: {
+              temperature: 0.3,
+              maxOutputTokens: 8192,
+              responseModalities: ["TEXT", "IMAGE"],
+            },
+          }),
+        });
+
+        if (faceRefineRes.ok) {
+          const faceRefineData = await faceRefineRes.json();
+          const frCandidates = faceRefineData?.candidates || [];
+          for (const candidate of frCandidates) {
+            const frParts = candidate?.content?.parts || [];
+            for (const part of frParts) {
+              if (part.inlineData) {
+                images[0] = {
+                  mimeType: part.inlineData.mimeType || "image/png",
+                  base64: part.inlineData.data,
+                };
+                console.log("Face refinement applied successfully via Gemini");
+                break;
+              }
+            }
+            if (frCandidates.length > 0) break;
+          }
+        } else {
+          const errBody = await faceRefineRes.text().catch(() => "");
+          console.warn("Face refinement API error (non-fatal):", faceRefineRes.status, errBody.substring(0, 300));
+        }
+      } catch (faceErr) {
+        console.warn("Face refinement error (non-fatal):", faceErr);
+      }
+    }
+
     return res.status(200).json({ success: true, images });
   } catch (err: any) {
     console.error("virtual-tryon error:", err);
