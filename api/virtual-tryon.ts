@@ -264,35 +264,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    // --- v18: Gemini Face Refinement ---
+    // --- v19: Improved Gemini Face Refinement ---
     // The Imagen 3 VTO model distorts facial features (skin tone shift,
     // eye asymmetry, beard softening, expression change). Use Gemini 2.5
     // Flash Image to restore the original face onto the VTO result.
-    // Only runs on final step when we have the original body photo.
+    //
+    // v19 improvements over v18:
+    // - Send ORIGINAL photo FIRST so Gemini sees the ground truth reference
+    // - Tighter, more directive prompt (less verbose = less creative drift)
+    // - Lower temperature (0.1) for more faithful face reproduction
+    // - IMAGE-only output modality (no TEXT) to focus on image generation
+    // - Explicit warm skin tone preservation instruction
     const shouldRefineFace = useFinalQuality && images.length > 0 && bodyImageBase64;
     if (shouldRefineFace) {
       try {
         const faceRefineModel = "gemini-2.5-flash-image";
         const faceRefineUrl = `https://${REGION}-aiplatform.googleapis.com/v1/projects/${PROJECT}/locations/${REGION}/publishers/google/models/${faceRefineModel}:generateContent`;
 
-        const faceRefinePrompt = `You are given two images:
-1. FIRST IMAGE: A virtual try-on result where the person is wearing new clothes. The clothing, body pose, and background look great, but the FACE has been distorted by the AI model.
-2. SECOND IMAGE: The ORIGINAL unedited photo of the same person showing their real face.
+        const faceRefinePrompt = `IMAGE 1 is the REFERENCE — the person's REAL face. Study it carefully: the exact warm skin tone, beard texture, eye shape, expression, and facial structure.
 
-YOUR TASK: Fix ONLY the face in the first image to match the original face from the second image. Specifically restore:
-- Exact skin tone and complexion (match the warmth and shade precisely)
-- Eye shape, gaze direction, and expression
-- Facial hair (beard/mustache) with crisp, defined edges
-- Natural nose and cheek contours and shadows
-- The person's natural expression and confidence
+IMAGE 2 is a virtual try-on result. The CLOTHES, POSE, and BACKGROUND in Image 2 are perfect and must NOT change. But the FACE in Image 2 has been distorted by AI.
 
-CRITICAL RULES:
-- Keep the CLOTHING exactly as it appears in the first image — do NOT change any garment
-- Keep the BODY POSE exactly as it appears in the first image
-- Keep the BACKGROUND exactly as it appears in the first image
-- ONLY modify the face and neck/jawline area to match the original
-- The transition between the restored face and the rest of the image must be seamless and natural
-- Output the complete full-body image with the corrected face`;
+TASK: Replace ONLY the face+neck area in Image 2 with the person's real face from Image 1.
+
+MANDATORY:
+- Match the EXACT warm skin tone from Image 1 — do NOT make it paler or cooler
+- Copy the beard/facial hair with sharp, crisp edges exactly as in Image 1
+- Preserve the exact eye shape, pupil position, and natural expression from Image 1
+- Keep the face width and jawline shape identical to Image 1
+- Do NOT alter clothing, hands, body, pose, or background from Image 2
+- Blend the face seamlessly at the hairline and neck boundary
+- Output the FULL image (not cropped)`;
 
         const faceRefineRes = await fetch(faceRefineUrl, {
           method: "POST",
@@ -302,14 +304,15 @@ CRITICAL RULES:
           },
           body: JSON.stringify({
             contents: [{ role: "user", parts: [
-              { inlineData: { mimeType: images[0].mimeType || "image/png", data: images[0].base64 } },
+              // v19: Send original FIRST so Gemini sees the ground truth reference first
               { inlineData: { mimeType: "image/jpeg", data: bodyImageBase64 } },
+              { inlineData: { mimeType: images[0].mimeType || "image/png", data: images[0].base64 } },
               { text: faceRefinePrompt },
             ]}],
             generationConfig: {
-              temperature: 0.3,
+              temperature: 0.1,
               maxOutputTokens: 8192,
-              responseModalities: ["TEXT", "IMAGE"],
+              responseModalities: ["IMAGE"],
             },
           }),
         });
@@ -325,7 +328,7 @@ CRITICAL RULES:
                   mimeType: part.inlineData.mimeType || "image/png",
                   base64: part.inlineData.data,
                 };
-                console.log("Face refinement applied successfully via Gemini");
+                console.log("v19 face refinement applied successfully via Gemini");
                 break;
               }
             }
