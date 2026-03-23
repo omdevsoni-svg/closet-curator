@@ -186,6 +186,120 @@ export const virtualTryOnMulti = async (
 };
 
 /* ------------------------------------------------------------------ */
+/*  Virtual Try-On (Sequential) — one garment at a time, chained      */
+/*                                                                      */
+/*  Step 1: body + topwear → result1                                   */
+/*  Step 2: body (anchor) + result1 + bottomwear → result2             */
+/*  Step 3: body (anchor) + result2 + footwear → final                 */
+/*                                                                      */
+/*  The original body photo is ALWAYS sent as identity anchor.          */
+/* ------------------------------------------------------------------ */
+
+export interface SequentialGarment {
+  base64: string;
+  mimeType?: string;
+  label: string;       // e.g. "topwear: Puma Graphic Tee"
+  category: string;    // e.g. "topwear", "bottomwear", "shoes"
+}
+
+export interface SequentialProgress {
+  stepIndex: number;   // 0-based
+  totalSteps: number;
+  garmentLabel: string;
+  status: "starting" | "done" | "error";
+}
+
+export const virtualTryOnSequential = async (
+  bodyImageBase64: string,
+  garments: SequentialGarment[],
+  personDescription?: string,
+  onProgress?: (progress: SequentialProgress) => void,
+): Promise<TryOnResult[]> => {
+  const totalSteps = garments.length;
+  let previousResultBase64: string | null = null;
+  let previousResultMimeType = "image/jpeg";
+  const previousLabels: string[] = [];
+
+  for (let i = 0; i < garments.length; i++) {
+    const garment = garments[i];
+
+    // Notify UI of current step
+    onProgress?.({
+      stepIndex: i,
+      totalSteps,
+      garmentLabel: garment.label,
+      status: "starting",
+    });
+
+    try {
+      const res = await fetch("/api/virtual-tryon", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: "sequential-step",
+          bodyImageBase64,
+          productImages: [{ base64: garment.base64, mimeType: garment.mimeType || "image/jpeg" }],
+          personDescription: personDescription || undefined,
+          stepIndex: i,
+          totalSteps,
+          garmentLabel: garment.label,
+          previousLabels: [...previousLabels],
+          previousResultBase64: previousResultBase64 || undefined,
+          previousResultMimeType,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.success && data.images && data.images.length > 0) {
+        previousResultBase64 = data.images[0].base64;
+        previousResultMimeType = data.images[0].mimeType;
+        previousLabels.push(garment.label);
+
+        onProgress?.({
+          stepIndex: i,
+          totalSteps,
+          garmentLabel: garment.label,
+          status: "done",
+        });
+      } else {
+        console.error(`Sequential step ${i + 1}/${totalSteps} failed:`, data.error);
+        onProgress?.({
+          stepIndex: i,
+          totalSteps,
+          garmentLabel: garment.label,
+          status: "error",
+        });
+        // Return whatever we have so far (partial result from previous step)
+        if (previousResultBase64) {
+          return [{ mimeType: previousResultMimeType, base64: previousResultBase64 }];
+        }
+        return [];
+      }
+    } catch (err) {
+      console.error(`Sequential step ${i + 1}/${totalSteps} error:`, err);
+      onProgress?.({
+        stepIndex: i,
+        totalSteps,
+        garmentLabel: garment.label,
+        status: "error",
+      });
+      // Return partial result
+      if (previousResultBase64) {
+        return [{ mimeType: previousResultMimeType, base64: previousResultBase64 }];
+      }
+      return [];
+    }
+  }
+
+  // All steps complete — return final result
+  if (previousResultBase64) {
+    return [{ mimeType: previousResultMimeType, base64: previousResultBase64 }];
+  }
+  return [];
+};
+
+/* ------------------------------------------------------------------ */
 /*  AI Outfit Recommendation — calls Gemini via serverless function    */
 /* ------------------------------------------------------------------ */
 
@@ -295,7 +409,7 @@ export const uploadTryOnImage = async (
       byteArray[i] = byteChars.charCodeAt(i);
     }
     const blob = new Blob([byteArray], { type: "image/png" });
-    const fileName = \`\${userId}/\${Date.now()}_tryon.png\`;
+    const fileName = `${userId}/${Date.now()}_tryon.png`;
 
     const { error } = await supabase.storage
       .from("tryon-images")
