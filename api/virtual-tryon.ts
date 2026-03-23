@@ -51,7 +51,12 @@ async function getAccessToken(sa: ServiceAccountKey): Promise<string> {
 }
 
 /* ------------------------------------------------------------------ */
-/*  v15 Virtual Try-On — Imagen 3 Virtual Try-On (virtual-try-on-001) */
+/*  v16 Virtual Try-On — Imagen 3 VTO + Imagen Upscale                  */
+/*                                                                      */
+/*  Quality improvements over v15:                                      */
+/*  - baseSteps increased from 32 → 75 (max quality diffusion steps)   */
+/*  - Output format: PNG (lossless) instead of JPEG                     */
+/*  - Post-processing: Imagen 4.0 Upscale (2x) for high-res output     */
 /*                                                                      */
 /*  Uses the dedicated Imagen 3 VTO model which:                        */
 /*  - Takes a person image + ONE product image per call                 */
@@ -69,6 +74,10 @@ const PROJECT = "fynd-jio-impetus-non-prod";
 const REGION = "us-central1";
 const MODEL = "virtual-try-on-001";
 const VTO_URL = `https://${REGION}-aiplatform.googleapis.com/v1/projects/${PROJECT}/locations/${REGION}/publishers/google/models/${MODEL}:predict`;
+
+/* Imagen upscale model for post-processing */
+const UPSCALE_MODEL = "imagen-4.0-upscale-preview";
+const UPSCALE_URL = `https://${REGION}-aiplatform.googleapis.com/v1/projects/${PROJECT}/locations/${REGION}/publishers/google/models/${UPSCALE_MODEL}:predict`;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // CORS headers
@@ -131,6 +140,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // --- Build Imagen 3 VTO request ---
+    // Quality tuning: baseSteps 75 (max recommended), PNG lossless output
     const requestBody = {
       instances: [
         {
@@ -146,12 +156,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ],
       parameters: {
         sampleCount: 1,
-        baseSteps: 32,
+        baseSteps: 75,
         personGeneration: "allow_adult",
         safetySetting: "block_medium_and_above",
         outputOptions: {
-          mimeType: "image/jpeg",
-          compressionQuality: 80,
+          mimeType: "image/png",
         },
       },
     };
@@ -194,6 +203,56 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         success: false,
         error: "AI could not generate a try-on image. Try a different photo or clothing item.",
       });
+    }
+
+    // --- Optional: Upscale the result for higher resolution ---
+    const shouldUpscale = req.body.upscale !== false; // default ON
+    if (shouldUpscale && images.length > 0) {
+      try {
+        const upscaleBody = {
+          instances: [
+            {
+              prompt: "Upscale the image",
+              image: { bytesBase64Encoded: images[0].base64 },
+            },
+          ],
+          parameters: {
+            sampleCount: 1,
+            mode: "upscale",
+            upscaleConfig: { upscaleFactor: "x2" },
+            outputOptions: {
+              mimeType: "image/png",
+            },
+          },
+        };
+
+        const upscaleRes = await fetch(UPSCALE_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify(upscaleBody),
+        });
+
+        if (upscaleRes.ok) {
+          const upscaleData = await upscaleRes.json();
+          const upscaledPredictions = upscaleData?.predictions || [];
+          if (upscaledPredictions.length > 0 && upscaledPredictions[0].bytesBase64Encoded) {
+            // Replace with upscaled version
+            images[0] = {
+              mimeType: upscaledPredictions[0].mimeType || "image/png",
+              base64: upscaledPredictions[0].bytesBase64Encoded,
+            };
+            console.log("Image upscaled successfully via Imagen upscale model");
+          }
+        } else {
+          // Upscale failed — proceed with un-upscaled image (still better with baseSteps=75 + PNG)
+          console.warn("Upscale step failed:", upscaleRes.status, await upscaleRes.text().catch(() => ""));
+        }
+      } catch (upscaleErr) {
+        console.warn("Upscale step error (non-fatal):", upscaleErr);
+      }
     }
 
     return res.status(200).json({ success: true, images });
