@@ -51,12 +51,14 @@ async function getAccessToken(sa: ServiceAccountKey): Promise<string> {
 }
 
 /* ------------------------------------------------------------------ */
-/*  v16 Virtual Try-On — Imagen 3 VTO + Imagen Upscale                  */
+/*  v17 Virtual Try-On — Imagen 3 VTO + Smart Quality Tiering            */
 /*                                                                      */
-/*  Quality improvements over v15:                                      */
-/*  - baseSteps increased from 32 → 75 (max quality diffusion steps)   */
-/*  - Output format: PNG (lossless) instead of JPEG                     */
-/*  - Post-processing: Imagen 4.0 Upscale (2x) for high-res output     */
+/*  Optimizations over v16:                                             */
+/*  - Intermediate sequential steps: baseSteps=50, JPEG, no upscale    */
+/*    → ~40% faster for multi-garment outfits                           */
+/*  - Final step only: baseSteps=75, PNG, Imagen 4.0 Upscale 2x        */
+/*    → max quality where it matters (the result users actually see)    */
+/*  - Single-garment mode: always full quality + upscale                */
 /*                                                                      */
 /*  Uses the dedicated Imagen 3 VTO model which:                        */
 /*  - Takes a person image + ONE product image per call                 */
@@ -101,6 +103,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Sequential-step fields
       mode = "single",             // "single" | "sequential-step"
       previousResultBase64,        // result from previous step (becomes personImage)
+      isFinalStep = true,          // v17: true for single mode & last sequential step
     } = req.body;
 
     if (!bodyImageBase64) {
@@ -140,7 +143,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // --- Build Imagen 3 VTO request ---
-    // Quality tuning: baseSteps 75 (max recommended), PNG lossless output
+    // v17: Smart quality tiering — full quality only on final step
+    const useFinalQuality = isFinalStep || mode === "single";
+    const baseSteps = useFinalQuality ? 75 : 50;
+    const outputMime = useFinalQuality ? "image/png" : "image/jpeg";
+
     const requestBody = {
       instances: [
         {
@@ -156,11 +163,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ],
       parameters: {
         sampleCount: 1,
-        baseSteps: 75,
+        baseSteps,
         personGeneration: "allow_adult",
         safetySetting: "block_medium_and_above",
         outputOptions: {
-          mimeType: "image/png",
+          mimeType: outputMime,
+          ...(outputMime === "image/jpeg" ? { compressionQuality: 90 } : {}),
         },
       },
     };
@@ -206,7 +214,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // --- Optional: Upscale the result for higher resolution ---
-    const shouldUpscale = req.body.upscale !== false; // default ON
+    // v17: Only upscale on final step (single mode or last sequential step)
+    const shouldUpscale = req.body.upscale !== false && useFinalQuality;
     if (shouldUpscale && images.length > 0) {
       try {
         const upscaleBody = {
