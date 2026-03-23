@@ -264,18 +264,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    // --- v19: Improved Gemini Face Refinement ---
-    // The Imagen 3 VTO model distorts facial features (skin tone shift,
-    // eye asymmetry, beard softening, expression change). Use Gemini 2.5
-    // Flash Image to restore the original face onto the VTO result.
-    //
-    // v19 improvements over v18:
-    // - Send ORIGINAL photo FIRST so Gemini sees the ground truth reference
-    // - Tighter, more directive prompt (less verbose = less creative drift)
-    // - Lower temperature (0.1) for more faithful face reproduction
-    // - IMAGE-only output modality (no TEXT) to focus on image generation
-    // - Explicit warm skin tone preservation instruction
-    const shouldRefineFace = useFinalQuality && images.length > 0 && bodyImageBase64;
+    // --- v20: Gemini Face Refinement DISABLED ---
+    // After testing v18 and v19, the Gemini face refinement step consistently
+    // produces a different person's face rather than faithfully restoring the
+    // original. The raw Imagen VTO + Imagen upscale output preserves identity
+    // much better. Keeping the code commented out for future reference.
+    const shouldRefineFace = false; // was: useFinalQuality && images.length > 0 && bodyImageBase64;
     if (shouldRefineFace) {
       try {
         const faceRefineModel = "gemini-2.5-flash-image";
