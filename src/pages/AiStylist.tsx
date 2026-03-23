@@ -105,15 +105,10 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
             }
           }
 
-          // v12: Build detailed text description to strongly anchor identity
+          // v15: Imagen 3 VTO doesn't need text descriptions — it preserves identity automatically
+          // Keep personDescription for potential future use but don't hardcode facial features
           const descParts: string[] = [];
-          if (profile?.model_gender) descParts.push(profile.model_gender === "neutral" ? "person" : profile.model_gender === "men" ? "South Asian male" : "South Asian female");
-          if (profile?.skin_tone) descParts.push(`${profile.skin_tone}-brown skin tone`);
-          if (profile?.body_type) descParts.push(`${profile.body_type} body type`);
-          // Add facial feature anchors visible from the body photo
-          descParts.push("full thick dark beard");
-          descParts.push("round face shape");
-          descParts.push("short dark hair");
+          if (profile?.model_gender) descParts.push(profile.model_gender === "neutral" ? "person" : profile.model_gender === "men" ? "male" : "female");
           if (descParts.length > 0) setPersonDescription(descParts.join(", "));
 
           // Auto-select the first outfit item
@@ -157,7 +152,7 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
                   }))
                 );
 
-                // v14: Pass face close-up for face refinement final step
+                // v15: Imagen 3 VTO (face param kept for backward compat)
                 results = await virtualTryOnSequential(
                   bodyB64,
                   seqGarments,
@@ -507,10 +502,9 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
                     {timeMsg}
                   </p>
 
-                  {/* Sequential progress bar (garment steps + face refine) */}
+                  {/* Sequential progress bar (garment steps only — Imagen 3 VTO preserves identity) */}
                   {isSequential && (
                     <div className="mt-3 flex items-center gap-1.5 w-56">
-                      {/* Garment step segments */}
                       {sortedPreview.map((_, i) => {
                         const isDone = i < currentStep || (i === currentStep && seqProgress?.status === "done");
                         const isActive = i === currentStep && seqProgress?.status === "starting";
@@ -523,19 +517,6 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
                           />
                         );
                       })}
-                      {/* Face refinement segment */}
-                      {(() => {
-                        const faceIdx = sortedPreview.length;
-                        const isDone = faceIdx < currentStep || (faceIdx === currentStep && seqProgress?.status === "done");
-                        const isActive = faceIdx === currentStep && seqProgress?.status === "starting";
-                        return (
-                          <div
-                            className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${
-                              isDone ? "bg-ai" : isActive ? "bg-ai/50 animate-pulse" : "bg-muted"
-                            }`}
-                          />
-                        );
-                      })()}
                     </div>
                   )}
 
