@@ -1,4 +1,6 @@
 import { supabase } from "./supabase";
+// v18: Face refinement now handled server-side by Gemini in virtual-tryon API
+// import { compositeFaceOntoVTO } from "./face-composite";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -112,6 +114,10 @@ export interface TryOnResult {
   base64: string;
 }
 
+// v18: Face refinement now handled server-side by Gemini in virtual-tryon API
+// The canvas-based applyFaceComposite has been replaced with Gemini 2.5 Flash Image
+// which produces much better results (understands facial structure vs simple pixel blending)
+
 export const virtualTryOn = async (
   bodyImageBase64: string,
   productImageBase64: string,
@@ -133,6 +139,7 @@ export const virtualTryOn = async (
 
     const data = await res.json();
     if (data.success && data.images) {
+      // v18: Face refinement handled server-side by Gemini
       return data.images as TryOnResult[];
     }
     console.error("Virtual try-on failed:", data.error, data.details);
@@ -176,6 +183,7 @@ export const virtualTryOnMulti = async (
 
     const data = await res.json();
     if (data.success && data.images) {
+      // v18: Face refinement handled server-side by Gemini
       return data.images as TryOnResult[];
     }
     console.error("Virtual try-on (multi) failed:", data.error, data.details);
@@ -265,6 +273,7 @@ export const virtualTryOnSequential = async (
         console.error(`Sequential step ${i + 1}/${totalSteps} failed:`, data.error);
         onProgress?.({ stepIndex: i, totalSteps, garmentLabel: garment.label, status: "error" });
         if (previousResultBase64) {
+          // v18: Face refinement handled server-side on final step
           return [{ mimeType: previousResultMimeType, base64: previousResultBase64 }];
         }
         return [];
@@ -280,6 +289,7 @@ export const virtualTryOnSequential = async (
   }
 
   if (previousResultBase64) {
+    // v18: Face refinement already applied server-side on the final step
     return [{ mimeType: previousResultMimeType, base64: previousResultBase64 }];
   }
   return [];
