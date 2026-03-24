@@ -27,9 +27,9 @@ export const urlToBase64 = async (
   url: string,
   opts?: { maxDim?: number; quality?: number }
 ): Promise<string> => {
-  // v17: Higher resolution inputs for better VTO quality
-  const MAX = opts?.maxDim ?? 1024;
-  const quality = opts?.quality ?? 0.92;
+  // v22: Higher resolution inputs for better VTO quality
+  const MAX = opts?.maxDim ?? 1536;
+  const quality = opts?.quality ?? 0.95;
   const res = await fetch(url);
   const blob = await res.blob();
   // Compress via canvas to keep payload under Vercel 4.5MB limit
