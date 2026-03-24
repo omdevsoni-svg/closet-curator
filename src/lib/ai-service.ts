@@ -6,7 +6,7 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 /* ------------------------------------------------------------------ */
-/*  Helper: convert File â base64 string (no data: prefix)            */
+/*  Helper: convert File → base64 string (no data: prefix)            */
 /* ------------------------------------------------------------------ */
 export const fileToBase64 = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -21,18 +21,23 @@ export const fileToBase64 = (file: File): Promise<string> =>
   });
 
 /* ------------------------------------------------------------------ */
-/*  Helper: convert image URL â base64 string                         */
+/*  Helper: convert image URL → base64 string                         */
 /* ------------------------------------------------------------------ */
 export const urlToBase64 = async (
   url: string,
-  opts?: { maxDim?: number; quality?: number }
+  opts?: { maxDim?: number; quality?: number; removeBackground?: boolean }
 ): Promise<string> => {
-  // v22: Higher resolution inputs for better VTO quality
+  // v23: Background removal for garment images + PNG preservation
+  // VTO model needs clean garment on white/transparent background.
+  // AI-generated garment images often have grey/colored backgrounds that
+  // confuse the model about garment boundaries (collar, hem, sleeve length).
   const MAX = opts?.maxDim ?? 1536;
   const quality = opts?.quality ?? 0.95;
+  const removeBg = opts?.removeBackground ?? false;
   const res = await fetch(url);
   const blob = await res.blob();
-  // Compress via canvas to keep payload under Vercel 4.5MB limit
+  const isPng = blob.type === "image/png" || url.toLowerCase().includes(".png");
+
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = "anonymous";
@@ -47,8 +52,63 @@ export const urlToBase64 = async (
       canvas.width = w;
       canvas.height = h;
       const ctx = canvas.getContext("2d")!;
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, w, h);
       ctx.drawImage(img, 0, 0, w, h);
-      const dataUrl = canvas.toDataURL("image/jpeg", quality);
+
+      // v23: Remove background for garment images
+      if (removeBg) {
+        const imgData = ctx.getImageData(0, 0, w, h);
+        const d = imgData.data;
+
+        // Sample background color from corners (10x10 pixel areas)
+        const samples: number[][] = [];
+        const sampleSize = 10;
+        for (let sy = 0; sy < sampleSize; sy++) {
+          for (let sx = 0; sx < sampleSize; sx++) {
+            // Top-left corner
+            const i1 = (sy * w + sx) * 4;
+            samples.push([d[i1], d[i1+1], d[i1+2]]);
+            // Top-right corner
+            const i2 = (sy * w + (w - 1 - sx)) * 4;
+            samples.push([d[i2], d[i2+1], d[i2+2]]);
+            // Bottom-left corner
+            const i3 = ((h - 1 - sy) * w + sx) * 4;
+            samples.push([d[i3], d[i3+1], d[i3+2]]);
+            // Bottom-right corner
+            const i4 = ((h - 1 - sy) * w + (w - 1 - sx)) * 4;
+            samples.push([d[i4], d[i4+1], d[i4+2]]);
+          }
+        }
+
+        // Average background color
+        const bgR = Math.round(samples.reduce((s, c) => s + c[0], 0) / samples.length);
+        const bgG = Math.round(samples.reduce((s, c) => s + c[1], 0) / samples.length);
+        const bgB = Math.round(samples.reduce((s, c) => s + c[2], 0) / samples.length);
+
+        // Replace pixels similar to background with pure white
+        // Use a generous threshold to catch gradient backgrounds
+        const threshold = 40;
+        for (let i = 0; i < d.length; i += 4) {
+          const dr = Math.abs(d[i] - bgR);
+          const dg = Math.abs(d[i+1] - bgG);
+          const db = Math.abs(d[i+2] - bgB);
+          if (dr < threshold && dg < threshold && db < threshold) {
+            d[i] = 255;     // R
+            d[i+1] = 255;   // G
+            d[i+2] = 255;   // B
+            d[i+3] = 255;   // A (fully opaque white)
+          }
+        }
+        ctx.putImageData(imgData, 0, 0);
+        console.log(`v23 background removed: bg=(${bgR},${bgG},${bgB}), threshold=${threshold}`);
+      }
+
+      // Always output as PNG for garment images (preserves edges), JPEG for body photos
+      const outputFormat = (removeBg || isPng) ? "image/png" : "image/jpeg";
+      const dataUrl = outputFormat === "image/jpeg"
+        ? canvas.toDataURL("image/jpeg", quality)
+        : canvas.toDataURL("image/png");
       resolve(dataUrl.split(",")[1]);
       URL.revokeObjectURL(img.src);
     };
@@ -58,7 +118,7 @@ export const urlToBase64 = async (
 };
 
 /* ------------------------------------------------------------------ */
-/*  AI Attribute Detection â calls Gemini API directly                 */
+/*  AI Attribute Detection — calls Gemini API directly                 */
 /* ------------------------------------------------------------------ */
 export interface DetectedAttributes {
   name: string;
@@ -107,7 +167,7 @@ export const detectClothingAttributes = async (
 };
 
 /* ------------------------------------------------------------------ */
-/*  Virtual Try-On â calls Vercel serverless function with face + body */
+/*  Virtual Try-On — calls Vercel serverless function with face + body */
 /* ------------------------------------------------------------------ */
 export interface TryOnResult {
   mimeType: string;
@@ -139,6 +199,7 @@ export const virtualTryOn = async (
 
     const data = await res.json();
     if (data.success && data.images) {
+      // v21: Apply client-side face composite
       const results = data.images as TryOnResult[];
       if (results.length > 0) {
         try {
@@ -162,7 +223,7 @@ export const virtualTryOn = async (
 };
 
 /* ------------------------------------------------------------------ */
-/*  Virtual Try-On (Multi-Garment) â sends all outfit items at once    */
+/*  Virtual Try-On (Multi-Garment) — sends all outfit items at once    */
 /* ------------------------------------------------------------------ */
 export interface GarmentInput {
   base64: string;
@@ -194,6 +255,7 @@ export const virtualTryOnMulti = async (
 
     const data = await res.json();
     if (data.success && data.images) {
+      // v21: Apply client-side face composite
       const results = data.images as TryOnResult[];
       if (results.length > 0) {
         try {
@@ -217,13 +279,13 @@ export const virtualTryOnMulti = async (
 };
 
 /* ------------------------------------------------------------------ */
-/*  Virtual Try-On (Sequential) â Imagen 3 VTO, one garment at a time */
+/*  Virtual Try-On (Sequential) — Imagen 3 VTO, one garment at a time */
 /*                                                                      */
-/*  Step 1: body photo + topwear â result1                             */
-/*  Step 2: result1 (as person) + bottomwear â result2                 */
-/*  Step 3: result2 (as person) + footwear â final                     */
+/*  Step 1: body photo + topwear → result1                             */
+/*  Step 2: result1 (as person) + bottomwear → result2                 */
+/*  Step 3: result2 (as person) + footwear → final                     */
 /*                                                                      */
-/*  Imagen 3 VTO preserves identity automatically â no face refinement  */
+/*  Imagen 3 VTO preserves identity automatically — no face refinement  */
 /*  needed. Previous result becomes the personImage for the next step.  */
 /* ------------------------------------------------------------------ */
 
@@ -248,7 +310,7 @@ export const virtualTryOnSequential = async (
   onProgress?: (progress: SequentialProgress) => void,
   _faceImageBase64?: string,
 ): Promise<TryOnResult[]> => {
-  // v17: Imagen 3 VTO + Smart Quality Tiering â fast intermediates, max quality final
+  // v17: Imagen 3 VTO + Smart Quality Tiering — fast intermediates, max quality final
   const totalSteps = garments.length;
   let previousResultBase64: string | null = null;
   let previousResultMimeType = "image/jpeg";
@@ -264,7 +326,7 @@ export const virtualTryOnSequential = async (
     });
 
     try {
-      // v17: isFinalStep flag â only the last step gets full quality + upscale
+      // v17: isFinalStep flag — only the last step gets full quality + upscale
       const isLast = i === garments.length - 1;
       const res = await fetch("/api/virtual-tryon", {
         method: "POST",
@@ -311,9 +373,14 @@ export const virtualTryOnSequential = async (
   }
 
   if (previousResultBase64) {
+    // v21: Client-side face composite — restore original face onto VTO result
+    // with Reinhard color correction and multi-layer feathered mask
     try {
       const compositedBase64 = await compositeFaceOntoVTO(
-        bodyImageBase64, previousResultBase64, "image/jpeg", previousResultMimeType
+        bodyImageBase64,
+        previousResultBase64,
+        "image/jpeg",
+        previousResultMimeType
       );
       if (compositedBase64) {
         console.log("v21 face composite applied successfully");
@@ -328,7 +395,7 @@ export const virtualTryOnSequential = async (
 };
 
 /* ------------------------------------------------------------------ */
-/*  AI Outfit Recommendation â calls Gemini via serverless function    */
+/*  AI Outfit Recommendation — calls Gemini via serverless function    */
 /* ------------------------------------------------------------------ */
 
 export interface RecommendationRequest {
