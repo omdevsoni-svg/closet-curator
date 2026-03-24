@@ -8,12 +8,6 @@ const ProfileSetup = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading, signUp, signIn } = useAuth();
 
-  // Redirect to home if already logged in
-  useEffect(() => {
-    if (!authLoading && user) {
-      navigate("/home", { replace: true });
-    }
-  }, [user, authLoading, navigate]);
   const [mode, setMode] = useState<"signup" | "login">("signup");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -21,6 +15,23 @@ const ProfileSetup = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Redirect to home if already logged in
+  useEffect(() => {
+    if (!authLoading && user) {
+      navigate("/home", { replace: true });
+    }
+  }, [user, authLoading, navigate]);
+
+  // While auth is loading or user is already logged in, show a minimal spinner
+  // instead of the login form — this prevents the "flash" on PWA launch
+  if (authLoading || user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="h-8 w-8 animate-spin rounded-full border-3 border-primary/30 border-t-primary" />
+      </div>
+    );
+  }
 
   const handleSubmit = async () => {
     setError("");
