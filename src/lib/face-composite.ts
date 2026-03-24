@@ -1,5 +1,5 @@
 /* ------------------------------------------------------------------ */
-/*  Face Composite v21 — restores original face onto VTO result        */
+/*  Face Composite v24 — restores original face onto VTO result        */
 /*                                                                      */
 /*  The Imagen 3 VTO model sometimes distorts facial features (skin     */
 /*  tone shift, eye asymmetry, expression change, beard softening).     */
@@ -205,7 +205,7 @@ function createFeatheredMask(
   width: number,
   height: number,
   box: FaceBox,
-  feather = 0.20
+  feather = 0.12
 ): HTMLCanvasElement {
   const mask = document.createElement("canvas");
   mask.width = width;
@@ -213,25 +213,25 @@ function createFeatheredMask(
   const ctx = mask.getContext("2d")!;
   ctx.clearRect(0, 0, width, height);
 
-  // v23: Tighter mask — only face + chin area, NOT neck/shoulders/arms
-  // Previous 30% neck extension + 40% feather bled into arms causing skin artifacts
-  const neckExtend = box.height * 0.10;  // was 0.30 — minimal chin extension only
+  // v24: Very tight mask — face only, NO chin/neck extension
+  // v23 still bled into collar/chest shifting garment color
+  const neckExtend = 0;  // was 0.10 — completely removed to protect garment collar
   const cx = box.x + box.width / 2;
-  const cy = box.y + box.height / 2 + neckExtend * 0.2;
+  const cy = box.y + box.height / 2;  // centered on face, no downward offset
   const expandX = box.width * feather;
-  const expandY = (box.height + neckExtend) * feather;
+  const expandY = box.height * feather;
   const rx = box.width / 2 + expandX;
-  const ry = (box.height + neckExtend) / 2 + expandY;
+  const ry = box.height / 2 + expandY;
   const maxR = Math.max(rx, ry);
 
-  // Multi-stop gradient for natural blending
+  // Sharper gradient — solid core larger, faster falloff at edges
   const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxR);
   gradient.addColorStop(0, "rgba(255,255,255,1)");
-  gradient.addColorStop(0.45, "rgba(255,255,255,1)");    // Solid core
-  gradient.addColorStop(0.60, "rgba(255,255,255,0.85)");  // Start fade
-  gradient.addColorStop(0.75, "rgba(255,255,255,0.5)");   // Mid fade
-  gradient.addColorStop(0.88, "rgba(255,255,255,0.15)");  // Near edge
-  gradient.addColorStop(1.0, "rgba(255,255,255,0)");      // Fully transparent
+  gradient.addColorStop(0.55, "rgba(255,255,255,1)");    // Larger solid core
+  gradient.addColorStop(0.70, "rgba(255,255,255,0.7)");  // Start fade later
+  gradient.addColorStop(0.82, "rgba(255,255,255,0.25)"); // Faster drop
+  gradient.addColorStop(0.92, "rgba(255,255,255,0.05)"); // Nearly gone
+  gradient.addColorStop(1.0, "rgba(255,255,255,0)");     // Fully transparent
 
   // Draw elliptical mask
   ctx.save();
@@ -324,15 +324,17 @@ export async function compositeFaceOntoVTO(
   );
 
   // Apply Reinhard color correction to match VTO lighting
+  // v24: Much smaller radius — only correct pixels very close to face center
+  // v23 radius of 0.3 still reached collar/chest and shifted garment color
   applyColorCorrection(
     origCtx, outW, outH,
     origStats, vtoStats,
     vtoFace,
-    Math.max(vtoFace.width, vtoFace.height) * 0.3  // v23: tighter color correction radius
+    Math.max(vtoFace.width, vtoFace.height) * 0.10  // v24: minimal — face only
   );
 
-  // v23: Tighter mask to avoid bleeding into shoulders/arms
-  const mask = createFeatheredMask(outW, outH, vtoFace, 0.20);
+  // v24: Very tight mask — no neck extension, sharper falloff
+  const mask = createFeatheredMask(outW, outH, vtoFace, 0.12);
 
   // --- Composite: VTO base + masked original face ---
   const canvas = document.createElement("canvas");
