@@ -51,12 +51,12 @@ async function getAccessToken(sa: ServiceAccountKey): Promise<string> {
 }
 
 /* ------------------------------------------------------------------ */
-/*  v17 Virtual Try-On — Imagen 3 VTO + Smart Quality Tiering            */
+/*  v22 Virtual Try-On — Imagen 3 VTO + Garment Fidelity Optimization            */
 /*                                                                      */
-/*  Optimizations over v16:                                             */
-/*  - Intermediate sequential steps: baseSteps=50, JPEG, no upscale    */
-/*    → ~40% faster for multi-garment outfits                           */
-/*  - Final step only: baseSteps=75, PNG, Imagen 4.0 Upscale 2x        */
+/*  v22 changes (garment quality fix):                                             */
+/*  - Intermediate steps: baseSteps=75, JPEG q95 (was 50/q90)    */
+/*    → preserves garment details/prints through sequential chain                           */
+/*  - Final step: baseSteps=100, PNG, Imagen 4.0 Upscale 2x        */
 /*    → max quality where it matters (the result users actually see)    */
 /*  - Single-garment mode: always full quality + upscale                */
 /*                                                                      */
@@ -143,9 +143,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // --- Build Imagen 3 VTO request ---
-    // v17: Smart quality tiering — full quality only on final step
+    // v22: Improved quality tiering — full quality only on final step
     const useFinalQuality = isFinalStep || mode === "single";
-    const baseSteps = useFinalQuality ? 100 : 50;
+    const baseSteps = useFinalQuality ? 100 : 75;
     const outputMime = useFinalQuality ? "image/png" : "image/jpeg";
 
     const requestBody = {
@@ -168,7 +168,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         safetySetting: "block_medium_and_above",
         outputOptions: {
           mimeType: outputMime,
-          ...(outputMime === "image/jpeg" ? { compressionQuality: 90 } : {}),
+          ...(outputMime === "image/jpeg" ? { compressionQuality: 95 } : {}),
         },
       },
     };
