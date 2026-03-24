@@ -145,7 +145,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // --- Build Imagen 3 VTO request ---
     // v17: Smart quality tiering — full quality only on final step
     const useFinalQuality = isFinalStep || mode === "single";
-    const baseSteps = useFinalQuality ? 75 : 50;
+    const baseSteps = useFinalQuality ? 100 : 50;
     const outputMime = useFinalQuality ? "image/png" : "image/jpeg";
 
     const requestBody = {
