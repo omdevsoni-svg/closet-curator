@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import crypto from "crypto";
 
 /* ------------------------------------------------------------------ */
-/*  GCP Service Account Auth: JWT → Access Token                       */
+/*  GCP Service Account Auth: JWT â Access Token                       */
 /* ------------------------------------------------------------------ */
 
 interface ServiceAccountKey {
@@ -51,24 +51,24 @@ async function getAccessToken(sa: ServiceAccountKey): Promise<string> {
 }
 
 /* ------------------------------------------------------------------ */
-/*  v22 Virtual Try-On — Imagen 3 VTO + Garment Fidelity Optimization            */
+/*  v22 Virtual Try-On â Imagen 3 VTO + Garment Fidelity Optimization            */
 /*                                                                      */
 /*  v22 changes (garment quality fix):                                             */
 /*  - Intermediate steps: baseSteps=75, JPEG q95 (was 50/q90)    */
-/*    → preserves garment details/prints through sequential chain                           */
+/*    â preserves garment details/prints through sequential chain                           */
 /*  - Final step: baseSteps=100, PNG, Imagen 4.0 Upscale 2x        */
-/*    → max quality where it matters (the result users actually see)    */
+/*    â max quality where it matters (the result users actually see)    */
 /*  - Single-garment mode: always full quality + upscale                */
 /*                                                                      */
 /*  Uses the dedicated Imagen 3 VTO model which:                        */
 /*  - Takes a person image + ONE product image per call                 */
 /*  - Automatically handles garment placement (no text prompts needed)  */
 /*  - Preserves face identity much better than generative models        */
-/*  - Sequential chaining: previous result → personImage for next step  */
+/*  - Sequential chaining: previous result â personImage for next step  */
 /*                                                                      */
 /*  Modes:                                                              */
-/*  1. "single" — one garment: person + garment → result               */
-/*  2. "sequential-step" — chained: previous result becomes person      */
+/*  1. "single" â one garment: person + garment â result               */
+/*  2. "sequential-step" â chained: previous result becomes person      */
 /*     image for next call                                              */
 /* ------------------------------------------------------------------ */
 
@@ -106,7 +106,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       isFinalStep = true,          // v17: true for single mode & last sequential step
     } = req.body;
 
-    if (!bodyImageBase64) {
+  if (!bodyImageBase64 && !previousResultBase64) { // v28: allow empty body when chaining
       return res.status(400).json({ success: false, error: "bodyImageBase64 is required" });
     }
 
@@ -143,7 +143,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // --- Build Imagen 3 VTO request ---
-    // v22: Improved quality tiering — full quality only on final step
+    // v22: Improved quality tiering â full quality only on final step
     const useFinalQuality = isFinalStep || mode === "single";
     const baseSteps = useFinalQuality ? 100 : 75;
     const outputMime = useFinalQuality ? "image/png" : "image/jpeg";
@@ -256,7 +256,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             console.log("Image upscaled successfully via Imagen upscale model");
           }
         } else {
-          // Upscale failed — proceed with un-upscaled image (still better with baseSteps=75 + PNG)
+          // Upscale failed â proceed with un-upscaled image (still better with baseSteps=75 + PNG)
           console.warn("Upscale step failed:", upscaleRes.status, await upscaleRes.text().catch(() => ""));
         }
       } catch (upscaleErr) {
@@ -275,14 +275,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const faceRefineModel = "gemini-2.5-flash-image";
         const faceRefineUrl = `https://${REGION}-aiplatform.googleapis.com/v1/projects/${PROJECT}/locations/${REGION}/publishers/google/models/${faceRefineModel}:generateContent`;
 
-        const faceRefinePrompt = `IMAGE 1 is the REFERENCE — the person's REAL face. Study it carefully: the exact warm skin tone, beard texture, eye shape, expression, and facial structure.
+        const faceRefinePrompt = `IMAGE 1 is the REFERENCE â the person's REAL face. Study it carefully: the exact warm skin tone, beard texture, eye shape, expression, and facial structure.
 
 IMAGE 2 is a virtual try-on result. The CLOTHES, POSE, and BACKGROUND in Image 2 are perfect and must NOT change. But the FACE in Image 2 has been distorted by AI.
 
 TASK: Replace ONLY the face+neck area in Image 2 with the person's real face from Image 1.
 
 MANDATORY:
-- Match the EXACT warm skin tone from Image 1 — do NOT make it paler or cooler
+- Match the EXACT warm skin tone from Image 1 â do NOT make it paler or cooler
 - Copy the beard/facial hair with sharp, crisp edges exactly as in Image 1
 - Preserve the exact eye shape, pupil position, and natural expression from Image 1
 - Keep the face width and jawline shape identical to Image 1
