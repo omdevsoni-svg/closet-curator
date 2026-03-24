@@ -14,7 +14,6 @@ import { type ClothingItem } from "@/lib/database";
 /* ------------------------------------------------------------------ */
 /*  Slot definitions & category mapping                                */
 /* ------------------------------------------------------------------ */
-
 interface SlotDef {
   key: string;
   label: string;
@@ -34,177 +33,227 @@ const DRESS_SLOT: SlotDef = {
 };
 
 /* ------------------------------------------------------------------ */
-/*  Vertical Swipe Column — one draggable column per slot              */
+/*  Style-aware shuffle: formality/style matching                      */
 /* ------------------------------------------------------------------ */
 
-interface SwipeColumnProps {
+/** Infer a formality tier from item name, tags, category, and material */
+function inferFormality(item: ClothingItem): "formal" | "smart-casual" | "casual" | "sporty" {
+  const text = [
+    item.name,
+    ...(item.tags || []),
+    item.material || "",
+    item.brand || "",
+  ].join(" ").toLowerCase();
+
+  // Sporty / Athletic
+  if (
+    text.match(/\b(sport|athletic|gym|running|jogger|track|sneaker|trainer|activewear|workout|yoga|legging)\b/)
+  ) return "sporty";
+
+  // Formal / Dressy
+  if (
+    text.match(/\b(formal|suit|blazer|dress\s?shoe|oxford|loafer|heel|pump|derby|brogue|chino|trouser|silk|satin|linen\s?pant|wool|cashmere|office|business|tie|cufflink)\b/)
+  ) return "formal";
+
+  // Smart casual
+  if (
+    text.match(/\b(polo|button|collar|boot|chelsea|suede|leather|khaki|slim|fitted|cardigan|knit|smart|semi)\b/)
+  ) return "smart-casual";
+
+  // Default casual
+  return "casual";
+}
+
+/** Compatible formality pairings */
+const FORMALITY_COMPAT: Record<string, string[]> = {
+  "formal":       ["formal", "smart-casual"],
+  "smart-casual": ["formal", "smart-casual", "casual"],
+  "casual":       ["smart-casual", "casual", "sporty"],
+  "sporty":       ["casual", "sporty"],
+};
+
+/* ------------------------------------------------------------------ */
+/*  Vertical Casino Carousel - 3 visible rows, middle active           */
+/* ------------------------------------------------------------------ */
+interface VerticalCarouselProps {
   slot: SlotDef;
   items: ClothingItem[];
   selectedItem: ClothingItem | null;
   onSelect: (item: ClothingItem) => void;
 }
 
-const SwipeColumn = ({ slot, items, selectedItem, onSelect }: SwipeColumnProps) => {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const isUserScrolling = useRef(false);
-  const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+const ITEM_HEIGHT = 88; // px per row
+const VISIBLE_COUNT = 3;
 
-  const scrollTo = (dir: "up" | "down") => {
-    if (!scrollRef.current) return;
-    scrollRef.current.scrollBy({
-      top: dir === "up" ? -130 : 130,
-      behavior: "smooth",
-    });
-  };
+const VerticalCarousel = ({ slot, items, selectedItem, onSelect }: VerticalCarouselProps) => {
+  // Find the index of the selected item, default to 0
+  const selectedIdx = selectedItem ? items.findIndex(i => i.id === selectedItem.id) : -1;
+  const [activeIndex, setActiveIndex] = useState(Math.max(0, selectedIdx));
 
-  // Find the item closest to the vertical center of the scroll container
-  const findCenteredItem = useCallback(() => {
-    const container = scrollRef.current;
-    if (!container || items.length === 0) return;
-    const containerRect = container.getBoundingClientRect();
-    const centerY = containerRect.top + containerRect.height / 2;
-    let closestItem: ClothingItem | null = null;
-    let closestDist = Infinity;
-    for (const item of items) {
-      const el = container.querySelector(`[data-item-id="${item.id}"]`);
-      if (!el) continue;
-      const rect = el.getBoundingClientRect();
-      const itemCenterY = rect.top + rect.height / 2;
-      const dist = Math.abs(itemCenterY - centerY);
-      if (dist < closestDist) {
-        closestDist = dist;
-        closestItem = item;
-      }
-    }
-    if (closestItem && closestItem.id !== selectedItem?.id) {
-      onSelect(closestItem);
-    }
-  }, [items, selectedItem?.id, onSelect]);
-
-  // Auto-select on scroll (debounced)
+  // Sync activeIndex when selectedItem changes externally (e.g. shuffle)
   useEffect(() => {
-    const container = scrollRef.current;
-    if (!container) return;
-    const handleScroll = () => {
-      if (scrollTimer.current) clearTimeout(scrollTimer.current);
-      scrollTimer.current = setTimeout(() => {
-        findCenteredItem();
-      }, 120);
-    };
-    container.addEventListener("scroll", handleScroll, { passive: true });
-    return () => {
-      container.removeEventListener("scroll", handleScroll);
-      if (scrollTimer.current) clearTimeout(scrollTimer.current);
-    };
-  }, [findCenteredItem]);
+    if (selectedItem) {
+      const idx = items.findIndex(i => i.id === selectedItem.id);
+      if (idx >= 0) setActiveIndex(idx);
+    }
+  }, [selectedItem, items]);
 
-  // Auto-select first item on mount if nothing selected
+  // Auto-select middle item on mount if nothing selected
   useEffect(() => {
     if (!selectedItem && items.length > 0) {
-      onSelect(items[0]);
+      onSelect(items[activeIndex]);
     }
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-scroll to selected item on mount
-  useEffect(() => {
-    if (!scrollRef.current || !selectedItem) return;
-    const container = scrollRef.current;
-    const selectedEl = container.querySelector(`[data-item-id="${selectedItem.id}"]`);
-    if (selectedEl) {
-      selectedEl.scrollIntoView({ block: "center", behavior: "smooth" });
-    }
-  }, [selectedItem?.id]);
+  const scrollUp = useCallback(() => {
+    setActiveIndex(prev => {
+      const next = Math.max(0, prev - 1);
+      onSelect(items[next]);
+      return next;
+    });
+  }, [items, onSelect]);
+
+  const scrollDown = useCallback(() => {
+    setActiveIndex(prev => {
+      const next = Math.min(items.length - 1, prev + 1);
+      onSelect(items[next]);
+      return next;
+    });
+  }, [items, onSelect]);
 
   if (items.length === 0) {
     return (
-      <div className="flex-1 flex flex-col items-center min-w-0">
-        <div className="mb-2 rounded-lg bg-ai/10 px-3 py-1">
-          <p className="text-[10px] font-body font-bold uppercase tracking-widest text-ai">
-            {slot.label}
-          </p>
-        </div>
-        <div className="flex-1 flex items-center justify-center rounded-2xl bg-card/40 border border-dashed border-border/50 p-4 w-full">
-          <div className="text-center">
-            <ImageIcon className="h-6 w-6 text-muted-foreground/20 mx-auto mb-1" />
-            <p className="text-[9px] text-muted-foreground">No items</p>
-          </div>
-        </div>
+      <div className="rounded-xl bg-card/50 p-4 text-center">
+        <p className="text-[11px] font-body text-muted-foreground">
+          No {slot.label.toLowerCase()} items in closet
+        </p>
       </div>
     );
   }
 
+  // Build 3 visible indices: prev, active, next
+  const prevIdx = activeIndex - 1;
+  const nextIdx = activeIndex + 1;
+  const visibleIndices = [prevIdx, activeIndex, nextIdx];
+
   return (
-    <div className="flex-1 flex flex-col items-center min-w-0">
-      {/* Slot header */}
-      <div className="mb-2 rounded-lg bg-ai/10 px-3 py-1">
-        <p className="text-[10px] font-body font-bold uppercase tracking-widest text-ai">
+    <div className="relative flex items-start gap-3">
+      {/* Slot label - vertical */}
+      <div className="flex flex-col items-center justify-center pt-1" style={{ minWidth: 40 }}>
+        <p className="text-[9px] font-body font-semibold uppercase tracking-wider text-ai/70 text-center">
           {slot.label}
         </p>
+        {/* Up/Down arrows */}
+        <div className="flex flex-col gap-0.5 mt-1">
+          <button
+            onClick={scrollUp}
+            disabled={activeIndex === 0}
+            className="flex h-5 w-5 items-center justify-center rounded-full bg-background/80 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-opacity"
+          >
+            <ChevronUp className="h-3 w-3" />
+          </button>
+          <button
+            onClick={scrollDown}
+            disabled={activeIndex >= items.length - 1}
+            className="flex h-5 w-5 items-center justify-center rounded-full bg-background/80 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-opacity"
+          >
+            <ChevronDown className="h-3 w-3" />
+          </button>
+        </div>
       </div>
 
-      {/* Up arrow */}
-      <button
-        onClick={() => scrollTo("up")}
-        className="mb-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-card shadow-sm border border-border/40 text-muted-foreground hover:text-foreground hover:bg-card/80 transition-colors"
-      >
-        <ChevronUp className="h-3.5 w-3.5" />
-      </button>
-
-      {/* Scrollable vertical column */}
+      {/* Casino reel */}
       <div
-        ref={scrollRef}
-        className="flex flex-col gap-2.5 overflow-y-auto scrollbar-none rounded-2xl bg-card/30 border border-border/30 p-2 w-full"
-        style={{
-          height: "320px",
-          scrollSnapType: "y mandatory",
-          WebkitOverflowScrolling: "touch",
-        }}
+        className="relative overflow-hidden rounded-xl flex-1"
+        style={{ height: ITEM_HEIGHT * VISIBLE_COUNT }}
       >
-        {items.map((item) => {
-          const isSelected = selectedItem?.id === item.id;
-          return (
-            <button
-              key={item.id}
-              data-item-id={item.id}
-              onClick={() => onSelect(item)}
-              className={`shrink-0 rounded-xl p-1.5 transition-all duration-200 ${
-                isSelected
-                  ? "ring-2 ring-ai bg-ai/10 shadow-lg shadow-ai/10 scale-[1.03]"
-                  : "bg-background hover:bg-background/80 hover:shadow-sm"
-              }`}
-              style={{ scrollSnapAlign: "center" }}
-            >
-              <div className="aspect-square overflow-hidden rounded-lg bg-background">
-                {item.image_url ? (
-                  <img
-                    src={item.image_url}
-                    alt={item.name}
-                    className="h-full w-full object-contain"
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center">
-                    <ImageIcon className="h-5 w-5 text-muted-foreground/30" />
-                  </div>
-                )}
-              </div>
-              <p className="mt-1 text-[8px] font-body font-medium text-foreground text-center truncate">
-                {item.name}
-              </p>
-              {isSelected && (
-                <div className="mt-0.5 mx-auto h-1 w-6 rounded-full bg-ai" />
-              )}
-            </button>
-          );
-        })}
-      </div>
+        <AnimatePresence initial={false}>
+          {visibleIndices.map((idx, pos) => {
+            if (idx < 0 || idx >= items.length) {
+              // Empty slot (top or bottom edge)
+              return (
+                <motion.div
+                  key={`empty-${pos}`}
+                  className="absolute left-0 right-0"
+                  style={{ height: ITEM_HEIGHT, top: pos * ITEM_HEIGHT }}
+                >
+                  <div className="h-full w-full" />
+                </motion.div>
+              );
+            }
 
-      {/* Down arrow */}
-      <button
-        onClick={() => scrollTo("down")}
-        className="mt-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-card shadow-sm border border-border/40 text-muted-foreground hover:text-foreground hover:bg-card/80 transition-colors"
-      >
-        <ChevronDown className="h-3.5 w-3.5" />
-      </button>
+            const item = items[idx];
+            const isActive = pos === 1; // middle row
+            const isFaded = !isActive;
+
+            return (
+              <motion.div
+                key={item.id}
+                layout
+                initial={{ opacity: 0, y: pos === 0 ? -ITEM_HEIGHT : ITEM_HEIGHT }}
+                animate={{
+                  opacity: 1,
+                  y: 0,
+                }}
+                exit={{ opacity: 0 }}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                className="absolute left-0 right-0 px-1"
+                style={{ height: ITEM_HEIGHT, top: pos * ITEM_HEIGHT }}
+              >
+                <button
+                  onClick={() => {
+                    if (!isActive) {
+                      setActiveIndex(idx);
+                    }
+                    onSelect(item);
+                  }}
+                  className={`flex items-center gap-3 w-full h-full rounded-xl px-2 transition-all duration-300 ${
+                    isActive
+                      ? "bg-ai/5 ring-2 ring-ai scale-[1.02] shadow-sm"
+                      : "bg-card/40"
+                  }`}
+                  style={{
+                    opacity: isFaded ? 0.35 : 1,
+                    filter: isFaded ? "blur(0.5px)" : "none",
+                  }}
+                >
+                  <div className={`shrink-0 overflow-hidden rounded-lg bg-background transition-all ${
+                    isActive ? "h-[72px] w-[60px]" : "h-[60px] w-[50px]"
+                  }`}>
+                    {item.image_url ? (
+                      <img
+                        src={item.image_url}
+                        alt={item.name}
+                        className="h-full w-full object-contain"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center">
+                        <ImageIcon className="h-4 w-4 text-muted-foreground/30" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0 text-left">
+                    <p className={`font-body font-medium text-foreground truncate ${
+                      isActive ? "text-xs" : "text-[10px]"
+                    }`}>
+                      {item.name}
+                    </p>
+                    {isActive && item.color && (
+                      <p className="text-[9px] font-body text-muted-foreground mt-0.5 truncate">
+                        {item.color}{item.brand ? ` - ${item.brand}` : ""}
+                      </p>
+                    )}
+                  </div>
+                </button>
+              </motion.div>
+            );
+          })}
+        </AnimatePresence>
+
+        {/* Top/bottom fade overlays */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-6 bg-gradient-to-b from-background/60 to-transparent z-10" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-background/60 to-transparent z-10" />
+      </div>
     </div>
   );
 };
@@ -212,7 +261,6 @@ const SwipeColumn = ({ slot, items, selectedItem, onSelect }: SwipeColumnProps) 
 /* ------------------------------------------------------------------ */
 /*  MixAndMatch main component                                         */
 /* ------------------------------------------------------------------ */
-
 interface MixAndMatchProps {
   closetItems: ClothingItem[];
   onTryOn: (items: ClothingItem[]) => void;
@@ -220,12 +268,7 @@ interface MixAndMatchProps {
   inline?: boolean;
 }
 
-const MixAndMatch = ({
-  closetItems,
-  onTryOn,
-  onClose,
-  inline = false,
-}: MixAndMatchProps) => {
+const MixAndMatch = ({ closetItems, onTryOn, onClose, inline = false }: MixAndMatchProps) => {
   // Determine if closet has dresses
   const dressItems = closetItems.filter((i) =>
     DRESS_SLOT.categories.includes(i.category)
@@ -242,31 +285,68 @@ const MixAndMatch = ({
 
   // Filter items by slot
   const getSlotItems = (slot: SlotDef) =>
-    closetItems.filter(
-      (i) => slot.categories.includes(i.category) && i.image_url
-    );
+    closetItems.filter((i) => slot.categories.includes(i.category) && i.image_url);
 
-  const activeSlots =
-    mode === "dress"
-      ? [DRESS_SLOT, SLOT_DEFS[2]] // dress + footwear
-      : SLOT_DEFS; // top + bottom + footwear
+  const activeSlots = mode === "dress"
+    ? [DRESS_SLOT, SLOT_DEFS[2]] // dress + footwear
+    : SLOT_DEFS; // top + bottom + footwear
 
   const handleSelect = (slotKey: string, item: ClothingItem) => {
     setSelections((prev) => ({
       ...prev,
-      [slotKey]: item,
+      [slotKey]: prev[slotKey]?.id === item.id ? null : item,
     }));
   };
 
+  // Style-aware shuffle: pick a random top first, then find compatible bottoms and shoes
   const handleRandomize = () => {
     const newSelections: Record<string, ClothingItem | null> = { ...selections };
-    activeSlots.forEach((slot) => {
-      const items = getSlotItems(slot);
-      if (items.length > 0) {
-        const rand = items[Math.floor(Math.random() * items.length)];
-        newSelections[slot.key] = rand;
+
+    if (mode === "dress") {
+      // Dress mode: just random dress + random shoe
+      activeSlots.forEach((slot) => {
+        const items = getSlotItems(slot);
+        if (items.length > 0) {
+          newSelections[slot.key] = items[Math.floor(Math.random() * items.length)];
+        }
+      });
+    } else {
+      // Standard mode: style-aware matching
+      const topItems = getSlotItems(SLOT_DEFS[0]);
+      const bottomItems = getSlotItems(SLOT_DEFS[1]);
+      const footItems = getSlotItems(SLOT_DEFS[2]);
+
+      // 1. Pick a random top
+      if (topItems.length > 0) {
+        const top = topItems[Math.floor(Math.random() * topItems.length)];
+        newSelections["topwear"] = top;
+        const topFormality = inferFormality(top);
+        const compatibleStyles = FORMALITY_COMPAT[topFormality] || [topFormality, "casual"];
+
+        // 2. Pick a compatible bottom
+        if (bottomItems.length > 0) {
+          const compatBottoms = bottomItems.filter(b => compatibleStyles.includes(inferFormality(b)));
+          const pool = compatBottoms.length > 0 ? compatBottoms : bottomItems;
+          newSelections["bottomwear"] = pool[Math.floor(Math.random() * pool.length)];
+        }
+
+        // 3. Pick compatible footwear
+        if (footItems.length > 0) {
+          const compatFoot = footItems.filter(f => compatibleStyles.includes(inferFormality(f)));
+          const pool = compatFoot.length > 0 ? compatFoot : footItems;
+          newSelections["footwear"] = pool[Math.floor(Math.random() * pool.length)];
+        }
+      } else {
+        // No tops: just random for everything
+        activeSlots.forEach((slot) => {
+          const items = getSlotItems(slot);
+          if (items.length > 0) {
+            newSelections[slot.key] = items[Math.floor(Math.random() * items.length)];
+          }
+        });
       }
-    });
+    }
+
     setSelections(newSelections);
   };
 
@@ -298,7 +378,7 @@ const MixAndMatch = ({
           {onClose && (
             <button
               onClick={onClose}
-              className="fleh h-7 w-7 items-center justify-center rounded-full bg-card text-muted-foreground hover:text-foreground"
+              className="flex h-7 w-7 items-center justify-center rounded-full bg-card text-muted-foreground hover:text-foreground"
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -307,7 +387,7 @@ const MixAndMatch = ({
       </div>
 
       <p className="mt-1 text-[11px] font-body text-muted-foreground">
-        Scroll to browse — center item is auto-selected
+        Scroll each slot to pick items, then try them on together
       </p>
 
       {/* Mode toggle (show only if dresses exist) */}
@@ -336,19 +416,18 @@ const MixAndMatch = ({
         </div>
       )}
 
-      {/* 3-column vertical carousel grid */}
-      <div className={`mt-4 grid gap-3 ${activeSlots.length === 3 ? "grid-cols-3" : "grid-cols-2"}`}>
+      {/* Casino-style vertical carousels */}
+      <div className="mt-4 space-y-3">
         <AnimatePresence mode="wait">
           {activeSlots.map((slot, i) => (
             <motion.div
               key={slot.key}
-              initial={{ opacity: 0, y: 16 }}
+              initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -16 }}
-              transition={{ delay: i * 0.1 }}
-              className="flex"
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ delay: i * 0.08 }}
             >
-              <SwipeColumn
+              <VerticalCarousel
                 slot={slot}
                 items={getSlotItems(slot)}
                 selectedItem={selections[slot.key]}
@@ -391,7 +470,7 @@ const MixAndMatch = ({
           onClick={() => {
             if (canTryOn) onTryOn(selectedItems);
           }}
-          className={`fleh h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[hsl(43,70%,50%)] to-[hsl(220,10%,65%)] text-white font-display font-semibold transition-all shadow-sm ${
+          className={`flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[hsl(43,70%,50%)] to-[hsl(220,10%,65%)] text-white font-display font-semibold transition-all shadow-sm ${
             !canTryOn ? "opacity-40 cursor-not-allowed" : "cursor-pointer"
           }`}
         >
