@@ -32,18 +32,30 @@ const DRESS_SLOT: SlotDef = {
   categories: ["Dresses"],
 };
 
+/* Ethnic wear slot definitions */
+const ETHNIC_SLOTS: SlotDef[] = [
+  { key: "ethnic-top", label: "Kurta", categories: ["Ethnic Wear"] },
+  { key: "ethnic-bottom", label: "Bottom", categories: ["Ethnic Wear", "Bottoms"] },
+  { key: "ethnic-footwear", label: "Footwear", categories: ["Ethnic Wear", "Footwear"] },
+];
+
 /* ------------------------------------------------------------------ */
 /*  Style-aware shuffle: formality/style matching                      */
 /* ------------------------------------------------------------------ */
 
 /** Infer a formality tier from item name, tags, category, and material */
-function inferFormality(item: ClothingItem): "formal" | "smart-casual" | "casual" | "sporty" {
+function inferFormality(item: ClothingItem): "formal" | "smart-casual" | "casual" | "sporty" | "ethnic" {
   const text = [
     item.name,
     ...(item.tags || []),
     item.material || "",
     item.brand || "",
   ].join(" ").toLowerCase();
+
+  // Ethnic / Traditional
+  if (
+    text.match(/\b(kurta|sherwani|nehru|ethnic|traditional|bandhgala|achkan|pajama|churidar|dhoti|jutti|mojari|kolhapuri|salwar|dupatta)\b/)
+  ) return "ethnic";
 
   // Sporty / Athletic
   if (
@@ -70,6 +82,7 @@ const FORMALITY_COMPAT: Record<string, string[]> = {
   "smart-casual": ["formal", "smart-casual", "casual"],
   "casual":       ["smart-casual", "casual", "sporty"],
   "sporty":       ["casual", "sporty"],
+  "ethnic":       ["ethnic"],
 };
 
 /* ------------------------------------------------------------------ */
@@ -85,6 +98,29 @@ function isActivewearBottom(item: ClothingItem): boolean {
 
 function isActivewearShoe(item: ClothingItem): boolean {
   return item.category === "Activewear" && ACTIVEWEAR_SHOE_PATTERN.test(item.name);
+}
+
+/* ---------------------------------------------------------------- */
+/*  Ethnic wear routing: tops vs bottoms vs footwear                  */
+/* ---------------------------------------------------------------- */
+const ETHNIC_TOP_PATTERN = /\b(kurta|sherwani|nehru|bandhgala|achkan|angrakha|bandi|waistcoat|jacket|vest|tunic)\b/i;
+const ETHNIC_BOTTOM_PATTERN = /\b(pajama|pyjama|churidar|dhoti|lungi|salwar|shalwar|pant|trouser|bottom|leheng)\b/i;
+const ETHNIC_SHOE_PATTERN = /\b(jutti|jutti|mojari|mojri|kolhapuri|sandal|chappal|shoe|slipper|khussa)\b/i;
+
+function isEthnicTop(item: ClothingItem): boolean {
+  if (item.category !== "Ethnic Wear") return false;
+  // If name matches bottom or shoe pattern, it's NOT a top
+  if (ETHNIC_BOTTOM_PATTERN.test(item.name) || ETHNIC_SHOE_PATTERN.test(item.name)) return false;
+  // Default: ethnic items without bottom/shoe keywords are tops (kurtas etc.)
+  return true;
+}
+
+function isEthnicBottom(item: ClothingItem): boolean {
+  return item.category === "Ethnic Wear" && ETHNIC_BOTTOM_PATTERN.test(item.name);
+}
+
+function isEthnicFootwear(item: ClothingItem): boolean {
+  return item.category === "Ethnic Wear" && ETHNIC_SHOE_PATTERN.test(item.name);
 }
 
 /* ------------------------------------------------------------------ */
@@ -283,12 +319,21 @@ const MixAndMatch = ({ closetItems, onTryOn, onClose, inline = false }: MixAndMa
   );
   const hasDresses = dressItems.length > 0;
 
-  const [mode, setMode] = useState<"standard" | "dress">("standard");
+  // Detect ethnic wear items
+  const ethnicItems = closetItems.filter((i) =>
+    i.category === "Ethnic Wear" && i.image_url
+  );
+  const hasEthnicWear = ethnicItems.length > 0;
+
+  const [mode, setMode] = useState<"standard" | "dress" | "ethnic">("standard");
   const [selections, setSelections] = useState<Record<string, ClothingItem | null>>({
     topwear: null,
     bottomwear: null,
     footwear: null,
     dress: null,
+    "ethnic-top": null,
+    "ethnic-bottom": null,
+    "ethnic-footwear": null,
   });
 
   // Filter items by slot (with smart activewear routing)
@@ -302,11 +347,22 @@ const MixAndMatch = ({ closetItems, onTryOn, onClose, inline = false }: MixAndMa
         if (slot.key === "topwear") return !isActivewearBottom(i) && !isActivewearShoe(i);
         return false; // dress slot: skip activewear
       }
+      // Smart ethnic wear handling: route to correct ethnic slot
+      if (i.category === "Ethnic Wear") {
+        if (slot.key === "ethnic-top") return isEthnicTop(i);
+        if (slot.key === "ethnic-bottom") return isEthnicBottom(i);
+        if (slot.key === "ethnic-footwear") return isEthnicFootwear(i);
+        // For standard slots, skip ethnic items
+        if (slot.key === "topwear" || slot.key === "bottomwear" || slot.key === "footwear") return false;
+        return false;
+      }
       return slot.categories.includes(i.category);
     });
 
   const activeSlots = mode === "dress"
     ? [DRESS_SLOT, SLOT_DEFS[2]] // dress + footwear
+    : mode === "ethnic"
+    ? ETHNIC_SLOTS // kurta + ethnic bottom + ethnic footwear
     : SLOT_DEFS; // top + bottom + footwear
 
   const handleSelect = (slotKey: string, item: ClothingItem) => {
@@ -322,6 +378,14 @@ const MixAndMatch = ({ closetItems, onTryOn, onClose, inline = false }: MixAndMa
 
     if (mode === "dress") {
       // Dress mode: just random dress + random shoe
+      activeSlots.forEach((slot) => {
+        const items = getSlotItems(slot);
+        if (items.length > 0) {
+          newSelections[slot.key] = items[Math.floor(Math.random() * items.length)];
+        }
+      });
+    } else if (mode === "ethnic") {
+      // Ethnic mode: random kurta + compatible ethnic bottom + ethnic footwear
       activeSlots.forEach((slot) => {
         const items = getSlotItems(slot);
         if (items.length > 0) {
@@ -409,7 +473,7 @@ const MixAndMatch = ({ closetItems, onTryOn, onClose, inline = false }: MixAndMa
       </p>
 
       {/* Mode toggle (show only if dresses exist) */}
-      {hasDresses && (
+      {(hasDresses || hasEthnicWear) && (
         <div className="mt-3 flex rounded-xl bg-card p-1">
           <button
             onClick={() => setMode("standard")}
@@ -431,6 +495,18 @@ const MixAndMatch = ({ closetItems, onTryOn, onClose, inline = false }: MixAndMa
           >
             Dress + Shoes
           </button>
+          {hasEthnicWear && (
+            <button
+              onClick={() => setMode("ethnic")}
+              className={`flex-1 rounded-lg py-1.5 text-xs font-body font-medium transition-all ${
+                mode === "ethnic"
+                  ? "bg-ai text-ai-foreground shadow-sm"
+                  : "text-muted-foreground"
+              }`}
+            >
+              Ethnic
+            </button>
+          )}
         </div>
       )}
 
