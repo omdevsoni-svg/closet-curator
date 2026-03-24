@@ -143,13 +143,19 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
                   return aOrder - bOrder;
                 });
 
+                // v22b: Preserve PNG format for garment images (critical for collar/hem fidelity)
                 const seqGarments = await Promise.all(
-                  sorted.map(async (item) => ({
-                    base64: await urlToBase64(item.image_url),
-                    mimeType: "image/jpeg",
-                    label: `${item.category}: ${item.name}`,
-                    category: item.category?.toLowerCase() || "other",
-                  }))
+                  sorted.map(async (item) => {
+                    const b64 = await urlToBase64(item.image_url, { preserveFormat: true });
+                    const isPng = item.image_url.toLowerCase().includes(".png") ||
+                      (await fetch(item.image_url, { method: "HEAD" }).then(r => r.headers.get("content-type") || "").catch(() => "")).includes("png");
+                    return {
+                      base64: b64,
+                      mimeType: isPng ? "image/png" : "image/jpeg",
+                      label: `${item.category}: ${item.name}`,
+                      category: item.category?.toLowerCase() || "other",
+                    };
+                  })
                 );
 
                 // v15: Imagen 3 VTO (face param kept for backward compat)
@@ -226,13 +232,19 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
           return aOrder - bOrder;
         });
 
+        // v22b: Preserve PNG format for garment images (critical for collar/hem fidelity)
         const seqGarments = await Promise.all(
-          sorted.map(async (item) => ({
-            base64: await urlToBase64(item.image_url),
-            mimeType: "image/jpeg",
-            label: `${item.category}: ${item.name}`,
-            category: item.category?.toLowerCase() || "other",
-          }))
+          sorted.map(async (item) => {
+            const b64 = await urlToBase64(item.image_url, { preserveFormat: true });
+            const isPng = item.image_url.toLowerCase().includes(".png") ||
+              (await fetch(item.image_url, { method: "HEAD" }).then(r => r.headers.get("content-type") || "").catch(() => "")).includes("png");
+            return {
+              base64: b64,
+              mimeType: isPng ? "image/png" : "image/jpeg",
+              label: `${item.category}: ${item.name}`,
+              category: item.category?.toLowerCase() || "other",
+            };
+          })
         );
 
         // v14: Pass face close-up for face refinement final step
