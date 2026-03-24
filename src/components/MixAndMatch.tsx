@@ -73,6 +73,21 @@ const FORMALITY_COMPAT: Record<string, string[]> = {
 };
 
 /* ------------------------------------------------------------------ */
+/*  Smart activewear routing: bottoms vs tops                          */
+/* ------------------------------------------------------------------ */
+const ACTIVEWEAR_BOTTOM_PATTERN = /\b(pant|short|jogger|legging|track\s?pant|sweat\s?pant|tight|skirt|trouser|bottom|capri|bermuda)\b/i;
+const ACTIVEWEAR_SHOE_PATTERN = /\b(shoe|sneaker|trainer|cleat|boot|sandal|slide|flip)\b/i;
+
+/** Check if an activewear item is actually a bottom/shoe based on its name */
+function isActivewearBottom(item: ClothingItem): boolean {
+  return item.category === "Activewear" && ACTIVEWEAR_BOTTOM_PATTERN.test(item.name);
+}
+
+function isActivewearShoe(item: ClothingItem): boolean {
+  return item.category === "Activewear" && ACTIVEWEAR_SHOE_PATTERN.test(item.name);
+}
+
+/* ------------------------------------------------------------------ */
 /*  Column Carousel - vertical carousel for a single category          */
 /* ------------------------------------------------------------------ */
 interface ColumnCarouselProps {
@@ -276,9 +291,19 @@ const MixAndMatch = ({ closetItems, onTryOn, onClose, inline = false }: MixAndMa
     dress: null,
   });
 
-  // Filter items by slot
+  // Filter items by slot (with smart activewear routing)
   const getSlotItems = (slot: SlotDef) =>
-    closetItems.filter((i) => slot.categories.includes(i.category) && i.image_url);
+    closetItems.filter((i) => {
+      if (!i.image_url) return false;
+      // Smart activewear handling: route activewear bottoms to Bottom slot
+      if (i.category === "Activewear") {
+        if (slot.key === "bottomwear") return isActivewearBottom(i);
+        if (slot.key === "footwear") return isActivewearShoe(i);
+        if (slot.key === "topwear") return !isActivewearBottom(i) && !isActivewearShoe(i);
+        return false; // dress slot: skip activewear
+      }
+      return slot.categories.includes(i.category);
+    });
 
   const activeSlots = mode === "dress"
     ? [DRESS_SLOT, SLOT_DEFS[2]] // dress + footwear
