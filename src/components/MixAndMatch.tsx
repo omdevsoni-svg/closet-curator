@@ -207,7 +207,7 @@ const ColumnCarousel = ({ slot, items, selectedItem, onSelect }: ColumnCarouselP
                       <img
                         src={item.image_url}
                         alt={item.name}
-                        className="h-full w-full object-contain p-1"
+                        className={`h-full w-full object-contain ${slot.key === "footwear" ? "p-3" : "p-1"}`}
                       />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center">
