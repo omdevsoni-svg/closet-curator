@@ -205,7 +205,7 @@ function createFeatheredMask(
   width: number,
   height: number,
   box: FaceBox,
-  feather = 0.40
+  feather = 0.20
 ): HTMLCanvasElement {
   const mask = document.createElement("canvas");
   mask.width = width;
@@ -213,10 +213,11 @@ function createFeatheredMask(
   const ctx = mask.getContext("2d")!;
   ctx.clearRect(0, 0, width, height);
 
-  // Expand box to include neck region (extend downward by 30%)
-  const neckExtend = box.height * 0.3;
+  // v23: Tighter mask — only face + chin area, NOT neck/shoulders/arms
+  // Previous 30% neck extension + 40% feather bled into arms causing skin artifacts
+  const neckExtend = box.height * 0.10;  // was 0.30 — minimal chin extension only
   const cx = box.x + box.width / 2;
-  const cy = box.y + box.height / 2 + neckExtend * 0.3;
+  const cy = box.y + box.height / 2 + neckExtend * 0.2;
   const expandX = box.width * feather;
   const expandY = (box.height + neckExtend) * feather;
   const rx = box.width / 2 + expandX;
@@ -327,11 +328,11 @@ export async function compositeFaceOntoVTO(
     origCtx, outW, outH,
     origStats, vtoStats,
     vtoFace,
-    Math.max(vtoFace.width, vtoFace.height) * 0.5
+    Math.max(vtoFace.width, vtoFace.height) * 0.3  // v23: tighter color correction radius
   );
 
-  // --- Create feathered mask ---
-  const mask = createFeatheredMask(outW, outH, vtoFace, 0.40);
+  // v23: Tighter mask to avoid bleeding into shoulders/arms
+  const mask = createFeatheredMask(outW, outH, vtoFace, 0.20);
 
   // --- Composite: VTO base + masked original face ---
   const canvas = document.createElement("canvas");
