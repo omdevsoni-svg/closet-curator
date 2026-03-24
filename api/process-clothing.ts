@@ -60,7 +60,8 @@ const CLOTHING_PROMPT = `First, determine if this image contains a clothing item
 If the image DOES contain a valid clothing/garment item, analyze it and return a JSON object with these exact fields:
 - is_garment: true
 - name: a short descriptive name for the clothing item (e.g. "Blue Denim Jacket")
-- category: EXACTLY one of these values: "Tops", "Bottoms", "Dresses", "Outerwear", "Activewear", "Footwear", "Accessories"
+- category: EXACTLY one of these values: "Tops", "Bottoms", "Dresses", "Outerwear", "Activewear", "Footwear", "Accessories", "Ethnic Wear"
+  NOTE: Use "Ethnic Wear" for traditional/Indian garments like kurta, sherwani, nehru jacket, pajama (ethnic bottom), churidar, dhoti, salwar, dupatta, saree, lehenga, jutti, mojari, kolhapuri.
 - color: EXACTLY one of these values: "Black", "White", "Navy", "Blue", "Red", "Green", "Beige", "Grey", "Pink", "Brown"
 - material: fabric type if identifiable, or best guess (e.g. "Cotton", "Polyester", "Denim", "Silk", "Wool", "Leather")
 - tags: array of 2-4 descriptive tags (e.g. ["casual", "summer", "lightweight"])
@@ -158,10 +159,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Validate and normalize category (match exact dropdown values)
-    const validCategories = ["Tops", "Bottoms", "Dresses", "Outerwear", "Activewear", "Footwear", "Accessories"];
+    const validCategories = ["Tops", "Bottoms", "Dresses", "Outerwear", "Activewear", "Footwear", "Accessories", "Ethnic Wear"];
     const categoryMap: Record<string, string> = {
       tops: "Tops", bottoms: "Bottoms", dresses: "Dresses", outerwear: "Outerwear",
       activewear: "Activewear", footwear: "Footwear", shoes: "Footwear", accessories: "Accessories",
+      "ethnic wear": "Ethnic Wear", ethnic: "Ethnic Wear", kurta: "Ethnic Wear", traditional: "Ethnic Wear", sherwani: "Ethnic Wear",
     };
     if (!validCategories.includes(attrs.category)) {
       attrs.category = categoryMap[attrs.category?.toLowerCase()] || "Tops";
