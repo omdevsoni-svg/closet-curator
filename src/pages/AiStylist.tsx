@@ -55,7 +55,7 @@ type ResolvedCombination = {
 };
 
 /* ------------------------------------------------------------------ */
-/*  Virtual Try-On Modal — now accepts specific outfit items           */
+/*  Virtual Try-On Modal â now accepts specific outfit items           */
 /* ------------------------------------------------------------------ */
 interface TryOnModalProps {
   isOpen: boolean;
@@ -105,7 +105,7 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
             }
           }
 
-          // v15: Imagen 3 VTO doesn't need text descriptions — it preserves identity automatically
+          // v15: Imagen 3 VTO doesn't need text descriptions â it preserves identity automatically
           // Keep personDescription for potential future use but don't hardcode facial features
           const descParts: string[] = [];
           if (profile?.model_gender) descParts.push(profile.model_gender === "neutral" ? "person" : profile.model_gender === "men" ? "male" : "female");
@@ -125,12 +125,12 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
               let results: { mimeType: string; base64: string }[] = [];
 
               if (itemsWithImages.length === 1) {
-                // Single garment — use direct one-shot
-                const productBase64 = await urlToBase64(itemsWithImages[0].image_url, { removeBackground: true });
+                // Single garment â use direct one-shot
+                const productBase64 = await urlToBase64(itemsWithImages[0].image_url, { removeBackground: false /* v27: disabled to fix garment mismatch */ });
                 results = await virtualTryOn(bodyB64, productBase64, 1, desc, faceB64 || undefined);
               } else {
-                // v22: SEQUENTIAL generation — one garment at a time
-                // Sort garments: shoes → bottomwear → topwear (topwear LAST for max quality & print fidelity)
+                // v22: SEQUENTIAL generation â one garment at a time
+                // Sort garments: shoes â bottomwear â topwear (topwear LAST for max quality & print fidelity)
                 const categoryOrder: Record<string, number> = {
                   shoes: 0, footwear: 0, sneakers: 0, boots: 0, sandals: 0,
                   bottomwear: 1, bottom: 1, pants: 1, jeans: 1, trousers: 1, shorts: 1, skirt: 1,
@@ -146,7 +146,7 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
                 // v23: Remove background from garment images for clean VTO input
                 const seqGarments = await Promise.all(
                   sorted.map(async (item) => ({
-                    base64: await urlToBase64(item.image_url, { removeBackground: true }),
+                    base64: await urlToBase64(item.image_url, { removeBackground: false /* v27: disabled to fix garment mismatch */ }),
                     mimeType: "image/png",
                     label: `${item.category}: ${item.name}`,
                     category: item.category?.toLowerCase() || "other",
@@ -211,10 +211,10 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
       let results: { mimeType: string; base64: string }[] = [];
 
       if (itemsToTry.length === 1) {
-        const productBase64 = await urlToBase64(itemsToTry[0].image_url, { removeBackground: true });
+        const productBase64 = await urlToBase64(itemsToTry[0].image_url, { removeBackground: false /* v27: disabled to fix garment mismatch */ });
         results = await virtualTryOn(bodyPhotoBase64, productBase64, 1, personDescription, facePhotoBase64 || undefined);
       } else {
-        // v22: Sequential generation — shoes → bottomwear → topwear (topwear LAST for best fidelity)
+        // v22: Sequential generation â shoes â bottomwear â topwear (topwear LAST for best fidelity)
         const categoryOrder: Record<string, number> = {
           shoes: 0, footwear: 0, sneakers: 0, boots: 0, sandals: 0,
           bottomwear: 1, bottom: 1, pants: 1, jeans: 1, trousers: 1, shorts: 1, skirt: 1,
@@ -230,7 +230,7 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
         // v23: Remove background from garment images for clean VTO input
         const seqGarments = await Promise.all(
           sorted.map(async (item) => ({
-            base64: await urlToBase64(item.image_url, { removeBackground: true }),
+            base64: await urlToBase64(item.image_url, { removeBackground: false /* v27: disabled to fix garment mismatch */ }),
             mimeType: "image/png",
             label: `${item.category}: ${item.name}`,
             category: item.category?.toLowerCase() || "other",
@@ -451,7 +451,7 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
               </div>
             )}
 
-            {/* Generating — with sequential step progress */}
+            {/* Generating â with sequential step progress */}
             {step === "generating" && (() => {
               const previewItems = mode === "outfit" && outfitItems.filter(i => i.image_url).length > 0
                 ? outfitItems.filter(i => i.image_url)
@@ -504,7 +504,7 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
                     {timeMsg}
                   </p>
 
-                  {/* Sequential progress bar (garment steps only — Imagen 3 VTO preserves identity) */}
+                  {/* Sequential progress bar (garment steps only â Imagen 3 VTO preserves identity) */}
                   {isSequential && (
                     <div className="mt-3 flex items-center gap-1.5 w-56">
                       {sortedPreview.map((_, i) => {
@@ -565,7 +565,7 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
                 <div className="mt-3 flex items-center gap-2 rounded-xl bg-ai/10 px-4 py-2.5">
                   <Sparkles className="h-4 w-4 text-ai" />
                   <span className="text-xs font-body text-ai font-medium">
-                    AI-generated preview — {outfitItemsWithImages.length > 1 ? `${outfitItemsWithImages.length}-piece outfit` : selectedItem?.name}
+                    AI-generated preview â {outfitItemsWithImages.length > 1 ? `${outfitItemsWithImages.length}-piece outfit` : selectedItem?.name}
                   </span>
                 </div>
                 <div className="mt-4 flex gap-2">
@@ -644,7 +644,7 @@ const CombinationCard = ({ combo, index, isActive, onTryOn }: CombinationCardPro
         </motion.button>
       </div>
 
-      {/* Outfit items — horizontal scroll with slot labels */}
+      {/* Outfit items â horizontal scroll with slot labels */}
       <div className="flex gap-3 overflow-x-auto px-4 py-3 scrollbar-none">
         {combo.slots.length > 0
           ? combo.slots.map(({ slot, item }, i) => (
@@ -1052,7 +1052,7 @@ const AiStylist = () => {
             <div className="flex items-center gap-2 mb-4">
               <Sparkles className="h-4 w-4 text-ai" />
               <h2 className="text-lg font-display font-semibold">
-                {selectedOccasion} — {combinations.length} Looks
+                {selectedOccasion} â {combinations.length} Looks
               </h2>
             </div>
 
