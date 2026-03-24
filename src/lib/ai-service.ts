@@ -1,12 +1,12 @@
 import { supabase } from "./supabase";
-// v18: Face refinement now handled server-side by Gemini in virtual-tryon API
-// import { compositeFaceOntoVTO } from "./face-composite";
+// v21: Client-side face composite with Reinhard color correction + feathered mask
+import { compositeFaceOntoVTO } from "./face-composite";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 /* ------------------------------------------------------------------ */
-/*  Helper: convert File → base64 string (no data: prefix)            */
+/*  Helper: convert File â base64 string (no data: prefix)            */
 /* ------------------------------------------------------------------ */
 export const fileToBase64 = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -21,7 +21,7 @@ export const fileToBase64 = (file: File): Promise<string> =>
   });
 
 /* ------------------------------------------------------------------ */
-/*  Helper: convert image URL → base64 string                         */
+/*  Helper: convert image URL â base64 string                         */
 /* ------------------------------------------------------------------ */
 export const urlToBase64 = async (
   url: string,
@@ -58,7 +58,7 @@ export const urlToBase64 = async (
 };
 
 /* ------------------------------------------------------------------ */
-/*  AI Attribute Detection — calls Gemini API directly                 */
+/*  AI Attribute Detection â calls Gemini API directly                 */
 /* ------------------------------------------------------------------ */
 export interface DetectedAttributes {
   name: string;
@@ -107,7 +107,7 @@ export const detectClothingAttributes = async (
 };
 
 /* ------------------------------------------------------------------ */
-/*  Virtual Try-On — calls Vercel serverless function with face + body */
+/*  Virtual Try-On â calls Vercel serverless function with face + body */
 /* ------------------------------------------------------------------ */
 export interface TryOnResult {
   mimeType: string;
@@ -139,8 +139,19 @@ export const virtualTryOn = async (
 
     const data = await res.json();
     if (data.success && data.images) {
-      // v18: Face refinement handled server-side by Gemini
-      return data.images as TryOnResult[];
+      const results = data.images as TryOnResult[];
+      if (results.length > 0) {
+        try {
+          const composited = await compositeFaceOntoVTO(
+            bodyImageBase64, results[0].base64, "image/jpeg", results[0].mimeType
+          );
+          if (composited) {
+            results[0] = { mimeType: "image/png", base64: composited };
+            console.log("v21 face composite applied (single)");
+          }
+        } catch (e) { console.warn("Face composite failed (non-fatal):", e); }
+      }
+      return results;
     }
     console.error("Virtual try-on failed:", data.error, data.details);
     return [];
@@ -151,7 +162,7 @@ export const virtualTryOn = async (
 };
 
 /* ------------------------------------------------------------------ */
-/*  Virtual Try-On (Multi-Garment) — sends all outfit items at once    */
+/*  Virtual Try-On (Multi-Garment) â sends all outfit items at once    */
 /* ------------------------------------------------------------------ */
 export interface GarmentInput {
   base64: string;
@@ -183,8 +194,19 @@ export const virtualTryOnMulti = async (
 
     const data = await res.json();
     if (data.success && data.images) {
-      // v18: Face refinement handled server-side by Gemini
-      return data.images as TryOnResult[];
+      const results = data.images as TryOnResult[];
+      if (results.length > 0) {
+        try {
+          const composited = await compositeFaceOntoVTO(
+            bodyImageBase64, results[0].base64, "image/jpeg", results[0].mimeType
+          );
+          if (composited) {
+            results[0] = { mimeType: "image/png", base64: composited };
+            console.log("v21 face composite applied (multi)");
+          }
+        } catch (e) { console.warn("Face composite failed (non-fatal):", e); }
+      }
+      return results;
     }
     console.error("Virtual try-on (multi) failed:", data.error, data.details);
     return [];
@@ -195,13 +217,13 @@ export const virtualTryOnMulti = async (
 };
 
 /* ------------------------------------------------------------------ */
-/*  Virtual Try-On (Sequential) — Imagen 3 VTO, one garment at a time */
+/*  Virtual Try-On (Sequential) â Imagen 3 VTO, one garment at a time */
 /*                                                                      */
-/*  Step 1: body photo + topwear → result1                             */
-/*  Step 2: result1 (as person) + bottomwear → result2                 */
-/*  Step 3: result2 (as person) + footwear → final                     */
+/*  Step 1: body photo + topwear â result1                             */
+/*  Step 2: result1 (as person) + bottomwear â result2                 */
+/*  Step 3: result2 (as person) + footwear â final                     */
 /*                                                                      */
-/*  Imagen 3 VTO preserves identity automatically — no face refinement  */
+/*  Imagen 3 VTO preserves identity automatically â no face refinement  */
 /*  needed. Previous result becomes the personImage for the next step.  */
 /* ------------------------------------------------------------------ */
 
@@ -226,7 +248,7 @@ export const virtualTryOnSequential = async (
   onProgress?: (progress: SequentialProgress) => void,
   _faceImageBase64?: string,
 ): Promise<TryOnResult[]> => {
-  // v17: Imagen 3 VTO + Smart Quality Tiering — fast intermediates, max quality final
+  // v17: Imagen 3 VTO + Smart Quality Tiering â fast intermediates, max quality final
   const totalSteps = garments.length;
   let previousResultBase64: string | null = null;
   let previousResultMimeType = "image/jpeg";
@@ -242,7 +264,7 @@ export const virtualTryOnSequential = async (
     });
 
     try {
-      // v17: isFinalStep flag — only the last step gets full quality + upscale
+      // v17: isFinalStep flag â only the last step gets full quality + upscale
       const isLast = i === garments.length - 1;
       const res = await fetch("/api/virtual-tryon", {
         method: "POST",
@@ -289,14 +311,24 @@ export const virtualTryOnSequential = async (
   }
 
   if (previousResultBase64) {
-    // v18: Face refinement already applied server-side on the final step
+    try {
+      const compositedBase64 = await compositeFaceOntoVTO(
+        bodyImageBase64, previousResultBase64, "image/jpeg", previousResultMimeType
+      );
+      if (compositedBase64) {
+        console.log("v21 face composite applied successfully");
+        return [{ mimeType: "image/png", base64: compositedBase64 }];
+      }
+    } catch (compErr) {
+      console.warn("Face composite failed (non-fatal), returning raw VTO:", compErr);
+    }
     return [{ mimeType: previousResultMimeType, base64: previousResultBase64 }];
   }
   return [];
 };
 
 /* ------------------------------------------------------------------ */
-/*  AI Outfit Recommendation — calls Gemini via serverless function    */
+/*  AI Outfit Recommendation â calls Gemini via serverless function    */
 /* ------------------------------------------------------------------ */
 
 export interface RecommendationRequest {
