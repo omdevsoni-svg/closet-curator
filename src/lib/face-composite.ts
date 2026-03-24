@@ -1,5 +1,5 @@
 /* ------------------------------------------------------------------ */
-/*  Face Composite v24 — restores original face onto VTO result        */
+/*  Face Composite v24 â restores original face onto VTO result        */
 /*                                                                      */
 /*  The Imagen 3 VTO model sometimes distorts facial features (skin     */
 /*  tone shift, eye asymmetry, expression change, beard softening).     */
@@ -28,7 +28,7 @@ interface FaceBox {
 async function detectFace(img: HTMLImageElement): Promise<FaceBox> {
   if ("FaceDetector" in window) {
     try {
-      // @ts-ignore — FaceDetector is a Chrome-only API
+      // @ts-ignore â FaceDetector is a Chrome-only API
       const detector = new FaceDetector({ maxDetectedFaces: 1 });
       const faces = await detector.detect(img);
       if (faces.length > 0) {
@@ -175,7 +175,7 @@ function applyColorCorrection(
     for (let x = 0; x < width; x++) {
       const idx = (y * width + x) * 4;
 
-      // Calculate distance from face center — apply stronger correction near face
+      // Calculate distance from face center â apply stronger correction near face
       const dist = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2);
       if (dist > maxDist) continue; // Skip pixels far from face
 
@@ -213,9 +213,9 @@ function createFeatheredMask(
   const ctx = mask.getContext("2d")!;
   ctx.clearRect(0, 0, width, height);
 
-  // v24: Very tight mask — face only, NO chin/neck extension
+  // v24: Very tight mask â face only, NO chin/neck extension
   // v23 still bled into collar/chest shifting garment color
-  const neckExtend = 0;  // was 0.10 — completely removed to protect garment collar
+  const neckExtend = 0;  // was 0.10 â completely removed to protect garment collar
   const cx = box.x + box.width / 2;
   const cy = box.y + box.height / 2;  // centered on face, no downward offset
   const expandX = box.width * feather;
@@ -224,7 +224,7 @@ function createFeatheredMask(
   const ry = box.height / 2 + expandY;
   const maxR = Math.max(rx, ry);
 
-  // Sharper gradient — solid core larger, faster falloff at edges
+  // Sharper gradient â solid core larger, faster falloff at edges
   const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxR);
   gradient.addColorStop(0, "rgba(255,255,255,1)");
   gradient.addColorStop(0.55, "rgba(255,255,255,1)");    // Larger solid core
@@ -243,6 +243,18 @@ function createFeatheredMask(
   ctx.arc(cx, cy, maxR, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
+
+  // v25: Hard clip bottom of mask to prevent collar/neck color bleed
+  const bottomFadeStart = box.y + box.height * 0.70;
+  const bottomFadeEnd = box.y + box.height * 0.85;
+  ctx.globalCompositeOperation = "destination-out";
+  const fadeGrad = ctx.createLinearGradient(0, bottomFadeStart, 0, bottomFadeEnd);
+  fadeGrad.addColorStop(0, "rgba(0,0,0,0)");
+  fadeGrad.addColorStop(1, "rgba(0,0,0,1)");
+  ctx.fillStyle = fadeGrad;
+  ctx.fillRect(0, bottomFadeStart, mask.width, bottomFadeEnd - bottomFadeStart);
+  ctx.clearRect(0, bottomFadeEnd, mask.width, mask.height - bottomFadeEnd);
+  ctx.globalCompositeOperation = "source-over";
 
   return mask;
 }
@@ -324,16 +336,16 @@ export async function compositeFaceOntoVTO(
   );
 
   // Apply Reinhard color correction to match VTO lighting
-  // v24: Much smaller radius — only correct pixels very close to face center
+  // v24: Much smaller radius â only correct pixels very close to face center
   // v23 radius of 0.3 still reached collar/chest and shifted garment color
   applyColorCorrection(
     origCtx, outW, outH,
     origStats, vtoStats,
     vtoFace,
-    Math.max(vtoFace.width, vtoFace.height) * 0.10  // v24: minimal — face only
+    Math.max(vtoFace.width, vtoFace.height) * 0.10  // v24: minimal â face only
   );
 
-  // v24: Very tight mask — no neck extension, sharper falloff
+  // v24: Very tight mask â no neck extension, sharper falloff
   const mask = createFeatheredMask(outW, outH, vtoFace, 0.12);
 
   // --- Composite: VTO base + masked original face ---
