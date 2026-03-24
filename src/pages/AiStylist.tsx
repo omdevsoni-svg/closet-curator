@@ -77,7 +77,7 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
   const [resultImage, setResultImage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<"outfit" | "closet">("outfit");
-  // v13: Sequential generation progress
+  // v22: Sequential generation progress
   const [seqProgress, setSeqProgress] = useState<SequentialProgress | null>(null);
 
   useEffect(() => {
@@ -129,12 +129,12 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
                 const productBase64 = await urlToBase64(itemsWithImages[0].image_url);
                 results = await virtualTryOn(bodyB64, productBase64, 1, desc, faceB64 || undefined);
               } else {
-                // v13: SEQUENTIAL generation — one garment at a time
-                // Sort garments: topwear → bottomwear → shoes/accessories
+                // v22: SEQUENTIAL generation — one garment at a time
+                // Sort garments: shoes → bottomwear → shoes/accessories
                 const categoryOrder: Record<string, number> = {
-                  topwear: 0, top: 0, shirt: 0, tshirt: 0, jacket: 0, hoodie: 0, sweater: 0, blazer: 0,
+                  shoes: 0, footwear: 0, sneakers: 0, boots: 0, sandals: 0,
                   bottomwear: 1, bottom: 1, pants: 1, jeans: 1, trousers: 1, shorts: 1, skirt: 1,
-                  shoes: 2, footwear: 2, sneakers: 2, boots: 2, sandals: 2,
+                  topwear: 2, top: 2, shirt: 2, tshirt: 2, jacket: 2, hoodie: 2, sweater: 2, blazer: 2,
                   accessories: 3, accessory: 3, watch: 3, bag: 3, hat: 3,
                 };
                 const sorted = [...itemsWithImages].sort((a, b) => {
@@ -213,11 +213,11 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
         const productBase64 = await urlToBase64(itemsToTry[0].image_url);
         results = await virtualTryOn(bodyPhotoBase64, productBase64, 1, personDescription, facePhotoBase64 || undefined);
       } else {
-        // v13: Sequential generation
+        // v22: Sequential generation
         const categoryOrder: Record<string, number> = {
-          topwear: 0, top: 0, shirt: 0, tshirt: 0, jacket: 0, hoodie: 0, sweater: 0, blazer: 0,
+          shoes: 0, footwear: 0, sneakers: 0, boots: 0, sandals: 0,
           bottomwear: 1, bottom: 1, pants: 1, jeans: 1, trousers: 1, shorts: 1, skirt: 1,
-          shoes: 2, footwear: 2, sneakers: 2, boots: 2, sandals: 2,
+          topwear: 2, top: 2, shirt: 2, tshirt: 2, jacket: 2, hoodie: 2, sweater: 2, blazer: 2,
           accessories: 3, accessory: 3, watch: 3, bag: 3, hat: 3,
         };
         const sorted = [...itemsToTry].sort((a, b) => {
@@ -455,11 +455,11 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
                 ? outfitItems.filter(i => i.image_url)
                 : selectedItem?.image_url ? [selectedItem] : [];
 
-              // Sort preview items in same order as sequential generation
+              // v22: Sort preview items in same order as sequential generation
               const categoryOrder: Record<string, number> = {
-                topwear: 0, top: 0, shirt: 0, tshirt: 0, jacket: 0, hoodie: 0, sweater: 0, blazer: 0,
+                shoes: 0, footwear: 0, sneakers: 0, boots: 0, sandals: 0,
                 bottomwear: 1, bottom: 1, pants: 1, jeans: 1, trousers: 1, shorts: 1, skirt: 1,
-                shoes: 2, footwear: 2, sneakers: 2, boots: 2, sandals: 2,
+                topwear: 2, top: 2, shirt: 2, tshirt: 2, jacket: 2, hoodie: 2, sweater: 2, blazer: 2,
                 accessories: 3, accessory: 3,
               };
               const sortedPreview = [...previewItems].sort((a, b) => {
