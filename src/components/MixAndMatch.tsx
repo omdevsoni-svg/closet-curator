@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Sparkles,
   ChevronUp,
@@ -73,20 +73,16 @@ const FORMALITY_COMPAT: Record<string, string[]> = {
 };
 
 /* ------------------------------------------------------------------ */
-/*  Vertical Casino Carousel - 3 visible rows, middle active           */
+/*  Column Carousel - vertical carousel for a single category          */
 /* ------------------------------------------------------------------ */
-interface VerticalCarouselProps {
+interface ColumnCarouselProps {
   slot: SlotDef;
   items: ClothingItem[];
   selectedItem: ClothingItem | null;
   onSelect: (item: ClothingItem) => void;
 }
 
-const ITEM_HEIGHT = 88; // px per row
-const VISIBLE_COUNT = 3;
-
-const VerticalCarousel = ({ slot, items, selectedItem, onSelect }: VerticalCarouselProps) => {
-  // Find the index of the selected item, default to 0
+const ColumnCarousel = ({ slot, items, selectedItem, onSelect }: ColumnCarouselProps) => {
   const selectedIdx = selectedItem ? items.findIndex(i => i.id === selectedItem.id) : -1;
   const [activeIndex, setActiveIndex] = useState(Math.max(0, selectedIdx));
 
@@ -98,7 +94,7 @@ const VerticalCarousel = ({ slot, items, selectedItem, onSelect }: VerticalCarou
     }
   }, [selectedItem, items]);
 
-  // Auto-select middle item on mount if nothing selected
+  // Auto-select first item on mount if nothing selected
   useEffect(() => {
     if (!selectedItem && items.length > 0) {
       onSelect(items[activeIndex]);
@@ -123,82 +119,70 @@ const VerticalCarousel = ({ slot, items, selectedItem, onSelect }: VerticalCarou
 
   if (items.length === 0) {
     return (
-      <div className="rounded-xl bg-card/50 p-4 text-center">
-        <p className="text-[11px] font-body text-muted-foreground">
-          No {slot.label.toLowerCase()} items in closet
+      <div className="flex flex-col items-center justify-center h-full rounded-xl bg-card/30 p-4">
+        <ImageIcon className="h-6 w-6 text-muted-foreground/20 mb-2" />
+        <p className="text-[10px] font-body text-muted-foreground text-center">
+          No {slot.label.toLowerCase()}
         </p>
       </div>
     );
   }
 
-  // Build 3 visible indices: prev, active, next
   const prevIdx = activeIndex - 1;
   const nextIdx = activeIndex + 1;
-  const visibleIndices = [prevIdx, activeIndex, nextIdx];
+  const rows = [
+    { idx: prevIdx, position: "top" as const },
+    { idx: activeIndex, position: "middle" as const },
+    { idx: nextIdx, position: "bottom" as const },
+  ];
 
   return (
-    <div className="relative flex items-start gap-3">
-      {/* Slot label - vertical */}
-      <div className="flex flex-col items-center justify-center pt-1" style={{ minWidth: 40 }}>
-        <p className="text-[9px] font-body font-semibold uppercase tracking-wider text-ai/70 text-center">
-          {slot.label}
-        </p>
-        {/* Up/Down arrows */}
-        <div className="flex flex-col gap-0.5 mt-1">
-          <button
-            onClick={scrollUp}
-            disabled={activeIndex === 0}
-            className="flex h-5 w-5 items-center justify-center rounded-full bg-background/80 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-opacity"
-          >
-            <ChevronUp className="h-3 w-3" />
-          </button>
-          <button
-            onClick={scrollDown}
-            disabled={activeIndex >= items.length - 1}
-            className="flex h-5 w-5 items-center justify-center rounded-full bg-background/80 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-opacity"
-          >
-            <ChevronDown className="h-3 w-3" />
-          </button>
-        </div>
-      </div>
+    <div className="flex flex-col items-center gap-1">
+      {/* Category label */}
+      <p className="text-[9px] font-body font-semibold uppercase tracking-wider text-ai/70 mb-1">
+        {slot.label}
+      </p>
 
-      {/* Casino reel */}
-      <div
-        className="relative overflow-hidden rounded-xl flex-1"
-        style={{ height: ITEM_HEIGHT * VISIBLE_COUNT }}
+      {/* Up arrow */}
+      <button
+        onClick={scrollUp}
+        disabled={activeIndex === 0}
+        className="flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground hover:text-foreground disabled:opacity-20 transition-opacity"
       >
+        <ChevronUp className="h-3.5 w-3.5" />
+      </button>
+
+      {/* 3-row reel */}
+      <div className="relative w-full overflow-hidden rounded-2xl bg-card/20" style={{ height: 320 }}>
         <AnimatePresence initial={false}>
-          {visibleIndices.map((idx, pos) => {
+          {rows.map(({ idx, position }) => {
+            const topOffset = position === "top" ? 0 : position === "middle" ? 107 : 214;
+
             if (idx < 0 || idx >= items.length) {
-              // Empty slot (top or bottom edge)
               return (
                 <motion.div
-                  key={`empty-${pos}`}
-                  className="absolute left-0 right-0"
-                  style={{ height: ITEM_HEIGHT, top: pos * ITEM_HEIGHT }}
+                  key={`empty-${position}`}
+                  className="absolute left-0 right-0 flex items-center justify-center"
+                  style={{ height: 106, top: topOffset }}
                 >
-                  <div className="h-full w-full" />
+                  <div className="h-4 w-4" />
                 </motion.div>
               );
             }
 
             const item = items[idx];
-            const isActive = pos === 1; // middle row
-            const isFaded = !isActive;
+            const isActive = position === "middle";
 
             return (
               <motion.div
                 key={item.id}
                 layout
-                initial={{ opacity: 0, y: pos === 0 ? -ITEM_HEIGHT : ITEM_HEIGHT }}
-                animate={{
-                  opacity: 1,
-                  y: 0,
-                }}
+                initial={{ opacity: 0, y: position === "top" ? -40 : position === "bottom" ? 40 : 0 }}
+                animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
                 transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                className="absolute left-0 right-0 px-1"
-                style={{ height: ITEM_HEIGHT, top: pos * ITEM_HEIGHT }}
+                className="absolute left-0 right-0 px-1.5 flex items-center justify-center"
+                style={{ height: 106, top: topOffset }}
               >
                 <button
                   onClick={() => {
@@ -207,53 +191,62 @@ const VerticalCarousel = ({ slot, items, selectedItem, onSelect }: VerticalCarou
                     }
                     onSelect(item);
                   }}
-                  className={`flex items-center gap-3 w-full h-full rounded-xl px-2 transition-all duration-300 ${
+                  className={`relative w-full h-[98px] rounded-xl overflow-hidden transition-all duration-300 ${
                     isActive
-                      ? "bg-ai/5 ring-2 ring-ai scale-[1.02] shadow-sm"
-                      : "bg-card/40"
+                      ? "ring-2 ring-ai shadow-lg scale-[1.03]"
+                      : ""
                   }`}
                   style={{
-                    opacity: isFaded ? 0.35 : 1,
-                    filter: isFaded ? "blur(0.5px)" : "none",
+                    opacity: isActive ? 1 : 0.35,
+                    filter: isActive ? "none" : "blur(0.5px)",
                   }}
                 >
-                  <div className={`shrink-0 overflow-hidden rounded-lg bg-background transition-all ${
-                    isActive ? "h-[72px] w-[60px]" : "h-[60px] w-[50px]"
-                  }`}>
+                  {/* Item image - fills the card */}
+                  <div className="absolute inset-0 bg-gradient-to-b from-background/50 to-background/80">
                     {item.image_url ? (
                       <img
                         src={item.image_url}
                         alt={item.name}
-                        className="h-full w-full object-contain"
+                        className="h-full w-full object-contain p-1"
                       />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center">
-                        <ImageIcon className="h-4 w-4 text-muted-foreground/30" />
+                        <ImageIcon className="h-6 w-6 text-muted-foreground/20" />
                       </div>
                     )}
                   </div>
-                  <div className="flex-1 min-w-0 text-left">
-                    <p className={`font-body font-medium text-foreground truncate ${
-                      isActive ? "text-xs" : "text-[10px]"
-                    }`}>
-                      {item.name}
-                    </p>
-                    {isActive && item.color && (
-                      <p className="text-[9px] font-body text-muted-foreground mt-0.5 truncate">
-                        {item.color}{item.brand ? ` - ${item.brand}` : ""}
+                  {/* Name overlay at bottom */}
+                  {isActive && (
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/50 to-transparent px-2 py-1.5">
+                      <p className="text-[10px] font-body font-medium text-white truncate">
+                        {item.name}
                       </p>
-                    )}
-                  </div>
+                      {item.color && (
+                        <p className="text-[8px] font-body text-white/70 truncate">
+                          {item.color}{item.brand ? ` · ${item.brand}` : ""}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </button>
               </motion.div>
             );
           })}
         </AnimatePresence>
 
-        {/* Top/bottom fade overlays */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-6 bg-gradient-to-b from-background/60 to-transparent z-10" />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-background/60 to-transparent z-10" />
+        {/* Separator lines between rows */}
+        <div className="pointer-events-none absolute left-2 right-2 top-[106px] h-px bg-border/30 z-10" />
+        <div className="pointer-events-none absolute left-2 right-2 top-[213px] h-px bg-border/30 z-10" />
       </div>
+
+      {/* Down arrow */}
+      <button
+        onClick={scrollDown}
+        disabled={activeIndex >= items.length - 1}
+        className="flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground hover:text-foreground disabled:opacity-20 transition-opacity"
+      >
+        <ChevronDown className="h-3.5 w-3.5" />
+      </button>
     </div>
   );
 };
@@ -416,8 +409,10 @@ const MixAndMatch = ({ closetItems, onTryOn, onClose, inline = false }: MixAndMa
         </div>
       )}
 
-      {/* Casino-style vertical carousels */}
-      <div className="mt-4 space-y-3">
+      {/* 3 side-by-side vertical carousels (slot machine grid) */}
+      <div className={`mt-4 grid gap-2 ${
+        activeSlots.length === 3 ? "grid-cols-3" : "grid-cols-2"
+      }`}>
         <AnimatePresence mode="wait">
           {activeSlots.map((slot, i) => (
             <motion.div
@@ -427,7 +422,7 @@ const MixAndMatch = ({ closetItems, onTryOn, onClose, inline = false }: MixAndMa
               exit={{ opacity: 0, y: -12 }}
               transition={{ delay: i * 0.08 }}
             >
-              <VerticalCarousel
+              <ColumnCarousel
                 slot={slot}
                 items={getSlotItems(slot)}
                 selectedItem={selections[slot.key]}
