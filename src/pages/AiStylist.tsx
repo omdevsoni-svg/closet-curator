@@ -55,7 +55,7 @@ type ResolvedCombination = {
 };
 
 /* ------------------------------------------------------------------ */
-/*  Virtual Try-On Modal â now accepts specific outfit items           */
+/*  Virtual Try-On Modal - now accepts specific outfit items           */
 /* ------------------------------------------------------------------ */
 interface TryOnModalProps {
   isOpen: boolean;
@@ -105,7 +105,7 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
             }
           }
 
-          // v15: Imagen 3 VTO doesn't need text descriptions â it preserves identity automatically
+          // v15: Imagen 3 VTO doesn't need text descriptions - it preserves identity automatically
           // Keep personDescription for potential future use but don't hardcode facial features
           const descParts: string[] = [];
           if (profile?.model_gender) descParts.push(profile.model_gender === "neutral" ? "person" : profile.model_gender === "men" ? "male" : "female");
@@ -125,11 +125,11 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
               let results: { mimeType: string; base64: string }[] = [];
 
               if (itemsWithImages.length === 1) {
-                // Single garment â use direct one-shot
+                // Single garment - use direct one-shot
                 const productBase64 = await urlToBase64(itemsWithImages[0].image_url, { removeBackground: false /* v27: disabled to fix garment mismatch */ });
                 results = await virtualTryOn(bodyB64, productBase64, 1, desc, faceB64 || undefined);
               } else {
-                // v22: SEQUENTIAL generation â one garment at a time
+                // v22: SEQUENTIAL generation - one garment at a time
                 // Sort garments: shoes â bottomwear â topwear (topwear LAST for max quality & print fidelity)
                 const categoryOrder: Record<string, number> = {
                   shoes: 0, footwear: 0, sneakers: 0, boots: 0, sandals: 0,
@@ -214,7 +214,7 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
         const productBase64 = await urlToBase64(itemsToTry[0].image_url, { removeBackground: false /* v27: disabled to fix garment mismatch */ });
         results = await virtualTryOn(bodyPhotoBase64, productBase64, 1, personDescription, facePhotoBase64 || undefined);
       } else {
-        // v22: Sequential generation â shoes â bottomwear â topwear (topwear LAST for best fidelity)
+        // v22: Sequential generation - shoes â bottomwear â topwear (topwear LAST for best fidelity)
         const categoryOrder: Record<string, number> = {
           shoes: 0, footwear: 0, sneakers: 0, boots: 0, sandals: 0,
           bottomwear: 1, bottom: 1, pants: 1, jeans: 1, trousers: 1, shorts: 1, skirt: 1,
@@ -451,7 +451,7 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
               </div>
             )}
 
-            {/* Generating â with sequential step progress */}
+            {/* Generating - with sequential step progress */}
             {step === "generating" && (() => {
               const previewItems = mode === "outfit" && outfitItems.filter(i => i.image_url).length > 0
                 ? outfitItems.filter(i => i.image_url)
@@ -504,7 +504,7 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
                     {timeMsg}
                   </p>
 
-                  {/* Sequential progress bar (garment steps only â Imagen 3 VTO preserves identity) */}
+                  {/* Sequential progress bar (garment steps only - Imagen 3 VTO preserves identity) */}
                   {isSequential && (
                     <div className="mt-3 flex items-center gap-1.5 w-56">
                       {sortedPreview.map((_, i) => {
@@ -565,9 +565,35 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
                 <div className="mt-3 flex items-center gap-2 rounded-xl bg-ai/10 px-4 py-2.5">
                   <Sparkles className="h-4 w-4 text-ai" />
                   <span className="text-xs font-body text-ai font-medium">
-                    AI-generated preview â {outfitItemsWithImages.length > 1 ? `${outfitItemsWithImages.length}-piece outfit` : selectedItem?.name}
+                    AI-generated preview - {outfitItemsWithImages.length > 1 ? `${outfitItemsWithImages.length}-piece outfit` : selectedItem?.name}
                   </span>
                 </div>
+                {/* v30: Garment thumbnails used for this VTO */}
+                {outfitItemsWithImages.length > 1 && (
+                  <div className="mt-3 flex items-center gap-3 px-1">
+                    {(() => {
+                      const catOrder: Record<string, number> = {
+                        topwear: 0, top: 0, shirt: 0, tshirt: 0, jacket: 0, hoodie: 0, sweater: 0, blazer: 0,
+                        bottomwear: 1, bottom: 1, pants: 1, jeans: 1, trousers: 1, shorts: 1, skirt: 1,
+                        shoes: 2, footwear: 2, sneakers: 2, boots: 2, sandals: 2,
+                        accessories: 3, accessory: 3,
+                      };
+                      const sorted = [...outfitItemsWithImages].sort((a, b) =>
+                        (catOrder[a.category?.toLowerCase()] ?? 9) - (catOrder[b.category?.toLowerCase()] ?? 9)
+                      );
+                      return sorted.map((item) => (
+                        <div key={item.id} className="flex flex-col items-center gap-1">
+                          <div className="h-16 w-16 overflow-hidden rounded-lg border border-border bg-card">
+                            <img src={item.image_url} alt={item.name} className="h-full w-full object-cover" />
+                          </div>
+                          <span className="text-[10px] font-body text-muted-foreground truncate max-w-[64px]">
+                            {item.category?.charAt(0).toUpperCase() + item.category?.slice(1).toLowerCase().replace('wear','') || item.name}
+                          </span>
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                )}
                 <div className="mt-4 flex gap-2">
                   <button
                     onClick={reset}
@@ -644,7 +670,7 @@ const CombinationCard = ({ combo, index, isActive, onTryOn }: CombinationCardPro
         </motion.button>
       </div>
 
-      {/* Outfit items â horizontal scroll with slot labels */}
+      {/* Outfit items - horizontal scroll with slot labels */}
       <div className="flex gap-3 overflow-x-auto px-4 py-3 scrollbar-none">
         {combo.slots.length > 0
           ? combo.slots.map(({ slot, item }, i) => (
@@ -1052,7 +1078,7 @@ const AiStylist = () => {
             <div className="flex items-center gap-2 mb-4">
               <Sparkles className="h-4 w-4 text-ai" />
               <h2 className="text-lg font-display font-semibold">
-                {selectedOccasion} â {combinations.length} Looks
+                {selectedOccasion} - {combinations.length} Looks
               </h2>
             </div>
 
