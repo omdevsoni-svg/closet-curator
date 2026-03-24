@@ -55,7 +55,167 @@ type ResolvedCombination = {
 };
 
 /* ------------------------------------------------------------------ */
-/*  Virtual Try-On Modal - now accepts specific outfit items           */
+/*  VTO Loading Screen — garment showcase + creative waiting messages  */
+/* ------------------------------------------------------------------ */
+
+const CREATIVE_MESSAGES = [
+  "Picking the perfect fit for you...",
+  "Matching colors and patterns...",
+  "Adjusting the outfit to your style...",
+  "Almost there, putting the finishing touches...",
+  "Your personal stylist is at work...",
+  "Tailoring the look just for you...",
+  "Ironing out the details...",
+  "Checking the mirror one last time...",
+  "Mixing fabrics and textures...",
+  "Making sure everything is runway-ready...",
+];
+
+interface VtoLoadingScreenProps {
+  items: ClothingItem[];
+  isSequential: boolean;
+  currentStep: number;
+  seqProgress: SequentialProgress | null;
+}
+
+const VtoLoadingScreen = ({ items, isSequential, currentStep, seqProgress }: VtoLoadingScreenProps) => {
+  const [showcaseIdx, setShowcaseIdx] = useState(0);
+  const [msgIdx, setMsgIdx] = useState(0);
+
+  // Cycle through garment images every 2.5s
+  useEffect(() => {
+    if (items.length <= 1) return;
+    const interval = setInterval(() => {
+      setShowcaseIdx(prev => (prev + 1) % items.length);
+    }, 2500);
+    return () => clearInterval(interval);
+  }, [items.length]);
+
+  // Cycle through creative messages every 3.5s
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setMsgIdx(prev => (prev + 1) % CREATIVE_MESSAGES.length);
+    }, 3500);
+    return () => clearInterval(interval);
+  }, []);
+
+  const showcaseItem = items[showcaseIdx] || items[0];
+  const totalSteps = isSequential ? (seqProgress?.totalSteps ?? items.length) : 1;
+  const progressFraction = isSequential
+    ? Math.min(((currentStep + (seqProgress?.status === "done" ? 1 : 0.5)) / totalSteps), 0.95)
+    : 0.5;
+
+  return (
+    <div className="mt-6 flex flex-col items-center py-6">
+      {/* Garment showcase — cycling image */}
+      <div className="relative mb-5">
+        <div className="h-36 w-28 overflow-hidden rounded-2xl bg-card shadow-lg ring-1 ring-border/30">
+          <AnimatePresence mode="wait">
+            {showcaseItem && (
+              <motion.img
+                key={showcaseItem.id}
+                src={showcaseItem.image_url}
+                alt={showcaseItem.name}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 1.05 }}
+                transition={{ duration: 0.4 }}
+                className="h-full w-full object-contain p-1"
+              />
+            )}
+          </AnimatePresence>
+        </div>
+        {/* Category label badge */}
+        {showcaseItem && (
+          <motion.div
+            key={showcaseItem.id + "-label"}
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-ai px-3 py-0.5 shadow-sm"
+          >
+            <span className="text-[9px] font-display font-semibold text-ai-foreground whitespace-nowrap">
+              {showcaseItem.category || showcaseItem.name}
+            </span>
+          </motion.div>
+        )}
+      </div>
+
+      {/* Item dots — show which garment is currently showcased */}
+      {items.length > 1 && (
+        <div className="flex items-center gap-1.5 mb-4">
+          {items.map((_, i) => (
+            <div
+              key={i}
+              className={`rounded-full transition-all duration-300 ${
+                i === showcaseIdx
+                  ? "h-2 w-2 bg-ai"
+                  : "h-1.5 w-1.5 bg-muted-foreground/25"
+              }`}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Creative rotating message */}
+      <div className="h-8 flex items-center overflow-hidden">
+        <AnimatePresence mode="wait">
+          <motion.p
+            key={msgIdx}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            transition={{ duration: 0.3 }}
+            className="text-sm font-body font-medium text-foreground text-center"
+          >
+            {CREATIVE_MESSAGES[msgIdx]}
+          </motion.p>
+        </AnimatePresence>
+      </div>
+
+      {/* Subtle animated progress bar */}
+      <div className="mt-4 w-48 h-1 rounded-full bg-muted overflow-hidden">
+        <motion.div
+          className="h-full rounded-full bg-gradient-to-r from-ai/60 to-ai"
+          initial={{ width: "5%" }}
+          animate={{ width: `${Math.max(5, progressFraction * 100)}%` }}
+          transition={{ duration: 1, ease: "easeOut" }}
+        />
+      </div>
+
+      {/* Small garment strip at bottom */}
+      {items.length > 1 && (
+        <div className="mt-5 flex items-center gap-2">
+          {items.map((item, i) => {
+            const isDone = i < currentStep || (i === currentStep && seqProgress?.status === "done");
+            const isActive = i === currentStep && seqProgress?.status === "starting";
+            return (
+              <div
+                key={item.id || i}
+                className={`relative h-12 w-10 shrink-0 overflow-hidden rounded-lg transition-all duration-300 bg-card ${
+                  isActive
+                    ? "ring-2 ring-ai ring-offset-1 scale-110"
+                    : isDone
+                      ? "opacity-100"
+                      : "opacity-40"
+                }`}
+              >
+                <img src={item.image_url} alt={item.name} className="h-full w-full object-contain" />
+                {isDone && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-ai/20 rounded-lg">
+                    <Check className="h-3 w-3 text-ai" />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ------------------------------------------------------------------ */
+/*  Virtual Try-On Modal — now accepts specific outfit items           */
 /* ------------------------------------------------------------------ */
 interface TryOnModalProps {
   isOpen: boolean;
@@ -105,7 +265,7 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
             }
           }
 
-          // v15: Imagen 3 VTO doesn't need text descriptions - it preserves identity automatically
+          // v15: Imagen 3 VTO doesn't need text descriptions — it preserves identity automatically
           // Keep personDescription for potential future use but don't hardcode facial features
           const descParts: string[] = [];
           if (profile?.model_gender) descParts.push(profile.model_gender === "neutral" ? "person" : profile.model_gender === "men" ? "male" : "female");
@@ -125,12 +285,12 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
               let results: { mimeType: string; base64: string }[] = [];
 
               if (itemsWithImages.length === 1) {
-                // Single garment - use direct one-shot
-                const productBase64 = await urlToBase64(itemsWithImages[0].image_url, { removeBackground: false /* v27: disabled to fix garment mismatch */ });
+                // Single garment — use direct one-shot
+                const productBase64 = await urlToBase64(itemsWithImages[0].image_url, { removeBackground: true });
                 results = await virtualTryOn(bodyB64, productBase64, 1, desc, faceB64 || undefined);
               } else {
-                // v22: SEQUENTIAL generation - one garment at a time
-                // Sort garments: shoes â bottomwear â topwear (topwear LAST for max quality & print fidelity)
+                // v22: SEQUENTIAL generation — one garment at a time
+                // Sort garments: shoes → bottomwear → topwear (topwear LAST for max quality & print fidelity)
                 const categoryOrder: Record<string, number> = {
                   shoes: 0, footwear: 0, sneakers: 0, boots: 0, sandals: 0,
                   bottomwear: 1, bottom: 1, pants: 1, jeans: 1, trousers: 1, shorts: 1, skirt: 1,
@@ -146,7 +306,7 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
                 // v23: Remove background from garment images for clean VTO input
                 const seqGarments = await Promise.all(
                   sorted.map(async (item) => ({
-                    base64: await urlToBase64(item.image_url, { removeBackground: false /* v27: disabled to fix garment mismatch */ }),
+                    base64: await urlToBase64(item.image_url, { removeBackground: true }),
                     mimeType: "image/png",
                     label: `${item.category}: ${item.name}`,
                     category: item.category?.toLowerCase() || "other",
@@ -211,10 +371,10 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
       let results: { mimeType: string; base64: string }[] = [];
 
       if (itemsToTry.length === 1) {
-        const productBase64 = await urlToBase64(itemsToTry[0].image_url, { removeBackground: false /* v27: disabled to fix garment mismatch */ });
+        const productBase64 = await urlToBase64(itemsToTry[0].image_url, { removeBackground: true });
         results = await virtualTryOn(bodyPhotoBase64, productBase64, 1, personDescription, facePhotoBase64 || undefined);
       } else {
-        // v22: Sequential generation - shoes â bottomwear â topwear (topwear LAST for best fidelity)
+        // v22: Sequential generation — shoes → bottomwear → topwear (topwear LAST for best fidelity)
         const categoryOrder: Record<string, number> = {
           shoes: 0, footwear: 0, sneakers: 0, boots: 0, sandals: 0,
           bottomwear: 1, bottom: 1, pants: 1, jeans: 1, trousers: 1, shorts: 1, skirt: 1,
@@ -230,7 +390,7 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
         // v23: Remove background from garment images for clean VTO input
         const seqGarments = await Promise.all(
           sorted.map(async (item) => ({
-            base64: await urlToBase64(item.image_url, { removeBackground: false /* v27: disabled to fix garment mismatch */ }),
+            base64: await urlToBase64(item.image_url, { removeBackground: true }),
             mimeType: "image/png",
             label: `${item.category}: ${item.name}`,
             category: item.category?.toLowerCase() || "other",
@@ -451,13 +611,12 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
               </div>
             )}
 
-            {/* Generating - with sequential step progress */}
+            {/* Generating — garment showcase with creative messages */}
             {step === "generating" && (() => {
               const previewItems = mode === "outfit" && outfitItems.filter(i => i.image_url).length > 0
                 ? outfitItems.filter(i => i.image_url)
                 : selectedItem?.image_url ? [selectedItem] : [];
 
-              // v22: Sort preview items in same order as sequential generation
               const categoryOrder: Record<string, number> = {
                 shoes: 0, footwear: 0, sneakers: 0, boots: 0, sandals: 0,
                 bottomwear: 1, bottom: 1, pants: 1, jeans: 1, trousers: 1, shorts: 1, skirt: 1,
@@ -472,87 +631,14 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
 
               const isSequential = sortedPreview.length > 1;
               const currentStep = seqProgress?.stepIndex ?? -1;
-              const totalSteps = seqProgress?.totalSteps ?? (sortedPreview.length + 1);
-              const isFaceRefineStep = isSequential && currentStep >= sortedPreview.length;
-
-              // Progress message
-              let progressMsg = "Creating your look...";
-              let timeMsg = "This may take 15-30 seconds";
-              if (isSequential && seqProgress) {
-                const stepNum = seqProgress.stepIndex + 1;
-                if (isFaceRefineStep) {
-                  progressMsg = `Final step: Refining your face...`;
-                  timeMsg = seqProgress.status === "done"
-                    ? "Face refined! Almost done..."
-                    : "~15s remaining";
-                } else {
-                  progressMsg = `Step ${stepNum} of ${totalSteps}: Adding ${seqProgress.garmentLabel.split(": ").pop() || seqProgress.garmentLabel}...`;
-                  const secsRemaining = (totalSteps - stepNum) * 20 + 15;
-                  timeMsg = seqProgress.status === "done"
-                    ? `Step ${stepNum} done! Moving to next...`
-                    : `~${secsRemaining}s remaining`;
-                }
-              }
 
               return (
-                <div className="mt-8 flex flex-col items-center py-8">
-                  <Loader2 className="h-10 w-10 animate-spin text-ai" />
-                  <p className="mt-4 text-sm font-body font-medium text-foreground">
-                    {progressMsg}
-                  </p>
-                  <p className="mt-1 text-xs font-body text-muted-foreground">
-                    {timeMsg}
-                  </p>
-
-                  {/* Sequential progress bar (garment steps only - Imagen 3 VTO preserves identity) */}
-                  {isSequential && (
-                    <div className="mt-3 flex items-center gap-1.5 w-56">
-                      {sortedPreview.map((_, i) => {
-                        const isDone = i < currentStep || (i === currentStep && seqProgress?.status === "done");
-                        const isActive = i === currentStep && seqProgress?.status === "starting";
-                        return (
-                          <div
-                            key={i}
-                            className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${
-                              isDone ? "bg-ai" : isActive ? "bg-ai/50 animate-pulse" : "bg-muted"
-                            }`}
-                          />
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* Garment preview thumbnails */}
-                  <div className="mt-4 flex items-center gap-3">
-                    <div className="h-16 w-12 shrink-0 overflow-hidden rounded-lg">
-                      <img src={personPhoto!} alt="You" className="h-full w-full object-cover" />
-                    </div>
-                    <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-                    {sortedPreview.map((item, i) => {
-                      const isDone = i < currentStep || (i === currentStep && seqProgress?.status === "done");
-                      const isActive = i === currentStep && seqProgress?.status === "starting";
-                      return (
-                        <div
-                          key={item.id || i}
-                          className={`relative h-16 w-12 shrink-0 overflow-hidden rounded-lg transition-all duration-300 ${
-                            isActive
-                              ? "ring-2 ring-ai ring-offset-1 scale-110"
-                              : isDone
-                                ? "opacity-100"
-                                : "opacity-40"
-                          } bg-card`}
-                        >
-                          <img src={item.image_url} alt={item.name} className="h-full w-full object-contain" />
-                          {isDone && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-ai/20 rounded-lg">
-                              <Check className="h-4 w-4 text-ai" />
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
+                <VtoLoadingScreen
+                  items={sortedPreview}
+                  isSequential={isSequential}
+                  currentStep={currentStep}
+                  seqProgress={seqProgress}
+                />
               );
             })()}
 
@@ -670,7 +756,7 @@ const CombinationCard = ({ combo, index, isActive, onTryOn }: CombinationCardPro
         </motion.button>
       </div>
 
-      {/* Outfit items - horizontal scroll with slot labels */}
+      {/* Outfit items — horizontal scroll with slot labels */}
       <div className="flex gap-3 overflow-x-auto px-4 py-3 scrollbar-none">
         {combo.slots.length > 0
           ? combo.slots.map(({ slot, item }, i) => (
