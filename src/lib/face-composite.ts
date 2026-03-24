@@ -344,7 +344,7 @@ export async function compositeFaceOntoVTO(
   // origStats, vtoStats,
   // vtoFace,
   // Math.max(vtoFace.width, vtoFace.height) * 0.10  // v24: minimal Ã¢ÂÂ face only
-  );
+  // );
 
   // v24: Very tight mask Ã¢ÂÂ no neck extension, sharper falloff
   const mask = createFeatheredMask(outW, outH, vtoFace, 0.12);
