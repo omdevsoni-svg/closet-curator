@@ -6,7 +6,37 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 /* ------------------------------------------------------------------ */
-/*  Helper: convert File â base64 string (no data: prefix)            */
+/*  v29: Compress base64 image to reduce payload for Vercel limits    */
+/* ------------------------------------------------------------------ */
+const compressBase64Image = (
+  base64: string,
+  mimeType = "image/jpeg",
+  maxDim = 1024,
+  quality = 0.65
+): Promise<string> =>
+  new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      let w = img.width;
+      let h = img.height;
+      if (w > maxDim || h > maxDim) {
+        if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
+        else { w = Math.round(w * maxDim / h); h = maxDim; }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d")!;
+      ctx.drawImage(img, 0, 0, w, h);
+      const dataUrl = canvas.toDataURL("image/jpeg", quality);
+      resolve(dataUrl.split(",")[1]);
+    };
+    img.onerror = () => resolve(base64); // fallback to original
+    img.src = `data:${mimeType};base64,${base64}`;
+  });
+
+/* ------------------------------------------------------------------ */
+/*  Helper: convert File Ã¢ÂÂ base64 string (no data: prefix)            */
 /* ------------------------------------------------------------------ */
 export const fileToBase64 = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -21,7 +51,7 @@ export const fileToBase64 = (file: File): Promise<string> =>
   });
 
 /* ------------------------------------------------------------------ */
-/*  Helper: convert image URL â base64 string                         */
+/*  Helper: convert image URL Ã¢ÂÂ base64 string                         */
 /* ------------------------------------------------------------------ */
 export const urlToBase64 = async (
   url: string,
@@ -118,7 +148,7 @@ export const urlToBase64 = async (
 };
 
 /* ------------------------------------------------------------------ */
-/*  AI Attribute Detection â calls Gemini API directly                 */
+/*  AI Attribute Detection Ã¢ÂÂ calls Gemini API directly                 */
 /* ------------------------------------------------------------------ */
 export interface DetectedAttributes {
   name: string;
@@ -167,7 +197,7 @@ export const detectClothingAttributes = async (
 };
 
 /* ------------------------------------------------------------------ */
-/*  Virtual Try-On â calls Vercel serverless function with face + body */
+/*  Virtual Try-On Ã¢ÂÂ calls Vercel serverless function with face + body */
 /* ------------------------------------------------------------------ */
 export interface TryOnResult {
   mimeType: string;
@@ -223,7 +253,7 @@ export const virtualTryOn = async (
 };
 
 /* ------------------------------------------------------------------ */
-/*  Virtual Try-On (Multi-Garment) â sends all outfit items at once    */
+/*  Virtual Try-On (Multi-Garment) Ã¢ÂÂ sends all outfit items at once    */
 /* ------------------------------------------------------------------ */
 export interface GarmentInput {
   base64: string;
@@ -279,13 +309,13 @@ export const virtualTryOnMulti = async (
 };
 
 /* ------------------------------------------------------------------ */
-/*  Virtual Try-On (Sequential) â Imagen 3 VTO, one garment at a time */
+/*  Virtual Try-On (Sequential) Ã¢ÂÂ Imagen 3 VTO, one garment at a time */
 /*                                                                      */
-/*  Step 1: body photo + topwear â result1                             */
-/*  Step 2: result1 (as person) + bottomwear â result2                 */
-/*  Step 3: result2 (as person) + footwear â final                     */
+/*  Step 1: body photo + topwear Ã¢ÂÂ result1                             */
+/*  Step 2: result1 (as person) + bottomwear Ã¢ÂÂ result2                 */
+/*  Step 3: result2 (as person) + footwear Ã¢ÂÂ final                     */
 /*                                                                      */
-/*  Imagen 3 VTO preserves identity automatically â no face refinement  */
+/*  Imagen 3 VTO preserves identity automatically Ã¢ÂÂ no face refinement  */
 /*  needed. Previous result becomes the personImage for the next step.  */
 /* ------------------------------------------------------------------ */
 
@@ -310,7 +340,7 @@ export const virtualTryOnSequential = async (
   onProgress?: (progress: SequentialProgress) => void,
   _faceImageBase64?: string,
 ): Promise<TryOnResult[]> => {
-  // v17: Imagen 3 VTO + Smart Quality Tiering â fast intermediates, max quality final
+  // v17: Imagen 3 VTO + Smart Quality Tiering Ã¢ÂÂ fast intermediates, max quality final
   const totalSteps = garments.length;
   let previousResultBase64: string | null = null;
   let previousResultMimeType = "image/jpeg";
@@ -326,17 +356,26 @@ export const virtualTryOnSequential = async (
     });
 
     try {
-      // v17: isFinalStep flag â only the last step gets full quality + upscale
+      // v17: isFinalStep flag Ã¢ÂÂ only the last step gets full quality + upscale
       const isLast = i === garments.length - 1;
+
+      // v29: Compress previousResultBase64 to stay under Vercel's ~4.5MB payload limit
+      // Intermediate results from Imagen are high-res; resize to 1024px and JPEG 0.65
+      let compressedPrev = previousResultBase64 || undefined;
+      if (previousResultBase64 && i > 0) {
+        compressedPrev = await compressBase64Image(previousResultBase64, previousResultMimeType, 1024, 0.65);
+        console.log(`v29: Compressed prev result from ${previousResultBase64.length} to ${compressedPrev.length} chars`);
+      }
+
       const res = await fetch("/api/virtual-tryon", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           mode: i === 0 ? "single" : "sequential-step",
-          bodyImageBase64: (i === 0 || !previousResultBase64) ? bodyImageBase64 : '', // v28: skip body for step 2+ to reduce payload size
+          bodyImageBase64: (i === 0 || !previousResultBase64) ? bodyImageBase64 : '', // v28: skip body for step 2+
           productImages: [{ base64: garment.base64, mimeType: garment.mimeType || "image/jpeg" }],
           // For step 2+: previous result becomes the person image
-          previousResultBase64: previousResultBase64 || undefined,
+          previousResultBase64: compressedPrev,
           isFinalStep: isLast,
         }),
       });
@@ -373,7 +412,7 @@ export const virtualTryOnSequential = async (
   }
 
   if (previousResultBase64) {
-    // v21: Client-side face composite â restore original face onto VTO result
+    // v21: Client-side face composite Ã¢ÂÂ restore original face onto VTO result
     // with Reinhard color correction and multi-layer feathered mask
     try {
       const compositedBase64 = await compositeFaceOntoVTO(
@@ -395,7 +434,7 @@ export const virtualTryOnSequential = async (
 };
 
 /* ------------------------------------------------------------------ */
-/*  AI Outfit Recommendation â calls Gemini via serverless function    */
+/*  AI Outfit Recommendation Ã¢ÂÂ calls Gemini via serverless function    */
 /* ------------------------------------------------------------------ */
 
 export interface RecommendationRequest {
