@@ -77,7 +77,7 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
   const [resultImage, setResultImage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<"outfit" | "closet">("outfit");
-  // v22: Sequential generation progress
+  // v13: Sequential generation progress
   const [seqProgress, setSeqProgress] = useState<SequentialProgress | null>(null);
 
   useEffect(() => {
@@ -126,11 +126,11 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
 
               if (itemsWithImages.length === 1) {
                 // Single garment — use direct one-shot
-                const productBase64 = await urlToBase64(itemsWithImages[0].image_url);
+                const productBase64 = await urlToBase64(itemsWithImages[0].image_url, { removeBackground: true });
                 results = await virtualTryOn(bodyB64, productBase64, 1, desc, faceB64 || undefined);
               } else {
                 // v22: SEQUENTIAL generation — one garment at a time
-                // Sort garments: shoes → bottomwear → shoes/accessories
+                // Sort garments: shoes → bottomwear → topwear (topwear LAST for max quality & print fidelity)
                 const categoryOrder: Record<string, number> = {
                   shoes: 0, footwear: 0, sneakers: 0, boots: 0, sandals: 0,
                   bottomwear: 1, bottom: 1, pants: 1, jeans: 1, trousers: 1, shorts: 1, skirt: 1,
@@ -143,19 +143,14 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
                   return aOrder - bOrder;
                 });
 
-                // v22b: Preserve PNG format for garment images (critical for collar/hem fidelity)
+                // v23: Remove background from garment images for clean VTO input
                 const seqGarments = await Promise.all(
-                  sorted.map(async (item) => {
-                    const b64 = await urlToBase64(item.image_url, { preserveFormat: true });
-                    const isPng = item.image_url.toLowerCase().includes(".png") ||
-                      (await fetch(item.image_url, { method: "HEAD" }).then(r => r.headers.get("content-type") || "").catch(() => "")).includes("png");
-                    return {
-                      base64: b64,
-                      mimeType: isPng ? "image/png" : "image/jpeg",
-                      label: `${item.category}: ${item.name}`,
-                      category: item.category?.toLowerCase() || "other",
-                    };
-                  })
+                  sorted.map(async (item) => ({
+                    base64: await urlToBase64(item.image_url, { removeBackground: true }),
+                    mimeType: "image/png",
+                    label: `${item.category}: ${item.name}`,
+                    category: item.category?.toLowerCase() || "other",
+                  }))
                 );
 
                 // v15: Imagen 3 VTO (face param kept for backward compat)
@@ -216,10 +211,10 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
       let results: { mimeType: string; base64: string }[] = [];
 
       if (itemsToTry.length === 1) {
-        const productBase64 = await urlToBase64(itemsToTry[0].image_url);
+        const productBase64 = await urlToBase64(itemsToTry[0].image_url, { removeBackground: true });
         results = await virtualTryOn(bodyPhotoBase64, productBase64, 1, personDescription, facePhotoBase64 || undefined);
       } else {
-        // v22: Sequential generation
+        // v22: Sequential generation — shoes → bottomwear → topwear (topwear LAST for best fidelity)
         const categoryOrder: Record<string, number> = {
           shoes: 0, footwear: 0, sneakers: 0, boots: 0, sandals: 0,
           bottomwear: 1, bottom: 1, pants: 1, jeans: 1, trousers: 1, shorts: 1, skirt: 1,
@@ -232,19 +227,14 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
           return aOrder - bOrder;
         });
 
-        // v22b: Preserve PNG format for garment images (critical for collar/hem fidelity)
+        // v23: Remove background from garment images for clean VTO input
         const seqGarments = await Promise.all(
-          sorted.map(async (item) => {
-            const b64 = await urlToBase64(item.image_url, { preserveFormat: true });
-            const isPng = item.image_url.toLowerCase().includes(".png") ||
-              (await fetch(item.image_url, { method: "HEAD" }).then(r => r.headers.get("content-type") || "").catch(() => "")).includes("png");
-            return {
-              base64: b64,
-              mimeType: isPng ? "image/png" : "image/jpeg",
-              label: `${item.category}: ${item.name}`,
-              category: item.category?.toLowerCase() || "other",
-            };
-          })
+          sorted.map(async (item) => ({
+            base64: await urlToBase64(item.image_url, { removeBackground: true }),
+            mimeType: "image/png",
+            label: `${item.category}: ${item.name}`,
+            category: item.category?.toLowerCase() || "other",
+          }))
         );
 
         // v14: Pass face close-up for face refinement final step
