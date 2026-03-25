@@ -29,7 +29,7 @@ import {
   uploadImage,
   type ClothingItem,
 } from "@/lib/database";
-import { detectClothingAttributes, fileToBase64, type DetectionResult } from "@/lib/ai-service";
+import { detectClothingAttributes, fileToBase64, suggestEthnicPairing, type DetectionResult, type SuggestedEthnicItem } from "@/lib/ai-service";
 import heic2any from "heic2any";
 
 /* ------------------------------------------------------------------ */
@@ -672,6 +672,9 @@ const ItemDetailModal = ({ item, allItems, onClose, onToggleFavorite, onDelete, 
   const [editTags, setEditTags] = useState("");
   const [saving, setSaving] = useState(false);
   const [tryOnResult, setTryOnResult] = useState<AutoPairResult | null>(null);
+  const [suggestingPair, setSuggestingPair] = useState(false);
+  const [suggestedItems, setSuggestedItems] = useState<SuggestedEthnicItem[]>([]);
+  const [suggestError, setSuggestError] = useState<string | null>(null);
 
   useEffect(() => {
     if (item) {
@@ -682,6 +685,8 @@ const ItemDetailModal = ({ item, allItems, onClose, onToggleFavorite, onDelete, 
       setEditTags(item.tags.join(", "));
       setEditing(false);
       setTryOnResult(null);
+      setSuggestedItems([]);
+      setSuggestError(null);
     }
   }, [item]);
 
@@ -949,11 +954,84 @@ const ItemDetailModal = ({ item, allItems, onClose, onToggleFavorite, onDelete, 
                     </div>
                   )}
 
+                  {/* AI Suggest button — shown when ethnic items are missing */}
+                  {tryOnResult.warnings.length > 0 && classifyRole(item) === "ethnic-top" && suggestedItems.length === 0 && (
+                    <motion.button
+                      whileTap={{ scale: 0.98 }}
+                      onClick={async () => {
+                        if (!item.image_url) return;
+                        setSuggestingPair(true);
+                        setSuggestError(null);
+                        const missingTypes: ("ethnic-bottom" | "ethnic-footwear")[] = [];
+                        for (const w of tryOnResult.warnings) {
+                          if (w.toLowerCase().includes("bottom") || w.toLowerCase().includes("pajama") || w.toLowerCase().includes("churidar")) missingTypes.push("ethnic-bottom");
+                          if (w.toLowerCase().includes("footwear") || w.toLowerCase().includes("jutti") || w.toLowerCase().includes("mojari") || w.toLowerCase().includes("kolhapuri")) missingTypes.push("ethnic-footwear");
+                        }
+                        if (missingTypes.length === 0) missingTypes.push("ethnic-bottom", "ethnic-footwear");
+                        const result = await suggestEthnicPairing(item.image_url, item.name, item.color, missingTypes);
+                        setSuggestingPair(false);
+                        if (result.success && result.suggestions.length > 0) {
+                          setSuggestedItems(result.suggestions);
+                        } else {
+                          setSuggestError(result.error || "Could not generate suggestions. Please try again.");
+                        }
+                      }}
+                      disabled={suggestingPair}
+                      className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-ai/10 text-ai font-display font-semibold text-sm disabled:opacity-60"
+                    >
+                      {suggestingPair ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          AI is generating matching pieces...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-4 w-4" />
+                          AI Suggest Matching Pieces
+                        </>
+                      )}
+                    </motion.button>
+                  )}
+
+                  {/* AI Suggest error */}
+                  {suggestError && (
+                    <div className="flex items-start gap-2 rounded-lg bg-red-500/10 px-3 py-2">
+                      <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-500" />
+                      <p className="text-[11px] font-body text-red-600 dark:text-red-400">{suggestError}</p>
+                    </div>
+                  )}
+
+                  {/* AI Suggested items — confirmation UI */}
+                  {suggestedItems.length > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="rounded-xl border border-ai/20 bg-ai/5 p-3 space-y-2"
+                    >
+                      <p className="text-[10px] uppercase tracking-wider text-ai font-body font-semibold">AI-Suggested Pairing</p>
+                      <div className="flex items-center gap-2">
+                        {suggestedItems.map((s, idx) => (
+                          <div key={idx} className="shrink-0 flex flex-col items-center">
+                            <div className="h-20 w-16 overflow-hidden rounded-lg bg-white ring-2 ring-ai/30">
+                              <img src={s.imageDataUrl} alt={s.name} className="h-full w-full object-contain" />
+                            </div>
+                            <p className="mt-1 text-center text-[8px] font-body text-muted-foreground w-16 truncate">
+                              {s.role === "ethnic-bottom" ? "Bottomwear" : "Footwear"}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-[10px] font-body text-muted-foreground">
+                        These AI-generated pieces will be used for virtual try-on preview only.
+                      </p>
+                    </motion.div>
+                  )}
+
                   {/* Action row */}
                   <div className="flex gap-2">
                     <motion.button
                       whileTap={{ scale: 0.98 }}
-                      onClick={() => setTryOnResult(autoPairItem(item, allItems))}
+                      onClick={() => { setTryOnResult(autoPairItem(item, allItems)); setSuggestedItems([]); setSuggestError(null); }}
                       className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-card py-3 text-xs font-body font-medium text-muted-foreground hover:text-foreground"
                     >
                       <Sparkles className="h-3.5 w-3.5" />
@@ -962,14 +1040,30 @@ const ItemDetailModal = ({ item, allItems, onClose, onToggleFavorite, onDelete, 
                     <motion.button
                       whileTap={{ scale: 0.98 }}
                       onClick={() => {
-                        if (tryOnResult.paired.length >= 2) {
-                          onTryOn(tryOnResult.paired);
+                        // Build the final item list: real paired items + AI-suggested virtual items
+                        const finalItems: ClothingItem[] = [...tryOnResult.paired];
+                        for (const s of suggestedItems) {
+                          finalItems.push({
+                            id: `ai-suggested-${s.role}-${Date.now()}`,
+                            user_id: "",
+                            name: s.name,
+                            category: s.role === "ethnic-bottom" ? "Bottoms" : "Footwear",
+                            color: item.color,
+                            tags: ["ethnic", "ai-suggested"],
+                            image_url: s.imageDataUrl,
+                            favorite: false,
+                            archived: false,
+                            created_at: new Date().toISOString(),
+                          } as ClothingItem);
+                        }
+                        if (finalItems.length >= 2) {
+                          onTryOn(finalItems);
                           onClose();
                         }
                       }}
-                      disabled={tryOnResult.paired.length < 2}
+                      disabled={tryOnResult.paired.length < 2 && suggestedItems.length === 0}
                       className={`flex flex-[2] items-center justify-center gap-2 rounded-xl py-3 text-sm font-display font-semibold shadow-sm ${
-                        tryOnResult.paired.length >= 2
+                        tryOnResult.paired.length >= 2 || suggestedItems.length > 0
                           ? "bg-gradient-to-r from-[hsl(43,70%,50%)] to-[hsl(220,10%,65%)] text-white"
                           : "bg-card text-muted-foreground opacity-40 cursor-not-allowed"
                       }`}
@@ -1339,8 +1433,15 @@ const DigitalCloset = () => {
           }}
           onTryOn={(pairedItems) => {
             // Navigate to AI Stylist with paired items for virtual try-on
-            const ids = pairedItems.map(i => i.id).join(",");
-            window.location.href = `/stylist?tryOn=${ids}`;
+            // Store full items in sessionStorage so AI-suggested items (with data URLs) are preserved
+            const hasAiSuggested = pairedItems.some(i => i.id.startsWith("ai-suggested-"));
+            if (hasAiSuggested) {
+              sessionStorage.setItem("tryOnItems", JSON.stringify(pairedItems));
+              window.location.href = `/stylist?tryOn=session`;
+            } else {
+              const ids = pairedItems.map(i => i.id).join(",");
+              window.location.href = `/stylist?tryOn=${ids}`;
+            }
           }}
         />
       )}
