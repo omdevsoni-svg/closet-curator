@@ -557,11 +557,17 @@ const FORMALITY_COMPAT: Record<string, string[]> = {
 type ItemRole = "top" | "bottom" | "footwear" | "dress" | "ethnic-top" | "ethnic-bottom" | "ethnic-footwear" | "accessory";
 
 function classifyRole(item: ClothingItem): ItemRole {
-  if (item.category === "Ethnic Wear") {
-    if (ETHNIC_BOTTOM_RE.test(item.name)) return "ethnic-bottom";
-    if (ETHNIC_SHOE_RE.test(item.name)) return "ethnic-footwear";
-    return "ethnic-top";
+  const text = [item.name, ...(item.tags || [])].join(" ");
+
+  // Check ethnic patterns FIRST — items may be stored under generic categories like "Tops"
+  if (item.category === "Ethnic Wear" || ETHNIC_TOP_RE.test(text)) {
+    if (ETHNIC_BOTTOM_RE.test(text)) return "ethnic-bottom";
+    if (ETHNIC_SHOE_RE.test(text)) return "ethnic-footwear";
+    if (ETHNIC_TOP_RE.test(text)) return "ethnic-top";
   }
+  if (ETHNIC_BOTTOM_RE.test(text) && inferFormality(item) === "ethnic") return "ethnic-bottom";
+  if (ETHNIC_SHOE_RE.test(text) && inferFormality(item) === "ethnic") return "ethnic-footwear";
+
   if (item.category === "Activewear") {
     if (ACTIVEWEAR_BOTTOM_RE.test(item.name)) return "bottom";
     if (ACTIVEWEAR_SHOE_RE.test(item.name)) return "footwear";
@@ -595,8 +601,9 @@ function autoPairItem(item: ClothingItem, allItems: ClothingItem[]): AutoPairRes
   };
 
   if (role === "ethnic-top") {
-    const eBottoms = pool.filter((i) => i.category === "Ethnic Wear" && ETHNIC_BOTTOM_RE.test(i.name));
-    const eShoes = pool.filter((i) => i.category === "Ethnic Wear" && ETHNIC_SHOE_RE.test(i.name));
+    // Search ALL categories for ethnic bottoms/shoes — items may not be under "Ethnic Wear"
+    const eBottoms = pool.filter((i) => classifyRole(i) === "ethnic-bottom");
+    const eShoes = pool.filter((i) => classifyRole(i) === "ethnic-footwear");
     if (eBottoms.length > 0) paired.push(eBottoms[Math.floor(Math.random() * eBottoms.length)]);
     else warnings.push("No ethnic bottoms (pajama, churidar) found — add some for complete ethnic outfits.");
     if (eShoes.length > 0) paired.push(eShoes[Math.floor(Math.random() * eShoes.length)]);
@@ -605,15 +612,15 @@ function autoPairItem(item: ClothingItem, allItems: ClothingItem[]): AutoPairRes
   }
 
   if (role === "ethnic-bottom" || role === "ethnic-footwear") {
-    const eTops = pool.filter((i) => i.category === "Ethnic Wear" && !ETHNIC_BOTTOM_RE.test(i.name) && !ETHNIC_SHOE_RE.test(i.name));
+    const eTops = pool.filter((i) => classifyRole(i) === "ethnic-top");
     if (eTops.length > 0) paired.push(eTops[Math.floor(Math.random() * eTops.length)]);
     else warnings.push("No kurtas/sherwanis found to pair with this item.");
     if (role === "ethnic-bottom") {
-      const eShoes = pool.filter((i) => i.category === "Ethnic Wear" && ETHNIC_SHOE_RE.test(i.name));
+      const eShoes = pool.filter((i) => classifyRole(i) === "ethnic-footwear");
       if (eShoes.length > 0) paired.push(eShoes[Math.floor(Math.random() * eShoes.length)]);
       else warnings.push("No ethnic footwear found — add jutti or kolhapuri for a complete look.");
     } else {
-      const eBottoms = pool.filter((i) => i.category === "Ethnic Wear" && ETHNIC_BOTTOM_RE.test(i.name));
+      const eBottoms = pool.filter((i) => classifyRole(i) === "ethnic-bottom");
       if (eBottoms.length > 0) paired.push(eBottoms[Math.floor(Math.random() * eBottoms.length)]);
       else warnings.push("No ethnic bottoms found — add pajama or churidar for a complete look.");
     }
@@ -1333,7 +1340,7 @@ const DigitalCloset = () => {
           onTryOn={(pairedItems) => {
             // Navigate to AI Stylist with paired items for virtual try-on
             const ids = pairedItems.map(i => i.id).join(",");
-            window.location.href = `/ai-stylist?tryOn=${ids}`;
+            window.location.href = `/stylist?tryOn=${ids}`;
           }}
         />
       )}
