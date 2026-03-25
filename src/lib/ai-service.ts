@@ -36,7 +36,7 @@ const compressBase64Image = (
   });
 
 /* ------------------------------------------------------------------ */
-/*  Helper: convert File Ã¢ÂÂ base64 string (no data: prefix)            */
+/*  Helper: convert File → base64 string (no data: prefix)            */
 /* ------------------------------------------------------------------ */
 export const fileToBase64 = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -51,7 +51,7 @@ export const fileToBase64 = (file: File): Promise<string> =>
   });
 
 /* ------------------------------------------------------------------ */
-/*  Helper: convert image URL Ã¢ÂÂ base64 string                         */
+/*  Helper: convert image URL → base64 string                         */
 /* ------------------------------------------------------------------ */
 export const urlToBase64 = async (
   url: string,
@@ -92,7 +92,7 @@ export const urlToBase64 = async (
         const d = imgData.data;
 
         // Sample background color from corners (10x10 pixel areas)
-        const samples: number[][] = [];
+        const samples: number[][]`= [];
         const sampleSize = 10;
         for (let sy = 0; sy < sampleSize; sy++) {
           for (let sx = 0; sx < sampleSize; sx++) {
@@ -148,7 +148,7 @@ export const urlToBase64 = async (
 };
 
 /* ------------------------------------------------------------------ */
-/*  AI Attribute Detection Ã¢ÂÂ calls Gemini API directly                 */
+/*  AI Attribute Detection — calls Gemini API directly                 */
 /* ------------------------------------------------------------------ */
 export interface DetectedAttributes {
   name: string;
@@ -197,7 +197,7 @@ export const detectClothingAttributes = async (
 };
 
 /* ------------------------------------------------------------------ */
-/*  Virtual Try-On Ã¢ÂÂ calls Vercel serverless function with face + body */
+/*  Virtual Try-On — calls Vercel serverless function with face + body */
 /* ------------------------------------------------------------------ */
 export interface TryOnResult {
   mimeType: string;
@@ -253,7 +253,7 @@ export const virtualTryOn = async (
 };
 
 /* ------------------------------------------------------------------ */
-/*  Virtual Try-On (Multi-Garment) Ã¢ÂÂ sends all outfit items at once    */
+/*  Virtual Try-On (Multi-Garment) — sends all outfit items at once    */
 /* ------------------------------------------------------------------ */
 export interface GarmentInput {
   base64: string;
@@ -309,13 +309,13 @@ export const virtualTryOnMulti = async (
 };
 
 /* ------------------------------------------------------------------ */
-/*  Virtual Try-On (Sequential) Ã¢ÂÂ Imagen 3 VTO, one garment at a time */
+/*  Virtual Try-On (Sequential) — Imagen 3 VTO, one garment at a time */
 /*                                                                      */
-/*  Step 1: body photo + topwear Ã¢ÂÂ result1                             */
-/*  Step 2: result1 (as person) + bottomwear Ã¢ÂÂ result2                 */
-/*  Step 3: result2 (as person) + footwear Ã¢ÂÂ final                     */
+/*  Step 1: body photo + topwear → result1                             */
+/*  Step 2: result1 (as person) + bottomwear → result2                 */
+/*  Step 3: result2 (as person) + footwear → final                     */
 /*                                                                      */
-/*  Imagen 3 VTO preserves identity automatically Ã¢ÂÂ no face refinement  */
+/*  Imagen 3 VTO preserves identity automatically — no face refinement  */
 /*  needed. Previous result becomes the personImage for the next step.  */
 /* ------------------------------------------------------------------ */
 
@@ -340,7 +340,7 @@ export const virtualTryOnSequential = async (
   onProgress?: (progress: SequentialProgress) => void,
   _faceImageBase64?: string,
 ): Promise<TryOnResult[]> => {
-  // v17: Imagen 3 VTO + Smart Quality Tiering Ã¢ÂÂ fast intermediates, max quality final
+  // v17: Imagen 3 VTO + Smart Quality Tiering — fast intermediates, max quality final
   const totalSteps = garments.length;
   let previousResultBase64: string | null = null;
   let previousResultMimeType = "image/jpeg";
@@ -356,7 +356,7 @@ export const virtualTryOnSequential = async (
     });
 
     try {
-      // v17: isFinalStep flag Ã¢ÂÂ only the last step gets full quality + upscale
+      // v17: isFinalStep flag — only the last step gets full quality + upscale
       const isLast = i === garments.length - 1;
 
       // v29: Compress previousResultBase64 to stay under Vercel's ~4.5MB payload limit
@@ -412,7 +412,7 @@ export const virtualTryOnSequential = async (
   }
 
   if (previousResultBase64) {
-    // v21: Client-side face composite Ã¢ÂÂ restore original face onto VTO result
+    // v21: Client-side face composite — restore original face onto VTO result
     // with Reinhard color correction and multi-layer feathered mask
     try {
       const compositedBase64 = await compositeFaceOntoVTO(
@@ -434,7 +434,7 @@ export const virtualTryOnSequential = async (
 };
 
 /* ------------------------------------------------------------------ */
-/*  AI Outfit Recommendation Ã¢ÂÂ calls Gemini via serverless function    */
+/*  AI Outfit Recommendation — calls Gemini via serverless function    */
 /* ------------------------------------------------------------------ */
 
 export interface RecommendationRequest {
@@ -528,8 +528,8 @@ export const getOutfitRecommendation = async (
   }
 };
 
-/* ------------------------------------------------------------------ */
-/*  Upload try-on result to Supabase Storage                          */
+/* ------------------------------------------------------------------- */
+/*  Upload try-on result to Supabase Storage                           */
 /* ------------------------------------------------------------------ */
 export const uploadTryOnImage = async (
   userId: string,
@@ -559,5 +559,65 @@ export const uploadTryOnImage = async (
   } catch (err) {
     console.error("uploadTryOnImage error:", err);
     return null;
+  }
+};
+
+/* ------------------------------------------------------------------- */
+/*  Suggest matching ethnic bottomwear/footwear via AI image gen       */
+/* ------------------------------------------------------------------ */
+
+export interface SuggestedEthnicItem {
+  role: "ethnic-bottom" | "ethnic-footwear";
+  name: string;
+  imageBase64: string;
+  imageMimeType: string;
+  /** Data URL for display in <img> tags */
+  imageDataUrl: string;
+}
+
+export const suggestEthnicPairing = async (
+  kurtaImageUrl: string,
+  kurtaName: string,
+  kurtaColor: string,
+  missingTypes: ("ethnic-bottom" | "ethnic-footwear")[]
+): Promise<{ success: boolean; suggestions: SuggestedEthnicItem[]; error?: string }> => {
+  try {
+    // Convert kurta image URL to base64 for the API
+    const kurtaBase64 = await urlToBase64(kurtaImageUrl, { maxDim: 1024, quality: 0.9 });
+
+    const apiUrl = SUPABASE_URL
+      ? `${window.location.origin}/api/suggest-ethnic-pair`
+      : "/api/suggest-ethnic-pair";
+
+    const res = await fetch(apiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        kurtaImageBase64: kurtaBase64,
+        kurtaMimeType: "image/jpeg",
+        kurtaName,
+        kurtaColor,
+        missingTypes,
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      return { success: false, suggestions: [], error: data.error };
+    }
+
+    // Build data URLs for display
+    const suggestions: SuggestedEthnicItem[] = data.suggestions.map(
+      (s: { role: "ethnic-bottom" | "ethnic-footwear"; name: string; imageBase64: string; imageMimeType: string }) => ({
+        ...s,
+        imageDataUrl: `data:${s.imageMimeType};base64,${s.imageBase64}`,
+      })
+    );
+
+    return { success: true, suggestions };
+  } catch (err: any) {
+    console.error("suggestEthnicPairing error:", err);
+    return { success: false, suggestions: [], error: err.message || "Failed to generate suggestions" };
   }
 };
