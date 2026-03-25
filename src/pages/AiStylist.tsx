@@ -895,6 +895,19 @@ const AiStylist = () => {
     load();
   }, [user]);
 
+  // Handle tryOn query param from Digital Closet's Try On button
+  useEffect(() => {
+    const tryOnIds = searchParams.get("tryOn");
+    if (!tryOnIds || closetItems.length === 0) return;
+    const ids = tryOnIds.split(",");
+    const matched = ids.map((id) => closetItems.find((i) => i.id === id)).filter(Boolean) as ClothingItem[];
+    if (matched.length > 0) {
+      setMixTryOnItems(matched);
+      setTryOnCombo(null);
+      setShowTryOn(true);
+    }
+  }, [closetItems, searchParams]);
+
   const fetchRecommendations = async (occasion: string) => {
     setSelectedOccasion(occasion);
     setGenerating(true);
