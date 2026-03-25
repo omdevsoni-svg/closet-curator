@@ -46,7 +46,7 @@ const isHeicFile = (file: File): boolean => {
   return heicTypes.includes(file.type) || ["heic", "heif"].includes(ext);
 };
 
-const categories = ["All", "Tops", "Bottoms", "Outerwear", "Footwear", "Dresses", "Accessories"];
+const categories = ["All", "Tops", "Bottoms", "Outerwear", "Footwear", "Dresses", "Accessories", "Activewear", "Ethnic Wear"];
 const colorOptions = ["Black", "White", "Navy", "Blue", "Red", "Green", "Beige", "Grey", "Pink", "Brown"];
 const categoryOptions = ["Tops", "Bottoms", "Outerwear", "Footwear", "Dresses", "Accessories", "Activewear"];
 
@@ -112,33 +112,38 @@ const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => 
     setAiDetecting(true);
     setAiDetected(false);
     setAiError(false);
+    setAiRejection(null);
     try {
       const base64 = await fileToBase64(processedFile);
       const result = await detectClothingAttributes(
         base64,
         processedFile.type || "image/jpeg"
       );
+
       if (result.success && "attributes" in result) {
         const attrs = result.attributes;
         if (attrs.name) setItemName(attrs.name);
         if (attrs.category) setCategory(attrs.category);
         if (attrs.color) setColor(attrs.color);
         if (attrs.gender) setGender(attrs.gender as "women" | "men" | "unisex");
+        // Brand is intentionally NOT set by AI — user must enter it manually
         if (attrs.material) setMaterial(attrs.material);
         if (attrs.tags?.length) setTags(attrs.tags.join(", "));
 
         // Use AI-enhanced catalog image if available
         if (result.enhancedImage) {
-          const eUrl = "data:" + result.enhancedImage.mimeType + ";base64," + result.enhancedImage.base64;
-          const resp2 = await fetch(eUrl);
-          const blob2 = await resp2.blob();
-          const enhancedFile = new File([blob2], "enhanced.png", { type: result.enhancedImage.mimeType });
+          const enhancedDataUrl = `data:${result.enhancedImage.mimeType};base64,${result.enhancedImage.base64}`;
+          // Convert data URL to File for upload
+          const resp = await fetch(enhancedDataUrl);
+          const blob = await resp.blob();
+          const enhancedFile = new File([blob], "enhanced.png", { type: result.enhancedImage.mimeType });
           setImageFile(enhancedFile);
-          setImagePreview(eUrl);
+          setImagePreview(enhancedDataUrl);
         }
 
         setAiDetected(true);
       } else if ("is_garment" in result && result.is_garment === false) {
+        // Non-garment image — reject and clear preview
         setAiRejection(result.rejection_reason);
         setImageFile(null);
         setImagePreview(null);
@@ -171,7 +176,7 @@ const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => 
     setAiRejection(null);
   };
 
-  // Close and reset  -  prevents stale preview on reopen
+  // Close and reset — prevents stale preview on reopen
   const handleClose = () => {
     resetForm();
     onClose();
@@ -309,7 +314,7 @@ const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => 
               >
                 <Sparkles className="h-4 w-4 text-green-600 dark:text-green-400" />
                 <span className="text-xs font-body text-green-700 dark:text-green-400 font-medium">
-                  AI auto-filled details - review and adjust below
+                  AI auto-filled details — review and adjust below
                 </span>
               </motion.div>
             )}
@@ -321,8 +326,27 @@ const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => 
               >
                 <AlertCircle className="h-4 w-4 text-destructive" />
                 <span className="text-xs font-body text-destructive font-medium">
-                  AI detection unavailable  -  please fill in details manually
+                  AI detection unavailable — please fill in details manually
                 </span>
+              </motion.div>
+            )}
+            {aiRejection && !aiDetecting && (
+              <motion.div
+                initial={{ opacity: 0, y: -5 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-3 rounded-xl bg-amber-500/10 px-4 py-3"
+              >
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                  <div>
+                    <span className="text-xs font-body font-semibold text-amber-700 dark:text-amber-300">
+                      Not a garment image
+                    </span>
+                    <p className="mt-0.5 text-[11px] font-body text-amber-600 dark:text-amber-400">
+                      {aiRejection}
+                    </p>
+                  </div>
+                </div>
               </motion.div>
             )}
 
@@ -469,7 +493,7 @@ const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => 
                 Purchase Price <span className="normal-case text-muted-foreground/60">(optional)</span>
               </label>
               <div className="relative mt-1.5">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground"> - </span>
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">₹</span>
                 <input
                   type="number"
                   value={price}
@@ -504,18 +528,135 @@ const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => 
 };
 
 /* ------------------------------------------------------------------ */
+/*  Formality inference & auto-pairing helpers (for single-item Try On) */
+/* ------------------------------------------------------------------ */
+
+const ACTIVEWEAR_BOTTOM_RE = /\b(jogger|track\s?pant|sweat\s?pant|legging|short|tight|cargo\s?pant)\b/i;
+const ACTIVEWEAR_SHOE_RE = /\b(sneaker|trainer|running\s?shoe|sport\s?shoe|athletic\s?shoe|slipper|slide|croc|flip[\s-]?flop)\b/i;
+const ETHNIC_TOP_RE = /\b(kurta|sherwani|nehru|bandhgala|achkan|angrakha|bandi|waistcoat|jacket|vest|tunic)\b/i;
+const ETHNIC_BOTTOM_RE = /\b(pajama|pyjama|churidar|dhoti|lungi|salwar|shalwar|pant|trouser|bottom|leheng)\b/i;
+const ETHNIC_SHOE_RE = /\b(jutti|mojari|mojri|kolhapuri|sandal|chappal|shoe|slipper|khussa)\b/i;
+
+function inferFormality(item: ClothingItem): "formal" | "smart-casual" | "casual" | "sporty" | "ethnic" {
+  const text = [item.name, ...(item.tags || []), item.material || "", item.brand || ""].join(" ").toLowerCase();
+  if (text.match(/\b(kurta|sherwani|nehru|ethnic|traditional|bandhgala|achkan|angrakha|jutti|mojari|kolhapuri|pajama|churidar|dhoti)\b/)) return "ethnic";
+  if (text.match(/\b(sport|athletic|gym|running|jogger|track|sneaker|trainer|activewear|workout|yoga|legging)\b/)) return "sporty";
+  if (text.match(/\b(formal|suit|blazer|dress\s?shoe|oxford|loafer|heel|pump|derby|brogue|chino|trouser|silk|satin|linen\s?pant|wool|cashmere|office|business|tie|cufflink)\b/)) return "formal";
+  if (text.match(/\b(polo|button|collar|boot|chelsea|suede|leather|khaki|slim|fitted|cardigan|knit|smart|semi)\b/)) return "smart-casual";
+  return "casual";
+}
+
+const FORMALITY_COMPAT: Record<string, string[]> = {
+  formal: ["formal", "smart-casual"],
+  "smart-casual": ["formal", "smart-casual", "casual"],
+  casual: ["smart-casual", "casual", "sporty"],
+  sporty: ["casual", "sporty"],
+  ethnic: ["ethnic"],
+};
+
+type ItemRole = "top" | "bottom" | "footwear" | "dress" | "ethnic-top" | "ethnic-bottom" | "ethnic-footwear" | "accessory";
+
+function classifyRole(item: ClothingItem): ItemRole {
+  if (item.category === "Ethnic Wear") {
+    if (ETHNIC_BOTTOM_RE.test(item.name)) return "ethnic-bottom";
+    if (ETHNIC_SHOE_RE.test(item.name)) return "ethnic-footwear";
+    return "ethnic-top";
+  }
+  if (item.category === "Activewear") {
+    if (ACTIVEWEAR_BOTTOM_RE.test(item.name)) return "bottom";
+    if (ACTIVEWEAR_SHOE_RE.test(item.name)) return "footwear";
+    return "top";
+  }
+  if (["Tops", "Outerwear"].includes(item.category)) return "top";
+  if (item.category === "Bottoms") return "bottom";
+  if (item.category === "Footwear") return "footwear";
+  if (item.category === "Dresses") return "dress";
+  return "accessory";
+}
+
+interface AutoPairResult {
+  paired: ClothingItem[];
+  warnings: string[];
+}
+
+function autoPairItem(item: ClothingItem, allItems: ClothingItem[]): AutoPairResult {
+  const role = classifyRole(item);
+  const formality = inferFormality(item);
+  const compat = FORMALITY_COMPAT[formality] || [formality];
+  const pool = allItems.filter((i) => i.id !== item.id && i.image_url && !i.archived);
+  const paired: ClothingItem[] = [item];
+  const warnings: string[] = [];
+
+  const pickBest = (candidates: ClothingItem[]): ClothingItem | null => {
+    const styled = candidates.filter((c) => compat.includes(inferFormality(c)));
+    const chosen = styled.length > 0 ? styled : candidates;
+    if (chosen.length === 0) return null;
+    return chosen[Math.floor(Math.random() * chosen.length)];
+  };
+
+  if (role === "ethnic-top") {
+    const eBottoms = pool.filter((i) => i.category === "Ethnic Wear" && ETHNIC_BOTTOM_RE.test(i.name));
+    const eShoes = pool.filter((i) => i.category === "Ethnic Wear" && ETHNIC_SHOE_RE.test(i.name));
+    if (eBottoms.length > 0) paired.push(eBottoms[Math.floor(Math.random() * eBottoms.length)]);
+    else warnings.push("No ethnic bottoms (pajama, churidar) found — add some for complete ethnic outfits.");
+    if (eShoes.length > 0) paired.push(eShoes[Math.floor(Math.random() * eShoes.length)]);
+    else warnings.push("No ethnic footwear (jutti, mojari, kolhapuri) found — add some for a traditional look.");
+    return { paired, warnings };
+  }
+
+  if (role === "ethnic-bottom" || role === "ethnic-footwear") {
+    const eTops = pool.filter((i) => i.category === "Ethnic Wear" && !ETHNIC_BOTTOM_RE.test(i.name) && !ETHNIC_SHOE_RE.test(i.name));
+    if (eTops.length > 0) paired.push(eTops[Math.floor(Math.random() * eTops.length)]);
+    else warnings.push("No kurtas/sherwanis found to pair with this item.");
+    if (role === "ethnic-bottom") {
+      const eShoes = pool.filter((i) => i.category === "Ethnic Wear" && ETHNIC_SHOE_RE.test(i.name));
+      if (eShoes.length > 0) paired.push(eShoes[Math.floor(Math.random() * eShoes.length)]);
+      else warnings.push("No ethnic footwear found — add jutti or kolhapuri for a complete look.");
+    } else {
+      const eBottoms = pool.filter((i) => i.category === "Ethnic Wear" && ETHNIC_BOTTOM_RE.test(i.name));
+      if (eBottoms.length > 0) paired.push(eBottoms[Math.floor(Math.random() * eBottoms.length)]);
+      else warnings.push("No ethnic bottoms found — add pajama or churidar for a complete look.");
+    }
+    return { paired, warnings };
+  }
+
+  if (role === "dress") {
+    const shoes = pool.filter((i) => classifyRole(i) === "footwear");
+    const pick = pickBest(shoes);
+    if (pick) paired.push(pick);
+    else warnings.push("No footwear in your closet to pair with this dress.");
+    return { paired, warnings };
+  }
+
+  // Standard: top, bottom, footwear
+  const needRoles: ItemRole[] = role === "top" ? ["bottom", "footwear"] : role === "bottom" ? ["top", "footwear"] : ["top", "bottom"];
+  const roleLabels: Record<string, string> = { top: "topwear", bottom: "bottomwear", footwear: "footwear" };
+
+  for (const need of needRoles) {
+    const candidates = pool.filter((i) => classifyRole(i) === need);
+    const pick = pickBest(candidates);
+    if (pick) paired.push(pick);
+    else warnings.push(`No suitable ${roleLabels[need]} found to pair with this item.`);
+  }
+
+  return { paired, warnings };
+}
+
+/* ------------------------------------------------------------------ */
 /*  Item Detail Modal                                                   */
 /* ------------------------------------------------------------------ */
 interface ItemDetailModalProps {
   item: ClothingItem | null;
+  allItems: ClothingItem[];
   onClose: () => void;
   onToggleFavorite: (item: ClothingItem) => void;
   onDelete: (id: string) => void;
   onToggleArchive: (item: ClothingItem) => void;
   onUpdate: (item: ClothingItem) => void;
+  onTryOn: (items: ClothingItem[]) => void;
 }
 
-const ItemDetailModal = ({ item, onClose, onToggleFavorite, onDelete, onToggleArchive, onUpdate }: ItemDetailModalProps) => {
+const ItemDetailModal = ({ item, allItems, onClose, onToggleFavorite, onDelete, onToggleArchive, onUpdate, onTryOn }: ItemDetailModalProps) => {
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState("");
   const [editColor, setEditColor] = useState("");
@@ -523,6 +664,7 @@ const ItemDetailModal = ({ item, onClose, onToggleFavorite, onDelete, onToggleAr
   const [editBrand, setEditBrand] = useState("");
   const [editTags, setEditTags] = useState("");
   const [saving, setSaving] = useState(false);
+  const [tryOnResult, setTryOnResult] = useState<AutoPairResult | null>(null);
 
   useEffect(() => {
     if (item) {
@@ -532,6 +674,7 @@ const ItemDetailModal = ({ item, onClose, onToggleFavorite, onDelete, onToggleAr
       setEditBrand(item.brand || "");
       setEditTags(item.tags.join(", "));
       setEditing(false);
+      setTryOnResult(null);
     }
   }, [item]);
 
@@ -553,42 +696,285 @@ const ItemDetailModal = ({ item, onClose, onToggleFavorite, onDelete, onToggleAr
   };
 
   if (!item) return null;
+
   return (
     <AnimatePresence>
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-        <motion.div initial={{ y: "100%", opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: "100%", opacity: 0 }} transition={{ type: "spring", bounce: 0.15, duration: 0.5 }} className="relative z-10 max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-background p-6 pb-24 sm:rounded-3xl sm:pb-6">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-50 flex items-end justify-center sm:items-center"
+      >
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={onClose}
+          className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        />
+        <motion.div
+          initial={{ y: "100%", opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: "100%", opacity: 0 }}
+          transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
+          className="relative z-10 max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-background p-6 pb-24 sm:rounded-3xl sm:pb-6"
+        >
+          {/* Close button */}
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-display font-bold text-foreground">Item Details</h2>
-            <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-full bg-card text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
+            <h2 className="text-lg font-display font-bold text-foreground">{editing ? "Edit Item" : "Item Details"}</h2>
+            <div className="flex items-center gap-2">
+              {!editing && (
+                <button
+                  onClick={() => setEditing(true)}
+                  className="rounded-lg bg-card px-3 py-1.5 text-xs font-body font-medium text-muted-foreground hover:text-foreground"
+                >
+                  Edit
+                </button>
+              )}
+              <button
+                onClick={editing ? () => setEditing(false) : onClose}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-card text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </div>
+
+          {/* Edit mode: inline form */}
+          {editing && (
+            <div className="mt-4 space-y-3">
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">Name</label>
+                <input value={editName} onChange={e => setEditName(e.target.value)} className="mt-1 h-10 w-full rounded-xl border border-border bg-card px-3 text-sm font-body text-foreground outline-none focus:border-ai" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">Color</label>
+                  <input value={editColor} onChange={e => setEditColor(e.target.value)} className="mt-1 h-10 w-full rounded-xl border border-border bg-card px-3 text-sm font-body text-foreground outline-none focus:border-ai" />
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">Material</label>
+                  <input value={editMaterial} onChange={e => setEditMaterial(e.target.value)} className="mt-1 h-10 w-full rounded-xl border border-border bg-card px-3 text-sm font-body text-foreground outline-none focus:border-ai" />
+                </div>
+              </div>
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">Brand</label>
+                <input value={editBrand} onChange={e => setEditBrand(e.target.value)} className="mt-1 h-10 w-full rounded-xl border border-border bg-card px-3 text-sm font-body text-foreground outline-none focus:border-ai" />
+              </div>
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">Tags (comma-separated)</label>
+                <input value={editTags} onChange={e => setEditTags(e.target.value)} className="mt-1 h-10 w-full rounded-xl border border-border bg-card px-3 text-sm font-body text-foreground outline-none focus:border-ai" />
+              </div>
+              <motion.button whileTap={{ scale: 0.98 }} onClick={handleSaveEdit} disabled={saving || !editName}
+                className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-ai text-ai-foreground font-display font-semibold text-sm disabled:opacity-40">
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Changes"}
+              </motion.button>
+            </div>
+          )}
+
+          {/* Expanded image */}
           <div className="mt-4 overflow-hidden rounded-2xl bg-card">
-            {item.image_url ? (<img src={item.image_url} alt={item.name} className="w-full object-contain max-h-[50vh]" />) : (<div className="flex h-48 w-full items-center justify-center"><ImageIcon className="h-16 w-16 text-muted-foreground/20" /></div>)}
+            {item.image_url ? (
+              <img
+                src={item.image_url}
+                alt={item.name}
+                className="w-full object-contain max-h-[50vh]"
+              />
+            ) : (
+              <div className="flex h-48 w-full items-center justify-center">
+                <ImageIcon className="h-16 w-16 text-muted-foreground/20" />
+              </div>
+            )}
           </div>
+
+          {/* Item name & category */}
           <div className="mt-4">
             <h3 className="text-xl font-display font-bold text-foreground">{item.name}</h3>
             <p className="mt-0.5 text-sm font-body text-muted-foreground">{item.category}</p>
           </div>
+
+          {/* Details grid */}
           <div className="mt-4 grid grid-cols-2 gap-3">
-            {item.color && (<div className="rounded-xl bg-card p-3"><p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">Color</p><p className="mt-0.5 text-sm font-medium font-body text-foreground">{item.color}</p></div>)}
-            {item.material && (<div className="rounded-xl bg-card p-3"><p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">Material</p><p className="mt-0.5 text-sm font-medium font-body text-foreground">{item.material}</p></div>)}
-            {item.brand && (<div className="rounded-xl bg-card p-3"><p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">Brand</p><p className="mt-0.5 text-sm font-medium font-body text-foreground">{item.brand}</p></div>)}
-            {item.gender && (<div className="rounded-xl bg-card p-3"><p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">Gender</p><p className="mt-0.5 text-sm font-medium font-body text-foreground capitalize">{item.gender}</p></div>)}
-            {item.price != null && (<div className="rounded-xl bg-card p-3"><p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">Price</p><p className="mt-0.5 text-sm font-semibold font-body text-ai">{String.fromCharCode(8377)}{item.price.toLocaleString("en-IN")}</p></div>)}
-            {item.purchase_type && (<div className="rounded-xl bg-card p-3"><p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">Condition</p><p className="mt-0.5 text-sm font-medium font-body text-foreground capitalize">{item.purchase_type}</p></div>)}
+            {item.color && (
+              <div className="rounded-xl bg-card p-3">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">Color</p>
+                <p className="mt-0.5 text-sm font-medium font-body text-foreground">{item.color}</p>
+              </div>
+            )}
+            {item.material && (
+              <div className="rounded-xl bg-card p-3">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">Material</p>
+                <p className="mt-0.5 text-sm font-medium font-body text-foreground">{item.material}</p>
+              </div>
+            )}
+            {item.brand && (
+              <div className="rounded-xl bg-card p-3">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">Brand</p>
+                <p className="mt-0.5 text-sm font-medium font-body text-foreground">{item.brand}</p>
+              </div>
+            )}
+            {item.gender && (
+              <div className="rounded-xl bg-card p-3">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">Gender</p>
+                <p className="mt-0.5 text-sm font-medium font-body text-foreground capitalize">{item.gender}</p>
+              </div>
+            )}
+            {item.price != null && (
+              <div className="rounded-xl bg-card p-3">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">Price</p>
+                <p className="mt-0.5 text-sm font-semibold font-body text-ai">₹{item.price.toLocaleString("en-IN")}</p>
+              </div>
+            )}
+            {item.purchase_type && (
+              <div className="rounded-xl bg-card p-3">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">Condition</p>
+                <p className="mt-0.5 text-sm font-medium font-body text-foreground capitalize">{item.purchase_type}</p>
+              </div>
+            )}
           </div>
-          {item.tags.length > 0 && (<div className="mt-4"><p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">Tags</p><div className="mt-1.5 flex flex-wrap gap-1.5">{item.tags.map((tag) => (<span key={tag} className="rounded-full bg-card px-3 py-1 text-xs font-body text-muted-foreground">{tag}</span>))}</div></div>)}
+
+          {/* Tags */}
+          {item.tags.length > 0 && (
+            <div className="mt-4">
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">Tags</p>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {item.tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="rounded-full bg-card px-3 py-1 text-xs font-body text-muted-foreground"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Action buttons */}
           <div className="mt-6 flex gap-2">
-            <motion.button whileTap={{ scale: 0.95 }} onClick={() => onToggleFavorite(item)} className={`flex flex-1 items-center justify-center gap-2 rounded-xl py-3 text-sm font-body font-medium transition-colors ${item.favorite ? "bg-rose-500/10 text-rose-500" : "bg-card text-muted-foreground hover:text-foreground"}`}>
-              <Heart className={`h-4 w-4 ${item.favorite ? "fill-current" : ""}`} />{item.favorite ? "Favorited" : "Favorite"}
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={() => onToggleFavorite(item)}
+              className={`flex flex-1 items-center justify-center gap-2 rounded-xl py-3 text-sm font-body font-medium transition-colors ${
+                item.favorite
+                  ? "bg-rose-500/10 text-rose-500"
+                  : "bg-card text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Heart className={`h-4 w-4 ${item.favorite ? "fill-current" : ""}`} />
+              {item.favorite ? "Favorited" : "Favorite"}
             </motion.button>
-            <motion.button whileTap={{ scale: 0.95 }} onClick={() => onToggleArchive(item)} className={`flex flex-1 items-center justify-center gap-2 rounded-xl py-3 text-sm font-body font-medium transition-colors ${item.archived ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" : "bg-card text-muted-foreground hover:text-foreground"}`}>
-              {item.archived ? (<><ArchiveRestore className="h-4 w-4" />Unarchive</>) : (<><Archive className="h-4 w-4" />Archive</>)}
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={() => onToggleArchive(item)}
+              className={`flex flex-1 items-center justify-center gap-2 rounded-xl py-3 text-sm font-body font-medium transition-colors ${
+                item.archived
+                  ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                  : "bg-card text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {item.archived ? (
+                <>
+                  <ArchiveRestore className="h-4 w-4" />
+                  Unarchive
+                </>
+              ) : (
+                <>
+                  <Archive className="h-4 w-4" />
+                  Archive
+                </>
+              )}
             </motion.button>
-            <motion.button whileTap={{ scale: 0.95 }} onClick={() => { onDelete(item.id); onClose(); }} className="flex items-center justify-center gap-2 rounded-xl bg-destructive/10 px-4 py-3 text-sm font-body font-medium text-destructive">
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={() => {
+                onDelete(item.id);
+                onClose();
+              }}
+              className="flex items-center justify-center gap-2 rounded-xl bg-destructive/10 px-4 py-3 text-sm font-body font-medium text-destructive"
+            >
               <Trash2 className="h-4 w-4" />
             </motion.button>
           </div>
+
+          {/* ---- Try On Section ---- */}
+          {classifyRole(item) !== "accessory" && (
+            <div className="mt-4">
+              {!tryOnResult ? (
+                <motion.button
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => setTryOnResult(autoPairItem(item, allItems))}
+                  className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[hsl(43,70%,50%)] to-[hsl(220,10%,65%)] text-white font-display font-semibold shadow-sm"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Try On — Auto Pair
+                </motion.button>
+              ) : (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="space-y-3"
+                >
+                  {/* Paired preview strip */}
+                  <div className="rounded-xl bg-card p-3">
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body mb-2">AI-Paired Outfit</p>
+                    <div className="flex items-center gap-2">
+                      {tryOnResult.paired.map((p) => (
+                        <div key={p.id} className="relative shrink-0">
+                          <div className={`h-16 w-14 overflow-hidden rounded-lg bg-background ring-2 ${p.id === item.id ? "ring-ai" : "ring-border"}`}>
+                            <img src={p.image_url} alt={p.name} className="h-full w-full object-contain" />
+                          </div>
+                          <p className="mt-1 text-center text-[8px] font-body text-muted-foreground truncate w-14">{p.name.split(" ").slice(0, 2).join(" ")}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Warnings */}
+                  {tryOnResult.warnings.length > 0 && (
+                    <div className="space-y-1.5">
+                      {tryOnResult.warnings.map((w, idx) => (
+                        <div key={idx} className="flex items-start gap-2 rounded-lg bg-amber-500/10 px-3 py-2">
+                          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
+                          <p className="text-[11px] font-body text-amber-700 dark:text-amber-300">{w}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Action row */}
+                  <div className="flex gap-2">
+                    <motion.button
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => setTryOnResult(autoPairItem(item, allItems))}
+                      className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-card py-3 text-xs font-body font-medium text-muted-foreground hover:text-foreground"
+                    >
+                      <Sparkles className="h-3.5 w-3.5" />
+                      Re-pair
+                    </motion.button>
+                    <motion.button
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => {
+                        if (tryOnResult.paired.length >= 2) {
+                          onTryOn(tryOnResult.paired);
+                          onClose();
+                        }
+                      }}
+                      disabled={tryOnResult.paired.length < 2}
+                      className={`flex flex-[2] items-center justify-center gap-2 rounded-xl py-3 text-sm font-display font-semibold shadow-sm ${
+                        tryOnResult.paired.length >= 2
+                          ? "bg-gradient-to-r from-[hsl(43,70%,50%)] to-[hsl(220,10%,65%)] text-white"
+                          : "bg-card text-muted-foreground opacity-40 cursor-not-allowed"
+                      }`}
+                    >
+                      <Camera className="h-4 w-4" />
+                      Virtual Try-On
+                    </motion.button>
+                  </div>
+                </motion.div>
+              )}
+            </div>
+          )}
         </motion.div>
       </motion.div>
     </AnimatePresence>
@@ -666,12 +1052,13 @@ const DigitalCloset = () => {
     setItems((prev) =>
       prev.map((i) => (i.id === item.id ? { ...i, archived: newArchived } : i))
     );
+    // Update selectedItem if it's the one being toggled
     setSelectedItem((prev) =>
       prev && prev.id === item.id ? { ...prev, archived: newArchived } : prev
     );
   };
 
-  // Filter items
+  // Filter items — separate active from archived
   const filtered = items.filter((item) => {
     const matchesCategory =
       activeCategory === "All" || item.category === activeCategory;
@@ -696,7 +1083,7 @@ const DigitalCloset = () => {
           <p className="text-sm text-muted-foreground font-body">
             {items.filter(i => !i.archived).length} {items.filter(i => !i.archived).length === 1 ? "item" : "items"}
             {items.filter(i => i.archived).length > 0 && (
-              <span className="text-muted-foreground/50">{" "}\u00b7 {items.filter(i => i.archived).length} archived</span>
+              <span className="text-muted-foreground/50"> · {items.filter(i => i.archived).length} archived</span>
             )}
           </p>
         </div>
@@ -839,7 +1226,6 @@ const DigitalCloset = () => {
         </div>
       )}
 
-
       {/* Archived items section */}
       {!loadingItems && archivedItems.length > 0 && (
         <div className="mt-8">
@@ -862,7 +1248,11 @@ const DigitalCloset = () => {
                 <div className="overflow-hidden rounded-2xl bg-card p-3 grayscale-[30%]">
                   <div className="relative aspect-square overflow-hidden rounded-xl bg-background">
                     {item.image_url ? (
-                      <img src={item.image_url} alt={item.name} className="h-full w-full object-contain" />
+                      <img
+                        src={item.image_url}
+                        alt={item.name}
+                        className="h-full w-full object-contain"
+                      />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center">
                         <ImageIcon className="h-10 w-10 text-muted-foreground/20" />
@@ -874,8 +1264,12 @@ const DigitalCloset = () => {
                     </div>
                   </div>
                   <div className="mt-2">
-                    <p className="text-xs font-medium font-body text-foreground/60 truncate">{item.name}</p>
-                    <p className="text-[10px] text-muted-foreground/60 font-body">{item.category}</p>
+                    <p className="text-xs font-medium font-body text-foreground/60 truncate">
+                      {item.name}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground/60 font-body">
+                      {item.category}
+                    </p>
                   </div>
                 </div>
               </motion.div>
@@ -884,7 +1278,7 @@ const DigitalCloset = () => {
         </div>
       )}
 
-      {/* Empty state  -  no items at all */}
+      {/* Empty state — no items at all */}
       {!loadingItems && items.length === 0 && (
         <div className="mt-16 flex flex-col items-center text-center">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-card">
@@ -897,7 +1291,7 @@ const DigitalCloset = () => {
         </div>
       )}
 
-      {/* Empty state  -  no search results */}
+      {/* Empty state — no search results */}
       {!loadingItems && items.length > 0 && filtered.length === 0 && (
         <div className="mt-16 flex flex-col items-center text-center">
           <Search className="h-12 w-12 text-muted-foreground/30" />
@@ -922,6 +1316,7 @@ const DigitalCloset = () => {
       {selectedItem && (
         <ItemDetailModal
           item={selectedItem}
+          allItems={items}
           onClose={() => setSelectedItem(null)}
           onToggleFavorite={(item) => {
             handleToggleFavorite(item);
@@ -934,6 +1329,11 @@ const DigitalCloset = () => {
           onUpdate={(updated) => {
             setItems(prev => prev.map(i => i.id === updated.id ? updated : i));
             setSelectedItem(updated);
+          }}
+          onTryOn={(pairedItems) => {
+            // Navigate to AI Stylist with paired items for virtual try-on
+            const ids = pairedItems.map(i => i.id).join(",");
+            window.location.href = `/ai-stylist?tryOn=${ids}`;
           }}
         />
       )}
