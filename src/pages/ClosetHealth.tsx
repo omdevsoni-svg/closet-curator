@@ -5,7 +5,7 @@ import { HeartPulse, AlertTriangle, Loader2, Shirt } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { getClosetItems, type ClothingItem } from "@/lib/database";
 
-const ALL_CATEGORIES = ["Tops", "Bottoms", "Outerwear", "Footwear", "Dresses", "Accessories", "Activewear"];
+const ALL_CATEGORIES = ["Tops", "Bottoms", "Outerwear", "Footwear", "Dresses", "Accessories", "Activewear", "Ethnic Wear"];
 const ALL_OCCASIONS = ["casual", "formal", "office", "party", "workout", "date", "summer", "winter"];
 
 interface HealthData {
@@ -35,6 +35,29 @@ const computeHealth = (items: ClothingItem[]): HealthData => {
         severity: ["Tops", "Bottoms", "Footwear"].includes(cat) ? "high" : "medium",
       });
     }
+  }
+
+  // Ethnic wear pairing gaps: if kurtas exist but no ethnic bottoms/shoes
+  const ETHNIC_BOTTOM_RE = /\b(pajama|pyjama|churidar|dhoti|lungi|salwar|shalwar|pant|trouser|bottom|leheng)\b/i;
+  const ETHNIC_SHOE_RE = /\b(jutti|mojari|mojri|kolhapuri|sandal|chappal|shoe|slipper|khussa)\b/i;
+  const ethnicItems = items.filter((i) => i.category === "Ethnic Wear");
+  const ethnicTops = ethnicItems.filter((i) => !ETHNIC_BOTTOM_RE.test(i.name) && !ETHNIC_SHOE_RE.test(i.name));
+  const ethnicBottoms = ethnicItems.filter((i) => ETHNIC_BOTTOM_RE.test(i.name));
+  const ethnicShoes = ethnicItems.filter((i) => ETHNIC_SHOE_RE.test(i.name));
+
+  if (ethnicTops.length > 0 && ethnicBottoms.length === 0) {
+    gaps.push({
+      category: "Ethnic Wear",
+      description: "You have kurtas but no ethnic bottoms (pajama, churidar). Add some to complete your ethnic outfits.",
+      severity: "high",
+    });
+  }
+  if (ethnicTops.length > 0 && ethnicShoes.length === 0) {
+    gaps.push({
+      category: "Ethnic Wear",
+      description: "You have kurtas but no ethnic footwear (jutti, mojari, kolhapuri). Add some for a complete look.",
+      severity: "medium",
+    });
   }
 
   return { versatility, occasionCoverage, colorBalance, gaps };
