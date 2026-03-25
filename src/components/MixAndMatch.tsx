@@ -21,7 +21,7 @@ interface SlotDef {
 }
 
 const SLOT_DEFS: SlotDef[] = [
-  { key: "topwear", label: "Top", categories: ["Tops", "Outerwear", "Activewear"] },
+  { key: "topwear", label: "Top", categories: ["Tops", "Outerwear"] },
   { key: "bottomwear", label: "Bottom", categories: ["Bottoms"] },
   { key: "footwear", label: "Shoes", categories: ["Footwear"] },
 ];
@@ -35,8 +35,8 @@ const DRESS_SLOT: SlotDef = {
 /* Ethnic wear slot definitions */
 const ETHNIC_SLOTS: SlotDef[] = [
   { key: "ethnic-top", label: "Kurta", categories: ["Ethnic Wear"] },
-  { key: "ethnic-bottom", label: "Bottom", categories: ["Ethnic Wear", "Bottoms"] },
-  { key: "ethnic-footwear", label: "Footwear", categories: ["Ethnic Wear", "Footwear"] },
+  { key: "ethnic-bottom", label: "Bottom", categories: ["Ethnic Wear"] },
+  { key: "ethnic-footwear", label: "Footwear", categories: ["Ethnic Wear"] },
 ];
 
 /* ------------------------------------------------------------------ */
