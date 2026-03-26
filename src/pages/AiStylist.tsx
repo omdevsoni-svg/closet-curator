@@ -899,6 +899,26 @@ const AiStylist = () => {
   useEffect(() => {
     const tryOnIds = searchParams.get("tryOn");
     if (!tryOnIds || closetItems.length === 0) return;
+
+    // Support "session" mode: items passed via sessionStorage (includes AI-suggested items)
+    if (tryOnIds === "session") {
+      try {
+        const stored = sessionStorage.getItem("tryOnItems");
+        if (stored) {
+          const items = JSON.parse(stored) as ClothingItem[];
+          sessionStorage.removeItem("tryOnItems"); // Clean up
+          if (items.length > 0) {
+            setMixTryOnItems(items);
+            setTryOnCombo(null);
+            setShowTryOn(true);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to parse tryOnItems from sessionStorage:", e);
+      }
+      return;
+    }
+
     const ids = tryOnIds.split(",");
     const matched = ids.map((id) => closetItems.find((i) => i.id === id)).filter(Boolean) as ClothingItem[];
     if (matched.length > 0) {
