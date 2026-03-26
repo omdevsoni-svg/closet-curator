@@ -1,5 +1,4 @@
 import { supabase } from "./supabase";
-import heic2any from "heic2any";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -19,7 +18,19 @@ export interface ClothingItem {
   material?: string;
   favorite: boolean;
   archived?: boolean;
+  worn_count?: number;
+  last_worn?: string;
+  laundry_status?: "available" | "in_laundry";
+  laundry_sent_at?: string;
   created_at: string;
+}
+
+export interface WearLog {
+  id: string;
+  user_id: string;
+  item_id: string;
+  worn_at: string;
+  outfit_items?: string[]; // IDs of other items worn together
 }
 
 export interface Profile {
@@ -151,32 +162,9 @@ export const toggleArchive = async (itemId: string, archived: boolean) => {
 };
 
 /* ------------------------------------------------------------------ */
-/*  Helper: detect if a file is HEIC/HEIF format                       */
+/*  Helper: convert any image file to a web-friendly JPEG via canvas   */
 /* ------------------------------------------------------------------ */
-const isHeicFile = (file: File): boolean => {
-  const ext = file.name.split(".").pop()?.toLowerCase() || "";
-  const heicTypes = ["image/heic", "image/heif", "image/heic-sequence", "image/heif-sequence"];
-  return heicTypes.includes(file.type) || ["heic", "heif"].includes(ext);
-};
-
-/* ------------------------------------------------------------------ */
-/*  Helper: convert HEIC/HEIF to JPEG using heic2any library           */
-/*  (browsers cannot natively decode Apple's HEIC format)              */
-/* ------------------------------------------------------------------ */
-const convertHeicToJpeg = async (file: File): Promise<Blob> => {
-  const result = await heic2any({
-    blob: file,
-    toType: "image/jpeg",
-    quality: 0.9,
-  });
-  // heic2any can return a single Blob or an array
-  return Array.isArray(result) ? result[0] : result;
-};
-
-/* ------------------------------------------------------------------ */
-/*  Helper: convert any browser-supported image to JPEG via canvas     */
-/* ------------------------------------------------------------------ */
-const toJpegViaCanvas = (file: File): Promise<Blob> =>
+const toJpegBlob = (file: File): Promise<Blob> =>
   new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
@@ -185,7 +173,7 @@ const toJpegViaCanvas = (file: File): Promise<Blob> =>
       canvas.width = img.naturalWidth;
       canvas.height = img.naturalHeight;
       const ctx = canvas.getContext("2d");
-      if (!ctx) { URL.revokeObjectURL(url); reject(new Error("Canvas not supported")); return; }
+      if (!ctx) { reject(new Error("Canvas not supported")); return; }
       ctx.drawImage(img, 0, 0);
       canvas.toBlob(
         (blob) => {
@@ -208,35 +196,27 @@ export const uploadImage = async (
   userId: string,
   file: File
 ): Promise<string | null> => {
+  // Convert non-web-friendly formats (HEIC, HEIF, TIFF, etc.) to JPEG
   const webFriendly = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/svg+xml"];
-  let uploadBlob: File | Blob = file;
+  let uploadFile: File | Blob = file;
   let ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
-  let contentType = file.type || "application/octet-stream";
 
-  try {
-    if (isHeicFile(file)) {
-      // HEIC/HEIF: browsers cannot decode these â use heic2any JS decoder
-      uploadBlob = await convertHeicToJpeg(file);
+  if (!webFriendly.includes(file.type) || ["heic", "heif", "tiff", "tif"].includes(ext)) {
+    try {
+      uploadFile = await toJpegBlob(file);
       ext = "jpg";
-      contentType = "image/jpeg";
-    } else if (!webFriendly.includes(file.type)) {
-      // Other non-standard formats: try canvas conversion
-      uploadBlob = await toJpegViaCanvas(file);
-      ext = "jpg";
-      contentType = "image/jpeg";
+    } catch (err) {
+      console.error("Image conversion failed, uploading original:", err);
     }
-  } catch (err) {
-    console.error("Image conversion failed, uploading original:", err);
-    // If conversion fails, we still try to upload the original
   }
 
   const fileName = `${userId}/${Date.now()}.${ext}`;
 
   const { error } = await supabase.storage
     .from(bucket)
-    .upload(fileName, uploadBlob, {
+    .upload(fileName, uploadFile, {
       upsert: true,
-      contentType,
+      contentType: uploadFile instanceof Blob && uploadFile !== file ? "image/jpeg" : file.type,
     });
 
   if (error) {
@@ -292,4 +272,108 @@ export const getClosetStats = async (userId: string) => {
     totalItems > 0 ? Math.min(100, Math.round((categories.size / 7) * 100)) : 0;
 
   return { totalItems, favorites, styleScore, items };
+};
+
+/* ------------------------------------------------------------------ */
+/*  Wear tracking operations                                           */
+/* ------------------------------------------------------------------ */
+export const logWear = async (
+  userId: string,
+  itemIds: string[],
+): Promise<boolean> => {
+  const now = new Date().toISOString();
+
+  // 1. Insert wear_log entries for each item
+  const logs = itemIds
+    .filter((id) => !id.startsWith("ai-suggested-")) // skip AI virtual items
+    .map((id) => ({
+      user_id: userId,
+      item_id: id,
+      worn_at: now,
+      outfit_items: itemIds.filter((x) => x !== id),
+    }));
+
+  if (logs.length > 0) {
+    const { error: logErr } = await supabase.from("wear_log").insert(logs);
+    if (logErr) console.error("logWear insert error:", logErr);
+  }
+
+  // 2. Increment worn_count & set last_worn on each real item
+  for (const id of itemIds) {
+    if (id.startsWith("ai-suggested-")) continue;
+    // Use RPC or manual update — Supabase JS doesn't have atomic increment,
+    // so we fetch current value first (acceptable for low-contention use case)
+    const { data: current } = await supabase
+      .from("closet_items")
+      .select("worn_count")
+      .eq("id", id)
+      .single();
+    const newCount = ((current as any)?.worn_count || 0) + 1;
+    await supabase
+      .from("closet_items")
+      .update({ worn_count: newCount, last_worn: now })
+      .eq("id", id);
+  }
+
+  return true;
+};
+
+export const getWearLogs = async (
+  userId: string,
+  itemId?: string
+): Promise<WearLog[]> => {
+  let query = supabase
+    .from("wear_log")
+    .select("*")
+    .eq("user_id", userId)
+    .order("worn_at", { ascending: false });
+  if (itemId) query = query.eq("item_id", itemId);
+  const { data, error } = await query.limit(100);
+  if (error) {
+    console.error("getWearLogs error:", error);
+    return [];
+  }
+  return data ?? [];
+};
+
+/* ------------------------------------------------------------------ */
+/*  Laundry operations                                                 */
+/* ------------------------------------------------------------------ */
+export const sendToLaundry = async (itemIds: string[]): Promise<boolean> => {
+  const now = new Date().toISOString();
+  const { error } = await supabase
+    .from("closet_items")
+    .update({ laundry_status: "in_laundry", laundry_sent_at: now })
+    .in("id", itemIds);
+  if (error) {
+    console.error("sendToLaundry error:", error);
+    return false;
+  }
+  return true;
+};
+
+export const returnFromLaundry = async (itemIds: string[]): Promise<boolean> => {
+  const { error } = await supabase
+    .from("closet_items")
+    .update({ laundry_status: "available", laundry_sent_at: null })
+    .in("id", itemIds);
+  if (error) {
+    console.error("returnFromLaundry error:", error);
+    return false;
+  }
+  return true;
+};
+
+export const getLaundryItems = async (userId: string): Promise<ClothingItem[]> => {
+  const { data, error } = await supabase
+    .from("closet_items")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("laundry_status", "in_laundry")
+    .order("laundry_sent_at", { ascending: false });
+  if (error) {
+    console.error('getLaundryItems error:', error);
+    return [];
+  }
+  return data ?? [];
 };
