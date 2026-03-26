@@ -1158,18 +1158,25 @@ const AiStylist = () => {
         </motion.button>
       </div>
 
-      {/* Generating state */}
-      {generating && (
-        <div className="mt-8 flex flex-col items-center">
-          <Loader2 className="h-6 w-6 animate-spin text-ai" />
-          <p className="mt-2 text-sm font-body text-muted-foreground">
-            AI is crafting 3 outfit combinations...
-          </p>
-          <p className="mt-1 text-[11px] font-body text-muted-foreground/60">
-            Powered by Gemini
-          </p>
-        </div>
-      )}
+      {/* Generating state — full-page overlay */}
+      <AnimatePresence>
+        {generating && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm"
+          >
+            <Loader2 className="h-10 w-10 animate-spin text-ai" />
+            <p className="mt-3 text-sm font-body font-medium text-foreground">
+              AI is crafting 3 outfit combinations...
+            </p>
+            <p className="mt-1 text-[11px] font-body text-muted-foreground/60">
+              Powered by Gemini
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* AI Error */}
       {!generating && aiError && (
