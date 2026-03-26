@@ -60,8 +60,7 @@ const CLOTHING_PROMPT = `First, determine if this image contains a clothing item
 If the image DOES contain a valid clothing/garment item, analyze it and return a JSON object with these exact fields:
 - is_garment: true
 - name: a short descriptive name for the clothing item (e.g. "Blue Denim Jacket")
-- category: EXACTLY one of these values: "Tops", "Bottoms", "Dresses", "Outerwear", "Activewear", "Footwear", "Accessories", "Ethnic Wear"
-  NOTE: Use "Ethnic Wear" for traditional/Indian garments like kurta, sherwani, nehru jacket, pajama (ethnic bottom), churidar, dhoti, salwar, dupatta, saree, lehenga, jutti, mojari, kolhapuri.
+- category: EXACTLY one of these values: "Tops", "Bottoms", "Dresses", "Outerwear", "Activewear", "Footwear", "Accessories"
 - color: EXACTLY one of these values: "Black", "White", "Navy", "Blue", "Red", "Green", "Beige", "Grey", "Pink", "Brown"
 - material: fabric type if identifiable, or best guess (e.g. "Cotton", "Polyester", "Denim", "Silk", "Wool", "Leather")
 - tags: array of 2-4 descriptive tags (e.g. ["casual", "summer", "lightweight"])
@@ -105,32 +104,82 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Get access token
     const accessToken = await getAccessToken(saKey);
 
-    // Call Vertex AI Gemini
     const project = "fynd-jio-impetus-non-prod";
     const region = "us-central1";
-    const model = "gemini-2.0-flash";
-    const url = `https://${region}-aiplatform.googleapis.com/v1/projects/${project}/locations/${region}/publishers/google/models/${model}:generateContent`;
 
-    const geminiRes = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            role: "user",
-            parts: [
-              { inlineData: { mimeType, data: imageBase64 } },
-              { text: CLOTHING_PROMPT },
-            ],
+    /* ---------------------------------------------------------------- */
+    /*  v30: PARALLEL detection + enhancement                            */
+    /*                                                                    */
+    /*  Previously these ran sequentially (detection → wait → enhance).   */
+    /*  Now both fire simultaneously with Promise.allSettled.              */
+    /*  Enhancement uses generic "clothing item" instead of detected      */
+    /*  category — the model sees the actual image so the extraction      */
+    /*  quality is identical. Saves ~3-5s per upload.                     */
+    /* ---------------------------------------------------------------- */
+
+    // --- Build both requests in parallel ---
+
+    const detectionPromise = fetch(
+      `https://${region}-aiplatform.googleapis.com/v1/projects/${project}/locations/${region}/publishers/google/models/gemini-2.0-flash:generateContent`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [
+            { inlineData: { mimeType, data: imageBase64 } },
+            { text: CLOTHING_PROMPT },
+          ]}],
+          generationConfig: { temperature: 0.1, maxOutputTokens: 1024 },
+        }),
+      }
+    );
+
+    const enhancePrompt = `Extract the COMPLETE clothing item from this image. Remove the person/model/mannequin body COMPLETELY - show ONLY the clothing as a ghost mannequin / flat lay product photo.
+
+WHAT TO REMOVE:
+- The human model's body, face, hands, feet, skin - ALL of it
+- Any physical mannequin body (beige/tan plastic torso, neck, hands, stand)
+- Background, props, accessories that aren't part of the garment
+
+WHAT TO KEEP:
+- ONLY the fabric/clothing itself
+- ALL layers of the outfit together as one complete look
+- Every garment detail: exact color, pattern, fabric texture, buttons, embroidery, logos, collar, sleeves, stitching
+
+Output: One clean product photo of the COMPLETE outfit on a white background. NO person or mannequin body visible.`;
+
+    const enhancementPromise = fetch(
+      `https://${region}-aiplatform.googleapis.com/v1/projects/${project}/locations/${region}/publishers/google/models/gemini-2.5-flash-image:generateContent`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [
+            { inlineData: { mimeType, data: imageBase64 } },
+            { text: enhancePrompt },
+          ]}],
+          generationConfig: {
+            temperature: 0.5,
+            maxOutputTokens: 8192,
+            responseModalities: ["TEXT", "IMAGE"],
           },
-        ],
-        generationConfig: { temperature: 0.1, maxOutputTokens: 1024 },
-      }),
-    });
+        }),
+      }
+    );
 
+    // Fire both in parallel
+    const [detectionResult, enhancementResult] = await Promise.allSettled([
+      detectionPromise,
+      enhancementPromise,
+    ]);
+
+    // --- Process detection result ---
+    if (detectionResult.status === "rejected") {
+      console.error("Detection call rejected:", detectionResult.reason);
+      return res.status(502).json({ success: false, error: "AI detection call failed" });
+    }
+
+    const geminiRes = detectionResult.value;
     if (!geminiRes.ok) {
       const errText = await geminiRes.text();
       console.error("Vertex AI error:", geminiRes.status, errText);
@@ -138,7 +187,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const data = await geminiRes.json();
-    const textContent = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+
+    // Extract text content from all parts
+    let textContent = "";
+    const candidates = data?.candidates || [];
+    for (const candidate of candidates) {
+      const cParts = candidate?.content?.parts || [];
+      for (const part of cParts) {
+        if (part.text) textContent += part.text;
+      }
+    }
+    if (!textContent) textContent = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
     // Extract JSON from response
     const jsonMatch = textContent.match(/\{[\s\S]*\}/);
@@ -158,18 +217,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // Validate and normalize category (match exact dropdown values)
-    const validCategories = ["Tops", "Bottoms", "Dresses", "Outerwear", "Activewear", "Footwear", "Accessories", "Ethnic Wear"];
+    // Validate and normalize category
+    const validCategories = ["Tops", "Bottoms", "Dresses", "Outerwear", "Activewear", "Footwear", "Accessories"];
     const categoryMap: Record<string, string> = {
       tops: "Tops", bottoms: "Bottoms", dresses: "Dresses", outerwear: "Outerwear",
       activewear: "Activewear", footwear: "Footwear", shoes: "Footwear", accessories: "Accessories",
-      "ethnic wear": "Ethnic Wear", ethnic: "Ethnic Wear", kurta: "Ethnic Wear", traditional: "Ethnic Wear", sherwani: "Ethnic Wear",
     };
     if (!validCategories.includes(attrs.category)) {
       attrs.category = categoryMap[attrs.category?.toLowerCase()] || "Tops";
     }
 
-    // Validate and normalize color (match exact dropdown values)
+    // Validate and normalize color
     const validColors = ["Black", "White", "Navy", "Blue", "Red", "Green", "Beige", "Grey", "Pink", "Brown"];
     const colorMap: Record<string, string> = {
       black: "Black", white: "White", navy: "Navy", blue: "Blue", red: "Red",
@@ -186,62 +244,43 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Remove brand — this should be user-provided only
     delete attrs.brand;
 
-    // Ghost mannequin extraction using gemini-2.5-flash-image
-    let enhancedImage = null;
+    // --- Process enhancement result (already completed in parallel) ---
+    let enhancedImage: { mimeType: string; base64: string } | null = null;
     let enhanceDebug = "";
     try {
-      const cat = attrs.category || "garment";
-      const enhancePrompt = "Extract the COMPLETE " + cat + " from this image. Remove the person/model/mannequin body COMPLETELY - show ONLY the clothing as a ghost mannequin / flat lay product photo. WHAT TO REMOVE: The human model body, face, hands, feet, skin - ALL of it. Any mannequin body. Background, props. WHAT TO KEEP: ONLY the fabric/clothing itself. Every garment detail: exact color, pattern, fabric texture, buttons, embroidery, logos, collar, sleeves, stitching. Output: One clean product photo on a white background. NO person visible.";
-
-      const enhanceModel = "gemini-2.5-flash-image";
-      const enhanceUrl = "https://" + region + "-aiplatform.googleapis.com/v1/projects/" + project + "/locations/" + region + "/publishers/google/models/" + enhanceModel + ":generateContent";
-
-      const enhanceRes = await fetch(enhanceUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: "Bearer " + accessToken,
-        },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts: [
-            { inlineData: { mimeType, data: imageBase64 } },
-            { text: enhancePrompt },
-          ]}],
-          generationConfig: {
-            temperature: 0.5,
-            maxOutputTokens: 8192,
-            responseModalities: ["TEXT", "IMAGE"],
-          },
-        }),
-      });
-
-      if (enhanceRes.ok) {
-        const enhanceData = await enhanceRes.json();
-        const eCandidates = enhanceData?.candidates || [];
-        for (const candidate of eCandidates) {
-          const eParts = candidate?.content?.parts || [];
-          for (const part of eParts) {
-            if (part.inlineData) {
-              enhancedImage = { mimeType: part.inlineData.mimeType, base64: part.inlineData.data };
-              break;
+      if (enhancementResult.status === "fulfilled") {
+        const enhanceRes = enhancementResult.value;
+        if (enhanceRes.ok) {
+          const enhanceData = await enhanceRes.json();
+          const eCandidates = enhanceData?.candidates || [];
+          for (const candidate of eCandidates) {
+            const eParts = candidate?.content?.parts || [];
+            for (const part of eParts) {
+              if (part.inlineData) {
+                enhancedImage = { mimeType: part.inlineData.mimeType, base64: part.inlineData.data };
+                break;
+              }
             }
+            if (enhancedImage) break;
           }
-          if (enhancedImage) break;
+        } else {
+          const errBody = await enhanceRes.text().catch(() => "");
+          console.error("Image enhancement API error:", enhanceRes.status, errBody);
+          enhanceDebug = "HTTP " + enhanceRes.status + ": " + errBody.substring(0, 300);
         }
-        if (!enhancedImage) enhanceDebug = "ok_response_but_no_image";
       } else {
-        const errBody = await enhanceRes.text().catch(() => "");
-        enhanceDebug = "HTTP " + enhanceRes.status + ": " + errBody.substring(0, 300);
+        enhanceDebug = "Enhancement rejected: " + String(enhancementResult.reason).substring(0, 200);
       }
-    } catch (enhErr) {
-      enhanceDebug = "Exception: " + String(enhErr).substring(0, 200);
+    } catch (enhErr: any) {
+      console.warn("Image enhancement failed:", enhErr);
+      enhanceDebug = "Exception: " + (enhErr.message || String(enhErr)).substring(0, 200);
     }
 
     return res.status(200).json({
       success: true,
       attributes: attrs,
       ...(enhancedImage ? { enhancedImage } : {}),
-      _enhanceDebug: enhanceDebug || (enhancedImage ? "ok" : "unknown"),
+      _enhanceDebug: enhanceDebug || (enhancedImage ? "ok" : "no_image_in_response"),
     });
   } catch (err: any) {
     console.error("process-clothing error:", err);
