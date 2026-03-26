@@ -55,7 +55,7 @@ async function getAccessToken(sa: ServiceAccountKey): Promise<string> {
 /* ------------------------------------------------------------------ */
 
 const CLOTHING_PROMPT = `First, determine if this image contains a clothing item, garment, footwear, or fashion accessory. If the image does NOT contain any clothing/garment/footwear/accessory (e.g. it shows a person without focus on clothing, a random object, food, scenery, animal, etc.), return this exact JSON:
-{"is_garment": false, "rejection_reason": "Brief explanation of what was detected instead of a garment, and a tip like: Please upload a clear photo of a clothing item with good lighting against a plain background."}
+{"is_garment": false, "rejection_reason": "Please upload valid garment image, ensure the photo is captured in a well-lit condition."}
 
 If the image DOES contain a valid clothing/garment item, analyze it and return a JSON object with these exact fields:
 - is_garment: true
@@ -213,7 +213,7 @@ Output: One clean product photo of the COMPLETE outfit on a white background. NO
       return res.status(200).json({
         success: false,
         is_garment: false,
-        rejection_reason: attrs.rejection_reason || "This doesn't appear to be a clothing item. Please upload a clear photo of a garment with good lighting.",
+        rejection_reason: "Please upload valid garment image, ensure the photo is captured in a well-lit condition.",
       });
     }
 
