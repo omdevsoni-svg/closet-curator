@@ -414,6 +414,38 @@ const Home = () => {
         </motion.div>
       </div>
 
+      {/* Laundry reminder */}
+      {!loadingStats && (() => {
+        const laundryItems = stats.items.filter((i: any) => i.laundry_status === "in_laundry");
+        const oldItems = laundryItems.filter((i: any) => i.laundry_sent_at && (Date.now() - new Date(i.laundry_sent_at).getTime()) > 3 * 86400000);
+        if (laundryItems.length === 0) return null;
+        return (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={`mb-5 rounded-2xl px-4 py-3 flex items-center justify-between ${oldItems.length > 0 ? "bg-amber-500/10" : "bg-blue-500/10"}`}
+          >
+            <div className="flex items-center gap-2.5">
+              <div className={`flex h-8 w-8 items-center justify-center rounded-full ${oldItems.length > 0 ? "bg-amber-500/20" : "bg-blue-500/20"}`}>
+                <span className="text-base">🧺</span>
+              </div>
+              <div>
+                <p className={`text-xs font-body font-medium ${oldItems.length > 0 ? "text-amber-700 dark:text-amber-400" : "text-blue-700 dark:text-blue-400"}`}>
+                  {laundryItems.length} item{laundryItems.length > 1 ? "s" : ""} in laundry
+                  {oldItems.length > 0 && " — some over 3 days!"}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => navigate("/health")}
+              className={`text-[11px] font-body font-semibold ${oldItems.length > 0 ? "text-amber-600 dark:text-amber-400" : "text-blue-600 dark:text-blue-400"}`}
+            >
+              View
+            </button>
+          </motion.div>
+        );
+      })()}
+
       {/* Explore Features */}
       <h2 className="text-base font-display font-semibold text-foreground">
         Explore Features
