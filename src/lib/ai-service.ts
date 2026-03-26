@@ -92,7 +92,7 @@ export const urlToBase64 = async (
         const d = imgData.data;
 
         // Sample background color from corners (10x10 pixel areas)
-        const samples: number[][]`= [];
+        const samples: number[][] = [];
         const sampleSize = 10;
         for (let sy = 0; sy < sampleSize; sy++) {
           for (let sx = 0; sx < sampleSize; sx++) {
@@ -528,8 +528,8 @@ export const getOutfitRecommendation = async (
   }
 };
 
-/* ------------------------------------------------------------------- */
-/*  Upload try-on result to Supabase Storage                           */
+/* ------------------------------------------------------------------ */
+/*  Upload try-on result to Supabase Storage                          */
 /* ------------------------------------------------------------------ */
 export const uploadTryOnImage = async (
   userId: string,
@@ -562,7 +562,7 @@ export const uploadTryOnImage = async (
   }
 };
 
-/* ------------------------------------------------------------------- */
+/* ------------------------------------------------------------------ */
 /*  Suggest matching ethnic bottomwear/footwear via AI image gen       */
 /* ------------------------------------------------------------------ */
 
