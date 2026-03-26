@@ -16,6 +16,7 @@ import DigitalCloset from "./pages/DigitalCloset";
 import AiStylist from "./pages/AiStylist";
 import ClosetHealth from "./pages/ClosetHealth";
 import Profile from "./pages/Profile";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -58,6 +59,7 @@ const App = () => {
                   <Route path="/stylist" element={<AiStylist />} />
                   <Route path="/health" element={<ClosetHealth />} />
                   <Route path="/profile" element={<Profile />} />
+                  <Route path="/settings" element={<Settings />} />
                 </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>
