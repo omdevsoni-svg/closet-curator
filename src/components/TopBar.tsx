@@ -42,7 +42,7 @@ const TopBar = () => {
 
         <motion.button
           whileTap={{ scale: 0.9 }}
-          onClick={() => navigate("/profile")}
+          onClick={() => navigate("/settings")}
           className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
           aria-label="Settings"
         >
