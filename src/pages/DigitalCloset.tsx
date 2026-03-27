@@ -1,144 +1,4 @@
-import { useState, useRef, useEffect } from "react";
-import {
-  Plus,
-  Search,
-  Mic,
-  MicOff,
-  SlidersHorizontal,
-  X,
-  Camera,
-  ImageIcon,
-  Upload,
-  Heart,
-  Trash2,
-  Loader2,
-  Sparkles,
-  AlertCircle,
-  Archive,
-  ArchiveRestore,
-  Clock,
-  WashingMachine,
-  CheckCircle2,
-  CalendarCheck,
-} from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
-import { useAuth } from "@/contexts/AuthContext";
-import {
-  getClosetItems,
-  addClosetItem,
-  deleteClosetItem,
-  toggleFavorite,
-  toggleArchive,
-  updateClosetItem,
-  uploadImage,
-  logWear,
-  sendToLaundry,
-  returnFromLaundry,
-  type ClothingItem,
-} from "@/lib/database";
-import { detectClothingAttributes, fileToBase64, suggestEthnicPairing, type DetectionResult, type SuggestedEthnicItem } from "@/lib/ai-service";
-import { fuzzySearch } from "@/lib/fuzzySearch";
-import heic2any from "heic2any";
-
-/* ------------------------------------------------------------------ */
-/*  HEIC detection helper                                              */
-/* ------------------------------------------------------------------ */
-const isHeicFile = (file: File): boolean => {
-  const ext = file.name.split(".").pop()?.toLowerCase() || "";
-  const heicTypes = [
-    "image/heic",
-    "image/heif",
-    "image/heic-sequence",
-    "image/heif-sequence",
-  ];
-  return heicTypes.includes(file.type) || ["heic", "heif"].includes(ext);
-};
-
-const categories = ["All", "Tops", "Bottoms", "Outerwear", "Footwear", "Dresses", "Accessories", "Activewear", "Ethnic Wear", "In Laundry"];
-const colorOptions = ["Black", "White", "Navy", "Blue", "Red", "Green", "Beige", "Grey", "Pink", "Brown"];
-const categoryOptions = ["Tops", "Bottoms", "Outerwear", "Footwear", "Dresses", "Accessories", "Activewear"];
-
-/* ------------------------------------------------------------------ */
-/*  Add Item Modal                                                     */
-/* ------------------------------------------------------------------ */
-interface AddItemModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onAdd: (item: ClothingItem) => void;
-  userId: string;
-}
-
-const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => {
-  const [itemName, setItemName] = useState("");
-  const [category, setCategory] = useState("");
-  const [gender, setGender] = useState<"women" | "men" | "unisex">("unisex");
-  const [color, setColor] = useState("");
-  const [tags, setTags] = useState("");
-  const [purchaseType, setPurchaseType] = useState<"new" | "pre-loved">("new");
-  const [price, setPrice] = useState("");
-  const [brand, setBrand] = useState("");
-  const [material, setMaterial] = useState("");
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [aiDetecting, setAiDetecting] = useState(false);
-  const [aiDetected, setAiDetected] = useState(false);
-  const [aiError, setAiError] = useState(false);
-  const [aiRejection, setAiRejection] = useState<string | null>(null);
-
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    e.target.value = ""; // reset input so same file can be re-selected
-
-    let processedFile: File = file;
-
-    // Convert HEIC/HEIF to JPEG so browsers & AI can handle it
-    if (isHeicFile(file)) {
-      try {
-        const result = await heic2any({
-          blob: file,
-          toType: "image/jpeg",
-          quality: 0.9,
-        });
-        const jpegBlob = Array.isArray(result) ? result[0] : result;
-        processedFile = new File(
-          [jpegBlob],
-          file.name.replace(/\.(heic|heif)$/i, ".jpg"),
-          { type: "image/jpeg" }
-        );
-      } catch (err) {
-        console.error("HEIC conversion error:", err);
-        // Fall through with original file as best-effort
-      }
-    }
-
-    setImageFile(processedFile);
-    setImagePreview(URL.createObjectURL(processedFile));
-
-    // Auto-detect attributes using AI
-    setAiDetecting(true);
-    setAiDetected(false);
-    setAiError(false);
-    setAiRejection(null);
-    try {
-      const base64 = await fileToBase64(processedFile);
-      const result = await detectClothingAttributes(
-        base64,
-        processedFile.type || "image/jpeg"
-      );
-
-      if (result.success && "attributes" in result) {
-        const attrs = result.attributes;
-        if (attrs.name) setItemName(attrs.name);
-        if (attrs.category) setCategory(attrs.category);
-        if (attrs.color) setColor(attrs.color);
-        if (attrs.gender) setGender(attrs.gender as "women" | "men" | "unisex");
-        // Brand is intentionally NOT set by AI — user must enter it manually
-        if (attrs.material) setMaterial(attrs.material);
-        if (attrs.tags?.length) setTags(attrs.tags.join(", "));
-
-        // Use AI-enhanced catalog image if available
+se AI-enhanced catalog image if available
         if (result.enhancedImage) {
           const enhancedDataUrl = `data:${result.enhancedImage.mimeType};base64,${result.enhancedImage.base64}`;
           // Convert data URL to File for upload
@@ -176,6 +36,8 @@ const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => 
     setPrice("");
     setBrand("");
     setMaterial("");
+    setSize("");
+    setFitNotes("");
     setImageFile(null);
     setImagePreview(null);
     setAiDetecting(false);
@@ -215,6 +77,8 @@ const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => 
       gender,
       brand: brand || undefined,
       material: material || undefined,
+      size: size || undefined,
+      fit_notes: fitNotes || undefined,
       favorite: false,
     });
 
@@ -451,6 +315,40 @@ const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => 
                 placeholder="e.g., Cotton, Polyester, Denim"
                 className="mt-1.5 h-11 w-full rounded-xl border border-border bg-card px-4 text-sm font-body text-foreground placeholder:text-muted-foreground outline-none focus:border-ai focus:ring-2 focus:ring-ai/20"
               />
+            </div>
+
+            {/* Size & Fit */}
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium font-body uppercase tracking-wider text-muted-foreground">
+                  Size <span className="normal-case text-muted-foreground/60">(optional)</span>
+                </label>
+                <input
+                  value={size}
+                  onChange={(e) => setSize(e.target.value)}
+                  placeholder="e.g., M, 32, EU 42"
+                  className="mt-1.5 h-11 w-full rounded-xl border border-border bg-card px-4 text-sm font-body text-foreground placeholder:text-muted-foreground outline-none focus:border-ai focus:ring-2 focus:ring-ai/20"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium font-body uppercase tracking-wider text-muted-foreground">
+                  Fit <span className="normal-case text-muted-foreground/60">(optional)</span>
+                </label>
+                <select
+                  value={fitNotes}
+                  onChange={(e) => setFitNotes(e.target.value)}
+                  className="mt-1.5 h-11 w-full rounded-xl border border-border bg-card px-4 text-sm font-body text-foreground outline-none focus:border-ai focus:ring-2 focus:ring-ai/20"
+                >
+                  <option value="">Select fit...</option>
+                  <option value="Slim fit">Slim fit</option>
+                  <option value="Regular fit">Regular fit</option>
+                  <option value="Relaxed fit">Relaxed fit</option>
+                  <option value="Oversized">Oversized</option>
+                  <option value="Runs small">Runs small</option>
+                  <option value="Runs large">Runs large</option>
+                  <option value="True to size">True to size</option>
+                </select>
+              </div>
             </div>
 
             {/* Tags */}
@@ -1064,6 +962,8 @@ const ItemDetailModal = ({ item, allItems, onClose, onToggleFavorite, onDelete, 
   const [editColor, setEditColor] = useState("");
   const [editMaterial, setEditMaterial] = useState("");
   const [editBrand, setEditBrand] = useState("");
+  const [editSize, setEditSize] = useState("");
+  const [editFitNotes, setEditFitNotes] = useState("");
   const [editTags, setEditTags] = useState("");
   const [saving, setSaving] = useState(false);
   const [tryOnResult, setTryOnResult] = useState<AutoPairResult | null>(null);
@@ -1077,6 +977,8 @@ const ItemDetailModal = ({ item, allItems, onClose, onToggleFavorite, onDelete, 
       setEditColor(item.color);
       setEditMaterial(item.material || "");
       setEditBrand(item.brand || "");
+      setEditSize(item.size || "");
+      setEditFitNotes(item.fit_notes || "");
       setEditTags(item.tags.join(", "));
       setEditing(false);
       setTryOnResult(null);
@@ -1093,6 +995,8 @@ const ItemDetailModal = ({ item, allItems, onClose, onToggleFavorite, onDelete, 
       color: editColor,
       material: editMaterial || undefined,
       brand: editBrand || undefined,
+      size: editSize || undefined,
+      fit_notes: editFitNotes || undefined,
       tags: editTags.split(",").map(t => t.trim()).filter(Boolean),
     });
     setSaving(false);
@@ -1168,6 +1072,25 @@ const ItemDetailModal = ({ item, allItems, onClose, onToggleFavorite, onDelete, 
                 <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">Brand</label>
                 <input value={editBrand} onChange={e => setEditBrand(e.target.value)} className="mt-1 h-10 w-full rounded-xl border border-border bg-card px-3 text-sm font-body text-foreground outline-none focus:border-ai" />
               </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">Size</label>
+                  <input value={editSize} onChange={e => setEditSize(e.target.value)} placeholder="e.g., M, 32" className="mt-1 h-10 w-full rounded-xl border border-border bg-card px-3 text-sm font-body text-foreground outline-none focus:border-ai" />
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">Fit</label>
+                  <select value={editFitNotes} onChange={e => setEditFitNotes(e.target.value)} className="mt-1 h-10 w-full rounded-xl border border-border bg-card px-3 text-sm font-body text-foreground outline-none focus:border-ai">
+                    <option value="">Select fit...</option>
+                    <option value="Slim fit">Slim fit</option>
+                    <option value="Regular fit">Regular fit</option>
+                    <option value="Relaxed fit">Relaxed fit</option>
+                    <option value="Oversized">Oversized</option>
+                    <option value="Runs small">Runs small</option>
+                    <option value="Runs large">Runs large</option>
+                    <option value="True to size">True to size</option>
+                  </select>
+                </div>
+              </div>
               <div>
                 <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">Tags (comma-separated)</label>
                 <input value={editTags} onChange={e => setEditTags(e.target.value)} className="mt-1 h-10 w-full rounded-xl border border-border bg-card px-3 text-sm font-body text-foreground outline-none focus:border-ai" />
@@ -1218,6 +1141,18 @@ const ItemDetailModal = ({ item, allItems, onClose, onToggleFavorite, onDelete, 
               <div className="rounded-xl bg-card p-3">
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">Brand</p>
                 <p className="mt-0.5 text-sm font-medium font-body text-foreground">{item.brand}</p>
+              </div>
+            )}
+            {item.size && (
+              <div className="rounded-xl bg-card p-3">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">Size</p>
+                <p className="mt-0.5 text-sm font-medium font-body text-foreground">{item.size}</p>
+              </div>
+            )}
+            {item.fit_notes && (
+              <div className="rounded-xl bg-card p-3">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">Fit</p>
+                <p className="mt-0.5 text-sm font-medium font-body text-foreground">{item.fit_notes}</p>
               </div>
             )}
             {item.gender && (
@@ -1840,12 +1775,10 @@ const DigitalCloset = () => {
                     </p>
                     <p className="text-[10px] text-muted-foreground/60 font-body">
                       {item.category}
-                    </p>
-                  </div>
                 </div>
-              </motion.div>
-            ))}
-          </div>
+              </div>
+            </motion.div>
+          ))}
         </div>
       )}
 
