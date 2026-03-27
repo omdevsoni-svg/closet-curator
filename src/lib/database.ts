@@ -44,6 +44,8 @@ export interface Profile {
   body_image_url?: string;
   notif_outfits: boolean;
   notif_gaps: boolean;
+  notif_unworn: boolean;
+  notif_laundry: boolean;
   personalization: boolean;
   created_at: string;
   updated_at: string;
@@ -261,6 +263,59 @@ export const saveStylistResult = async (
 };
 
 /* ------------------------------------------------------------------ */
+/*  Outfit plans (calendar)                                            */
+/* ------------------------------------------------------------------ */
+export interface OutfitPlan {
+  id: string;
+  user_id: string;
+  date: string; // YYYY-MM-DD
+  occasion?: string;
+  item_ids: string[];
+  tip?: string;
+  created_at: string;
+}
+
+export const getOutfitPlans = async (
+  userId: string,
+  from?: string,
+  to?: string
+): Promise<OutfitPlan[]> => {
+  let query = supabase
+    .from("outfit_plans")
+    .select("*")
+    .eq("user_id", userId)
+    .order("date", { ascending: true });
+  if (from) query = query.gte("date", from);
+  if (to) query = query.lte("date", to);
+  const { data, error } = await query;
+  if (error) {
+    console.error("getOutfitPlans error:", error);
+    return [];
+  }
+  return data ?? [];
+};
+
+export const saveOutfitPlan = async (
+  plan: Omit<OutfitPlan, "id" | "created_at">
+): Promise<OutfitPlan | null> => {
+  const { data, error } = await supabase
+    .from("outfit_plans")
+    .insert(plan)
+    .select()
+    .single();
+  if (error) {
+    console.error("saveOutfitPlan error:", error);
+    return null;
+  }
+  return data;
+};
+
+export const deleteOutfitPlan = async (planId: string) => {
+  const { error } = await supabase.from("outfit_plans").delete().eq("id", planId);
+  if (error) console.error("deleteOutfitPlan error:", error);
+};
+
+/* ------------------------------------------------------------------ */
 /*  Stats helpers                                                      */
 /* ------------------------------------------------------------------ */
 export const getClosetStats = async (userId: string) => {
@@ -372,7 +427,7 @@ export const getLaundryItems = async (userId: string): Promise<ClothingItem[]> =
     .eq("laundry_status", "in_laundry")
     .order("laundry_sent_at", { ascending: false });
   if (error) {
-    console.error('getLaundryItems error:', error);
+    console.error("getLaundryItems error:", error);
     return [];
   }
   return data ?? [];
