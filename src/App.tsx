@@ -17,6 +17,7 @@ import AiStylist from "./pages/AiStylist";
 import ClosetHealth from "./pages/ClosetHealth";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
+import OutfitCalendar from "./pages/OutfitCalendar";
 import ResetPassword from "./pages/ResetPassword";
 import EmailVerification from "./pages/EmailVerification";
 import NotFound from "./pages/NotFound";
@@ -64,6 +65,7 @@ const App = () => {
                   <Route path="/health" element={<ClosetHealth />} />
                   <Route path="/profile" element={<Profile />} />
                   <Route path="/settings" element={<Settings />} />
+                  <Route path="/calendar" element={<OutfitCalendar />} />
                 </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>
