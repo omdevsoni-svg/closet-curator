@@ -17,6 +17,7 @@ import AiStylist from "./pages/AiStylist";
 import ClosetHealth from "./pages/ClosetHealth";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
+import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -47,6 +48,7 @@ const App = () => {
                 <Route path="/" element={<ProfileSetup />} />
                 <Route path="/setup" element={<ProfileSetup />} />
                 <Route path="/landing" element={<Landing />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
                 <Route
                   element={
                     <ProtectedRoute>
