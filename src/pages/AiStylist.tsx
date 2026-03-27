@@ -24,6 +24,8 @@ import {
   Wand2,
   Share2,
   Download,
+  ShoppingBag,
+  Upload,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -796,7 +798,7 @@ async function shareOutfitAsImage(combo: ResolvedCombination, occasion: string) 
   // Branding
   ctx.fillStyle = "#bbb";
   ctx.font = "11px system-ui, sans-serif";
-  ctx.fillText("StyleOS \u2022 AI Digital Closet", 24, H - 16);
+  ctx.fillText("StyleOS • AI Digital Closet", 24, H - 16);
 
   // Convert to blob and share/download
   canvas.toBlob(async (blob) => {
@@ -1004,9 +1006,15 @@ const AiStylist = () => {
   const [aiError, setAiError] = useState<string | null>(null);
   const [tryOnCombo, setTryOnCombo] = useState<ResolvedCombination | null>(null);
   const [showTryOn, setShowTryOn] = useState(false);
-  const [activeTab, setActiveTab] = useState<"ai" | "mix" | "history">(
-    searchParams.get("tab") === "mix" ? "mix" : searchParams.get("tab") === "history" ? "history" : "ai"
+  const [activeTab, setActiveTab] = useState<"ai" | "mix" | "history" | "tryon">(
+    searchParams.get("tab") === "mix" ? "mix" : searchParams.get("tab") === "history" ? "history" : searchParams.get("tab") === "tryon" ? "tryon" : "ai"
   );
+  // Try Before You Buy state
+  const [tryOnFile, setTryOnFile] = useState<File | null>(null);
+  const [tryOnPreview, setTryOnPreview] = useState<string | null>(null);
+  const [tryOnGenerating, setTryOnGenerating] = useState(false);
+  const [tryOnResult, setTryOnResult] = useState<string | null>(null);
+  const [tryOnError, setTryOnError] = useState<string | null>(null);
   const [mixTryOnItems, setMixTryOnItems] = useState<ClothingItem[]>([]);
   const [history, setHistory] = useState<StylistHistory[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -1228,6 +1236,8 @@ const AiStylist = () => {
               ? `Tell me the occasion — I'll dress you (${closetItems.length} items)`
               : activeTab === "mix"
               ? "Swipe & pick items to create your own outfit"
+              : activeTab === "tryon"
+              ? "Upload a product photo — see how it looks on you"
               : "Your past outfit recommendations"}
           </p>
         </div>
@@ -1258,6 +1268,17 @@ const AiStylist = () => {
           Mix & Match
         </button>
         <button
+          onClick={() => setActiveTab("tryon")}
+          className={`flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-body font-semibold transition-all ${
+            activeTab === "tryon"
+              ? "bg-ai text-ai-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <ShoppingBag className="h-3.5 w-3.5" />
+          Try On
+        </button>
+        <button
           onClick={() => setActiveTab("history")}
           className={`flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-body font-semibold transition-all ${
             activeTab === "history"
@@ -1282,6 +1303,198 @@ const AiStylist = () => {
             onTryOn={handleMixTryOn}
             inline
           />
+        </motion.div>
+      )}
+
+      {/* Try Before You Buy tab */}
+      {activeTab === "tryon" && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-4"
+        >
+          {/* Upload area */}
+          {!tryOnPreview && !tryOnResult && (
+            <div className="flex flex-col items-center">
+              <label
+                htmlFor="tryon-upload"
+                className="group flex flex-col items-center gap-4 rounded-3xl border-2 border-dashed border-border bg-card/50 p-10 text-center transition-all hover:border-ai/50 hover:bg-card cursor-pointer w-full"
+              >
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-ai/10 text-ai group-hover:bg-ai/20 transition-colors">
+                  <Upload className="h-8 w-8" />
+                </div>
+                <div>
+                  <p className="text-base font-display font-semibold text-foreground">Upload a product photo</p>
+                  <p className="mt-1 text-xs font-body text-muted-foreground">
+                    Found something you like online? See how it looks on you before buying
+                  </p>
+                </div>
+                <div className="rounded-xl bg-ai px-6 py-2.5 text-sm font-display font-semibold text-ai-foreground">
+                  Choose Photo
+                </div>
+              </label>
+              <input
+                id="tryon-upload"
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  e.target.value = "";
+                  setTryOnFile(file);
+                  setTryOnPreview(URL.createObjectURL(file));
+                  setTryOnResult(null);
+                  setTryOnError(null);
+                }}
+              />
+              <div className="mt-6 w-full space-y-3">
+                <p className="text-xs font-body font-semibold text-muted-foreground uppercase tracking-wider">How it works</p>
+                <div className="flex items-start gap-3 rounded-2xl bg-card p-4">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-purple-100 text-purple-600 text-xs font-bold dark:bg-purple-900/30 dark:text-purple-400">1</div>
+                  <div>
+                    <p className="text-sm font-body font-medium text-foreground">Upload a product photo</p>
+                    <p className="text-xs font-body text-muted-foreground">Screenshot from any shopping site or take a photo in-store</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 rounded-2xl bg-card p-4">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-600 text-xs font-bold dark:bg-blue-900/30 dark:text-blue-400">2</div>
+                  <div>
+                    <p className="text-sm font-body font-medium text-foreground">AI tries it on your body photo</p>
+                    <p className="text-xs font-body text-muted-foreground">Uses your profile body photo for a realistic preview</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 rounded-2xl bg-card p-4">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-green-100 text-green-600 text-xs font-bold dark:bg-green-900/30 dark:text-green-400">3</div>
+                  <div>
+                    <p className="text-sm font-body font-medium text-foreground">Decide before you buy</p>
+                    <p className="text-xs font-body text-muted-foreground">Save money on returns — only buy what looks great on you</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Preview + Generate */}
+          {tryOnPreview && !tryOnResult && !tryOnGenerating && (
+            <div className="flex flex-col items-center">
+              <div className="relative w-full max-w-xs">
+                <img src={tryOnPreview} alt="Product" className="w-full rounded-2xl object-contain max-h-[45vh] bg-card" />
+                <button
+                  onClick={() => { setTryOnFile(null); setTryOnPreview(null); }}
+                  className="absolute top-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <p className="mt-3 text-sm font-body font-medium text-foreground">Product uploaded</p>
+              <p className="mt-1 text-xs font-body text-muted-foreground">
+                {profile?.body_image_url
+                  ? "Ready to try on — we'll use your profile body photo"
+                  : "You need a body photo in your profile to use this feature"}
+              </p>
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                disabled={!profile?.body_image_url}
+                onClick={async () => {
+                  if (!tryOnFile || !profile?.body_image_url) return;
+                  setTryOnGenerating(true);
+                  setTryOnError(null);
+                  try {
+                    const bodyB64 = await urlToBase64(profile.body_image_url, { maxDim: 768, quality: 0.85 });
+                    const productB64 = await fileToBase64(tryOnFile);
+                    let faceB64: string | undefined;
+                    if (profile.face_image_url) {
+                      try { faceB64 = await urlToBase64(profile.face_image_url, { maxDim: 512, quality: 0.85 }); } catch {}
+                    }
+                    const results = await virtualTryOn(bodyB64, productB64, 1, profile.model_gender || undefined, faceB64);
+                    if (results.length > 0) {
+                      setTryOnResult(`data:${results[0].mimeType};base64,${results[0].base64}`);
+                    } else {
+                      setTryOnError("No result generated — try a clearer product photo");
+                    }
+                  } catch (e: any) {
+                    setTryOnError(e?.message || "Failed to generate try-on");
+                  }
+                  setTryOnGenerating(false);
+                }}
+                className="mt-4 flex items-center gap-2 rounded-xl bg-ai px-8 py-3 text-sm font-display font-semibold text-ai-foreground disabled:opacity-40"
+              >
+                <Camera className="h-4 w-4" />
+                Try It On
+              </motion.button>
+              {!profile?.body_image_url && (
+                <button
+                  onClick={() => navigate("/profile")}
+                  className="mt-2 text-xs font-body text-ai underline"
+                >
+                  Add body photo in Profile
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Generating */}
+          {tryOnGenerating && (
+            <div className="flex flex-col items-center py-12">
+              {tryOnPreview && (
+                <div className="h-36 w-28 overflow-hidden rounded-2xl bg-card shadow-lg ring-1 ring-border/30 mb-5">
+                  <img src={tryOnPreview} alt="Product" className="h-full w-full object-contain p-1" />
+                </div>
+              )}
+              <Loader2 className="h-8 w-8 animate-spin text-ai" />
+              <p className="mt-4 text-sm font-body font-medium text-foreground">Trying it on you...</p>
+              <p className="mt-1 text-xs font-body text-muted-foreground">This takes about 15-30 seconds</p>
+            </div>
+          )}
+
+          {/* Result */}
+          {tryOnResult && (
+            <div className="flex flex-col items-center">
+              <img src={tryOnResult} alt="Try-on result" className="w-full max-w-sm rounded-2xl shadow-lg" />
+              <div className="mt-4 flex items-center gap-3">
+                <motion.button
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => {
+                    setTryOnResult(null);
+                    setTryOnFile(null);
+                    setTryOnPreview(null);
+                  }}
+                  className="flex items-center gap-2 rounded-xl bg-card px-5 py-2.5 text-sm font-body font-medium text-foreground"
+                >
+                  <Upload className="h-4 w-4" />
+                  Try Another
+                </motion.button>
+                <motion.button
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => {
+                    const link = document.createElement("a");
+                    link.href = tryOnResult!;
+                    link.download = `tryon-${Date.now()}.png`;
+                    link.click();
+                  }}
+                  className="flex items-center gap-2 rounded-xl bg-ai px-5 py-2.5 text-sm font-display font-semibold text-ai-foreground"
+                >
+                  <Download className="h-4 w-4" />
+                  Save Image
+                </motion.button>
+              </div>
+            </div>
+          )}
+
+          {/* Error */}
+          {tryOnError && (
+            <div className="mt-4 rounded-2xl bg-red-50 p-4 text-center dark:bg-red-900/20">
+              <AlertTriangle className="mx-auto h-6 w-6 text-red-500" />
+              <p className="mt-2 text-sm font-body text-red-600 dark:text-red-400">{tryOnError}</p>
+              <button
+                onClick={() => { setTryOnError(null); setTryOnResult(null); }}
+                className="mt-3 text-xs font-body text-ai underline"
+              >
+                Try again
+              </button>
+            </div>
+          )}
         </motion.div>
       )}
 
