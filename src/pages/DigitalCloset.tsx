@@ -1,4 +1,146 @@
-se AI-enhanced catalog image if available
+import { useState, useRef, useEffect } from "react";
+import {
+  Plus,
+  Search,
+  Mic,
+  MicOff,
+  SlidersHorizontal,
+  X,
+  Camera,
+  ImageIcon,
+  Upload,
+  Heart,
+  Trash2,
+  Loader2,
+  Sparkles,
+  AlertCircle,
+  Archive,
+  ArchiveRestore,
+  Clock,
+  WashingMachine,
+  CheckCircle2,
+  CalendarCheck,
+} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  getClosetItems,
+  addClosetItem,
+  deleteClosetItem,
+  toggleFavorite,
+  toggleArchive,
+  updateClosetItem,
+  uploadImage,
+  logWear,
+  sendToLaundry,
+  returnFromLaundry,
+  type ClothingItem,
+} from "@/lib/database";
+import { detectClothingAttributes, fileToBase64, suggestEthnicPairing, type DetectionResult, type SuggestedEthnicItem } from "@/lib/ai-service";
+import { fuzzySearch } from "@/lib/fuzzySearch";
+import heic2any from "heic2any";
+
+/* ------------------------------------------------------------------ */
+/*  HEIC detection helper                                              */
+/* ------------------------------------------------------------------ */
+const isHeicFile = (file: File): boolean => {
+  const ext = file.name.split(".").pop()?.toLowerCase() || "";
+  const heicTypes = [
+    "image/heic",
+    "image/heif",
+    "image/heic-sequence",
+    "image/heif-sequence",
+  ];
+  return heicTypes.includes(file.type) || ["heic", "heif"].includes(ext);
+};
+
+const categories = ["All", "Tops", "Bottoms", "Outerwear", "Footwear", "Dresses", "Accessories", "Activewear", "Ethnic Wear", "In Laundry"];
+const colorOptions = ["Black", "White", "Navy", "Blue", "Red", "Green", "Beige", "Grey", "Pink", "Brown"];
+const categoryOptions = ["Tops", "Bottoms", "Outerwear", "Footwear", "Dresses", "Accessories", "Activewear"];
+
+/* ------------------------------------------------------------------ */
+/*  Add Item Modal                                                     */
+/* ------------------------------------------------------------------ */
+interface AddItemModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onAdd: (item: ClothingItem) => void;
+  userId: string;
+}
+
+const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => {
+  const [itemName, setItemName] = useState("");
+  const [category, setCategory] = useState("");
+  const [gender, setGender] = useState<"women" | "men" | "unisex">("unisex");
+  const [color, setColor] = useState("");
+  const [tags, setTags] = useState("");
+  const [purchaseType, setPurchaseType] = useState<"new" | "pre-loved">("new");
+  const [price, setPrice] = useState("");
+  const [brand, setBrand] = useState("");
+  const [material, setMaterial] = useState("");
+  const [size, setSize] = useState("");
+  const [fitNotes, setFitNotes] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [aiDetecting, setAiDetecting] = useState(false);
+  const [aiDetected, setAiDetected] = useState(false);
+  const [aiError, setAiError] = useState(false);
+  const [aiRejection, setAiRejection] = useState<string | null>(null);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = ""; // reset input so same file can be re-selected
+
+    let processedFile: File = file;
+
+    // Convert HEIC/HEIF to JPEG so browsers & AI can handle it
+    if (isHeicFile(file)) {
+      try {
+        const result = await heic2any({
+          blob: file,
+          toType: "image/jpeg",
+          quality: 0.9,
+        });
+        const jpegBlob = Array.isArray(result) ? result[0] : result;
+        processedFile = new File(
+          [jpegBlob],
+          file.name.replace(/\.(heic|heif)$/i, ".jpg"),
+          { type: "image/jpeg" }
+        );
+      } catch (err) {
+        console.error("HEIC conversion error:", err);
+        // Fall through with original file as best-effort
+      }
+    }
+
+    setImageFile(processedFile);
+    setImagePreview(URL.createObjectURL(processedFile));
+
+    // Auto-detect attributes using AI
+    setAiDetecting(true);
+    setAiDetected(false);
+    setAiError(false);
+    setAiRejection(null);
+    try {
+      const base64 = await fileToBase64(processedFile);
+      const result = await detectClothingAttributes(
+        base64,
+        processedFile.type || "image/jpeg"
+      );
+
+      if (result.success && "attributes" in result) {
+        const attrs = result.attributes;
+        if (attrs.name) setItemName(attrs.name);
+        if (attrs.category) setCategory(attrs.category);
+        if (attrs.color) setColor(attrs.color);
+        if (attrs.gender) setGender(attrs.gender as "women" | "men" | "unisex");
+        // Brand is intentionally NOT set by AI — user must enter it manually
+        if (attrs.material) setMaterial(attrs.material);
+        if (attrs.tags?.length) setTags(attrs.tags.join(", "));
+
+        // Use AI-enhanced catalog image if available
         if (result.enhancedImage) {
           const enhancedDataUrl = `data:${result.enhancedImage.mimeType};base64,${result.enhancedImage.base64}`;
           // Convert data URL to File for upload
@@ -1775,10 +1917,12 @@ const DigitalCloset = () => {
                     </p>
                     <p className="text-[10px] text-muted-foreground/60 font-body">
                       {item.category}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            </motion.div>
-          ))}
+              </motion.div>
+            ))}
+          </div>
         </div>
       )}
 
