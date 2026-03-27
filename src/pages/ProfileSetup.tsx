@@ -62,7 +62,7 @@ const ProfileSetup = () => {
         setLoading(false);
         return;
       }
-      navigate("/home");
+      navigate("/verify-email");
     } else {
       const { error: signInError } = await signIn(trimEmail, trimPassword);
       if (signInError) {
