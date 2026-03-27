@@ -19,11 +19,13 @@ import {
   ChevronLeft,
   ChevronRight,
   Shuffle,
+  Clock,
+  Bookmark,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { getClosetItems, getProfile, type ClothingItem, type Profile } from "@/lib/database";
+import { getClosetItems, getProfile, getStylistHistory, saveStylistResult, type ClothingItem, type Profile, type StylistHistory } from "@/lib/database";
 import {
   virtualTryOn,
   virtualTryOnMulti,
@@ -55,7 +57,7 @@ type ResolvedCombination = {
 };
 
 /* ------------------------------------------------------------------ */
-/*  VTO Loading Screen — garment showcase + creative waiting messages  */
+/*  VTO Loading Screen - garment showcase + creative waiting messages  */
 /* ------------------------------------------------------------------ */
 
 const CREATIVE_MESSAGES = [
@@ -107,7 +109,7 @@ const VtoLoadingScreen = ({ items, isSequential, currentStep, seqProgress }: Vto
 
   return (
     <div className="mt-6 flex flex-col items-center py-6">
-      {/* Garment showcase — cycling image */}
+      {/* Garment showcase - cycling image */}
       <div className="relative mb-5">
         <div className="h-36 w-28 overflow-hidden rounded-2xl bg-card shadow-lg ring-1 ring-border/30">
           <AnimatePresence mode="wait">
@@ -140,7 +142,7 @@ const VtoLoadingScreen = ({ items, isSequential, currentStep, seqProgress }: Vto
         )}
       </div>
 
-      {/* Item dots — show which garment is currently showcased */}
+      {/* Item dots - show which garment is currently showcased */}
       {items.length > 1 && (
         <div className="flex items-center gap-1.5 mb-4">
           {items.map((_, i) => (
@@ -215,7 +217,7 @@ const VtoLoadingScreen = ({ items, isSequential, currentStep, seqProgress }: Vto
 };
 
 /* ------------------------------------------------------------------ */
-/*  Virtual Try-On Modal — now accepts specific outfit items           */
+/*  Virtual Try-On Modal - now accepts specific outfit items           */
 /* ------------------------------------------------------------------ */
 interface TryOnModalProps {
   isOpen: boolean;
@@ -265,7 +267,7 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
             }
           }
 
-          // v15: Imagen 3 VTO doesn't need text descriptions — it preserves identity automatically
+          // v15: Imagen 3 VTO doesn't need text descriptions - it preserves identity automatically
           // Keep personDescription for potential future use but don't hardcode facial features
           const descParts: string[] = [];
           if (profile?.model_gender) descParts.push(profile.model_gender === "neutral" ? "person" : profile.model_gender === "men" ? "male" : "female");
@@ -285,12 +287,12 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
               let results: { mimeType: string; base64: string }[] = [];
 
               if (itemsWithImages.length === 1) {
-                // Single garment — use direct one-shot
+                // Single garment - use direct one-shot
                 const productBase64 = await urlToBase64(itemsWithImages[0].image_url, { removeBackground: true });
                 results = await virtualTryOn(bodyB64, productBase64, 1, desc, faceB64 || undefined);
               } else {
-                // v22: SEQUENTIAL generation — one garment at a time
-                // Sort garments: shoes → bottomwear → topwear (topwear LAST for max quality & print fidelity)
+                // v22: SEQUENTIAL generation - one garment at a time
+                // Sort garments: shoes - bottomwear - topwear (topwear LAST for max quality & print fidelity)
                 const categoryOrder: Record<string, number> = {
                   shoes: 0, footwear: 0, sneakers: 0, boots: 0, sandals: 0,
                   bottomwear: 1, bottom: 1, pants: 1, jeans: 1, trousers: 1, shorts: 1, skirt: 1,
@@ -374,7 +376,7 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
         const productBase64 = await urlToBase64(itemsToTry[0].image_url, { removeBackground: true });
         results = await virtualTryOn(bodyPhotoBase64, productBase64, 1, personDescription, facePhotoBase64 || undefined);
       } else {
-        // v22: Sequential generation — shoes → bottomwear → topwear (topwear LAST for best fidelity)
+        // v22: Sequential generation - shoes - bottomwear - topwear (topwear LAST for best fidelity)
         const categoryOrder: Record<string, number> = {
           shoes: 0, footwear: 0, sneakers: 0, boots: 0, sandals: 0,
           bottomwear: 1, bottom: 1, pants: 1, jeans: 1, trousers: 1, shorts: 1, skirt: 1,
@@ -461,8 +463,7 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
           <motion.div
             initial={{ y: "100%", opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            exit={{ y: "100%", opacity: 0 }}
-            transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
+            exit={{ y: "100%", opacity: 0 }}            transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
             className="relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-background p-6 pb-24 sm:rounded-3xl sm:pb-6"
           >
             {/* Header */}
@@ -611,7 +612,7 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
               </div>
             )}
 
-            {/* Generating — garment showcase with creative messages */}
+            {/* Generating - garment showcase with creative messages */}
             {step === "generating" && (() => {
               const previewItems = mode === "outfit" && outfitItems.filter(i => i.image_url).length > 0
                 ? outfitItems.filter(i => i.image_url)
@@ -756,7 +757,7 @@ const CombinationCard = ({ combo, index, isActive, onTryOn }: CombinationCardPro
         </motion.button>
       </div>
 
-      {/* Outfit items — horizontal scroll with slot labels */}
+      {/* Outfit items - horizontal scroll with slot labels */}
       <div className="flex gap-3 overflow-x-auto px-4 py-3 scrollbar-none">
         {combo.slots.length > 0
           ? combo.slots.map(({ slot, item }, i) => (
@@ -866,8 +867,7 @@ const AiStylist = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [closetItems, setClosetItems] = useState<ClothingItem[]>([]);
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const [closetItems, setClosetItems] = useState<ClothingItem[]>([]);  const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedOccasion, setSelectedOccasion] = useState<string | null>(null);
   const [prompt, setPrompt] = useState("");
@@ -876,10 +876,12 @@ const AiStylist = () => {
   const [aiError, setAiError] = useState<string | null>(null);
   const [tryOnCombo, setTryOnCombo] = useState<ResolvedCombination | null>(null);
   const [showTryOn, setShowTryOn] = useState(false);
-  const [activeTab, setActiveTab] = useState<"ai" | "mix">(
-    searchParams.get("tab") === "mix" ? "mix" : "ai"
+  const [activeTab, setActiveTab] = useState<"ai" | "mix" | "history">(
+    searchParams.get("tab") === "mix" ? "mix" : searchParams.get("tab") === "history" ? "history" : "ai"
   );
   const [mixTryOnItems, setMixTryOnItems] = useState<ClothingItem[]>([]);
+  const [history, setHistory] = useState<StylistHistory[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -894,6 +896,18 @@ const AiStylist = () => {
     };
     load();
   }, [user]);
+
+  // Load history when history tab is active
+  useEffect(() => {
+    if (activeTab !== "history" || !user) return;
+    const loadHistory = async () => {
+      setHistoryLoading(true);
+      const data = await getStylistHistory(user.id);
+      setHistory(data);
+      setHistoryLoading(false);
+    };
+    loadHistory();
+  }, [activeTab, user]);
 
   // Handle tryOn query param from Digital Closet's Try On button
   useEffect(() => {
@@ -985,6 +999,22 @@ const AiStylist = () => {
         });
 
         setCombinations(resolved);
+
+        // Save each combination to stylist history
+        if (user) {
+          for (const combo of resolved) {
+            await saveStylistResult({
+              user_id: user.id,
+              occasion,
+              result_items: combo.items.map((item) => ({
+                name: item.name,
+                image_url: item.image_url || "",
+                item_id: item.id,
+              })),
+              tip: combo.tip,
+            });
+          }
+        }
       } else {
         setAiError(result.error);
       }
@@ -1097,6 +1127,17 @@ const AiStylist = () => {
           <Shuffle className="h-3.5 w-3.5" />
           Mix & Match
         </button>
+        <button
+          onClick={() => setActiveTab("history")}
+          className={`flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-body font-semibold transition-all ${
+            activeTab === "history"
+              ? "bg-ai text-ai-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Clock className="h-3.5 w-3.5" />
+          History
+        </button>
       </div>
 
       {/* Mix & Match tab */}
@@ -1111,6 +1152,98 @@ const AiStylist = () => {
             onTryOn={handleMixTryOn}
             inline
           />
+        </motion.div>
+      )}
+
+      {/* History tab */}
+      {activeTab === "history" && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-4"
+        >
+          {historyLoading ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : history.length === 0 ? (
+            <div className="flex flex-col items-center text-center py-16">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-card">
+                <Clock className="h-8 w-8 text-muted-foreground/30" />
+              </div>
+              <p className="mt-3 text-sm font-body font-medium text-foreground">No outfit history yet</p>
+              <p className="mt-1 text-xs font-body text-muted-foreground">
+                Get AI outfit recommendations to build your history
+              </p>
+              <button
+                onClick={() => setActiveTab("ai")}
+                className="mt-4 rounded-xl bg-ai px-6 py-2.5 text-sm font-display font-semibold text-ai-foreground"
+              >
+                Get AI Picks
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {history.map((entry) => {
+                const date = new Date(entry.created_at);
+                const dateStr = date.toLocaleDateString("en-IN", {
+                  day: "numeric",
+                  month: "short",
+                  year: date.getFullYear() !== new Date().getFullYear() ? "numeric" : undefined,
+                });
+                return (
+                  <motion.div
+                    key={entry.id}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="rounded-2xl bg-card p-4 border border-border"
+                  >
+                    {/* Header with occasion & date */}
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="h-3.5 w-3.5 text-ai" />
+                        <span className="text-sm font-display font-semibold text-foreground">
+                          {entry.occasion}
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-body text-muted-foreground">{dateStr}</span>
+                    </div>
+
+                    {/* Item thumbnails */}
+                    <div className="flex gap-2 overflow-x-auto scrollbar-none pb-1">
+                      {entry.result_items.map((ri, idx) => (
+                        <div key={idx} className="shrink-0">
+                          <div className="h-20 w-16 overflow-hidden rounded-xl bg-background border border-border p-1">
+                            {ri.image_url ? (
+                              <img
+                                src={ri.image_url}
+                                alt={ri.name}
+                                className="h-full w-full object-contain"
+                              />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center">
+                                <ImageIcon className="h-4 w-4 text-muted-foreground/30" />
+                              </div>
+                            )}
+                          </div>
+                          <p className="mt-0.5 text-center text-[9px] font-body text-muted-foreground truncate w-16">
+                            {ri.name}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Tip */}
+                    {entry.tip && (
+                      <p className="mt-3 text-xs font-body text-muted-foreground italic">
+                        \"{entry.tip}\"
+                      </p>
+                    )}
+                  </motion.div>
+                );
+              })}
+            </div>
+          )}
         </motion.div>
       )}
 
@@ -1158,7 +1291,7 @@ const AiStylist = () => {
         </motion.button>
       </div>
 
-      {/* Generating state — full-page overlay */}
+      {/* Generating state - full-page overlay */}
       <AnimatePresence>
         {generating && (
           <motion.div
