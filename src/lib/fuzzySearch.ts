@@ -13,7 +13,7 @@ function fuzzyScore(query: string, target: string): number {
   const q = query.toLowerCase();
   const t = target.toLowerCase();
 
-  // Exact substring match — highest score
+  // Exact substring match
   if (t.includes(q)) return 1;
 
   // Check if query is a prefix of a word in the target
@@ -23,17 +23,15 @@ function fuzzyScore(query: string, target: string): number {
   }
 
   // Levenshtein-based fuzzy matching for short queries (typo tolerance)
-  // Compare against each word in target
   for (const w of words) {
     const dist = levenshtein(q, w);
     const maxLen = Math.max(q.length, w.length);
     if (maxLen === 0) continue;
     const similarity = 1 - dist / maxLen;
-    // Allow up to ~30% character difference
     if (similarity >= 0.7) return similarity * 0.8;
   }
 
-  // Subsequence match — letters appear in order
+  // Subsequence match
   let qi = 0;
   for (let ti = 0; ti < t.length && qi < q.length; ti++) {
     if (t[ti] === q[qi]) qi++;
@@ -79,12 +77,6 @@ export interface FuzzyMatch<T> {
 /**
  * Fuzzy search across items. Each query token is matched independently
  * against all searchable fields. All tokens must match for an item to be included.
- *
- * @param items - Array of items to search
- * @param query - Search query string
- * @param getFields - Function that returns searchable strings for an item
- * @param threshold - Minimum score for a token match (default 0.3)
- * @returns Filtered items sorted by relevance (best first)
  */
 export function fuzzySearch<T>(
   items: T[],
@@ -114,7 +106,6 @@ export function fuzzySearch<T>(
         const score = fuzzyScore(token, field);
         if (score > bestTokenScore) bestTokenScore = score;
 
-        // Also check individual words in the field
         const fieldWords = field.toLowerCase().split(/[\s,_-]+/);
         for (const word of fieldWords) {
           const wordScore = fuzzyScore(token, word);
@@ -134,7 +125,6 @@ export function fuzzySearch<T>(
     }
   }
 
-  // Sort by score descending
   results.sort((a, b) => b.score - a.score);
   return results;
 }
