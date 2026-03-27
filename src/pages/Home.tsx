@@ -16,6 +16,7 @@ import {
   ImageIcon,
   Loader2,
   Shuffle,
+  Calendar,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
@@ -701,6 +702,20 @@ const Home = () => {
             <div className="text-left">
               <p className="text-sm font-body font-medium text-foreground">View Analytics</p>
               <p className="text-[10px] font-body text-muted-foreground">Closet insights</p>
+            </div>
+          </motion.button>
+
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            onClick={() => navigate("/calendar")}
+            className="flex items-center gap-3 rounded-2xl bg-card p-4 transition-colors hover:bg-card/80"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
+              <Calendar className="h-5 w-5" />
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-body font-medium text-foreground">Plan Outfits</p>
+              <p className="text-[10px] font-body text-muted-foreground">Outfit calendar</p>
             </div>
           </motion.button>
         </div>
