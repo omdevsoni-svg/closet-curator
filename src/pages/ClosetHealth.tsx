@@ -116,7 +116,7 @@ const computeHealth = (items: ClothingItem[]): HealthData => {
   const minCats = categoryBreakdown.filter((c) => c.count === 0);
   if (maxCat.count > 5 && minCats.length > 0) {
     recommendations.push(
-      `You have ${maxCat.count} ${maxCat.category.toLowerCase()} but you're missing ${minCats.map((c) => c.category.toLowerCase()).join(", ")}. Consider diversifying!`
+      `Your closet is really loving ${maxCat.category.toLowerCase()} right now (${maxCat.count} pieces!). Adding some ${minCats.map((c) => c.category.toLowerCase()).join(" or ")} could open up a whole new world of outfit combos.`
     );
   }
 
@@ -124,14 +124,14 @@ const computeHealth = (items: ClothingItem[]): HealthData => {
   const neverWorn = activeItems.filter((i) => !i.worn_count || i.worn_count === 0);
   if (neverWorn.length > 3) {
     recommendations.push(
-      `${neverWorn.length} items in your closet have never been worn. Try mixing them into your outfits or consider donating them.`
+      `${neverWorn.length} pieces are waiting for their moment to shine! They've never been worn yet — maybe this week's the week to give them some love?`
     );
   }
 
   // Color monotony
   if (colorBreakdown.length > 0 && colorBreakdown[0].count > activeItems.length * 0.4) {
     recommendations.push(
-      `Over 40% of your closet is ${colorBreakdown[0].color}. Adding contrasting colors could make your outfits more versatile.`
+      `Your closet is craving some color variety! Over 40% is ${colorBreakdown[0].color.toLowerCase()} — a pop of a contrasting color could really make your outfits sing.`
     );
   }
 
@@ -142,7 +142,7 @@ const computeHealth = (items: ClothingItem[]): HealthData => {
       const daysSince = Math.floor((Date.now() - new Date(oldestLaundry.laundry_sent_at).getTime()) / 86400000);
       if (daysSince >= 3) {
         recommendations.push(
-          `You have ${laundryItems.length} item${laundryItems.length > 1 ? "s" : ""} in laundry for ${daysSince}+ days. Time to check if they're back!`
+          `Friendly nudge: ${laundryItems.length} piece${laundryItems.length > 1 ? "s have" : " has"} been in the laundry pile for ${daysSince}+ days. Your fresh outfits miss them!`
         );
       }
     }
@@ -152,12 +152,12 @@ const computeHealth = (items: ClothingItem[]): HealthData => {
   if (occasionsFound.length < 4) {
     const missing = ALL_OCCASIONS.filter((o) => !allTags.includes(o));
     recommendations.push(
-      `Your wardrobe only covers ${occasionsFound.length} occasion types. Consider adding pieces tagged for: ${missing.slice(0, 3).join(", ")}.`
+      `Your wardrobe covers ${occasionsFound.length} occasion type${occasionsFound.length === 1 ? "" : "s"} so far — you're building something great! A few pieces tagged for ${missing.slice(0, 3).join(", ")} would round things out beautifully.`
     );
   }
 
   if (recommendations.length === 0 && activeItems.length > 0) {
-    recommendations.push("Your wardrobe is well-balanced! Keep it up and keep logging your outfits to get personalized insights.");
+    recommendations.push("Your wardrobe is looking fantastic and well-balanced! Keep logging your outfits — the more you wear, the smarter your style insights get.");
   }
 
   return { versatility, occasionCoverage, colorBalance, gaps, colorBreakdown, categoryBreakdown, mostWorn, leastWorn, laundryItems, recommendations };
@@ -546,7 +546,7 @@ const ClosetHealth = () => {
       >
         <div className="flex items-center gap-2 mb-3">
           <Sparkles className="h-4 w-4 text-ai" />
-          <h2 className="text-base font-display font-semibold">AI Insights</h2>
+          <h2 className="text-base font-display font-semibold">Your Style Story</h2>
         </div>
         <div className="space-y-2.5">
           {health.recommendations.map((rec, i) => (
