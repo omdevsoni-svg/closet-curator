@@ -40,6 +40,8 @@ const Settings = () => {
   // Toggles
   const [notifOutfits, setNotifOutfits] = useState(true);
   const [notifGaps, setNotifGaps] = useState(true);
+  const [notifUnworn, setNotifUnworn] = useState(true);
+  const [notifLaundry, setNotifLaundry] = useState(true);
   const [personalization, setPersonalization] = useState(true);
 
   // Change password
@@ -60,6 +62,8 @@ const Settings = () => {
         setProfile(p);
         setNotifOutfits(p.notif_outfits);
         setNotifGaps(p.notif_gaps);
+        setNotifUnworn(p.notif_unworn ?? true);
+        setNotifLaundry(p.notif_laundry ?? true);
         setPersonalization(p.personalization);
       }
       setLoading(false);
@@ -243,6 +247,24 @@ const Settings = () => {
             onChange={(v) => {
               setNotifGaps(v);
               savePreferences({ notif_gaps: v });
+            }}
+          />
+          <ToggleRow
+            label="Unworn reminders"
+            desc="Nudges for clothes you haven't tried yet"
+            value={notifUnworn}
+            onChange={(v) => {
+              setNotifUnworn(v);
+              savePreferences({ notif_unworn: v });
+            }}
+          />
+          <ToggleRow
+            label="Laundry alerts"
+            desc="Reminders when laundry has been out too long"
+            value={notifLaundry}
+            onChange={(v) => {
+              setNotifLaundry(v);
+              savePreferences({ notif_laundry: v });
             }}
           />
         </div>
