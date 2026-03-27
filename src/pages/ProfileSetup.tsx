@@ -172,6 +172,18 @@ const ProfileSetup = () => {
             </button>
           </div>
 
+          {mode === "login" && (
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => navigate("/reset-password")}
+                className="text-xs text-primary font-body font-medium hover:underline"
+              >
+                Forgot password?
+              </button>
+            </div>
+          )}
+
           <motion.button
             whileTap={{ scale: 0.98 }}
             onClick={handleSubmit}
