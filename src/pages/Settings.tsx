@@ -109,9 +109,48 @@ const Settings = () => {
     navigate("/setup");
   };
 
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
   const handleDeleteAllData = async () => {
-    await signOut();
-    navigate("/setup");
+    if (!showDeleteConfirm) {
+      setShowDeleteConfirm(true);
+      return;
+    }
+    if (!user) return;
+    setDeleting(true);
+    try {
+      // Delete all user data from every table
+      await supabase.from("wear_log").delete().eq("user_id", user.id);
+      await supabase.from("stylist_history").delete().eq("user_id", user.id);
+      await supabase.from("closet_items").delete().eq("user_id", user.id);
+      // Remove storage files
+      const { data: clothingFiles } = await supabase.storage
+        .from("clothing-images")
+        .list(user.id);
+      if (clothingFiles?.length) {
+        await supabase.storage
+          .from("clothing-images")
+          .remove(clothingFiles.map((f) => `${user.id}/${f.name}`));
+      }
+      const { data: profileFiles } = await supabase.storage
+        .from("profile-images")
+        .list(user.id);
+      if (profileFiles?.length) {
+        await supabase.storage
+          .from("profile-images")
+          .remove(profileFiles.map((f) => `${user.id}/${f.name}`));
+      }
+      // Delete profile row
+      await supabase.from("profiles").delete().eq("id", user.id);
+      // Sign out
+      await signOut();
+      navigate("/setup");
+    } catch (err) {
+      console.error("Delete all data error:", err);
+      setDeleting(false);
+      setShowDeleteConfirm(false);
+    }
   };
 
   if (loading) {
@@ -361,19 +400,47 @@ const Settings = () => {
       </motion.div>
 
       {/* ── Danger zone ── */}
-      <motion.button
+      <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3 }}
-        onClick={handleDeleteAllData}
-        className="mt-4 flex w-full items-center justify-between rounded-2xl bg-card p-5 text-destructive transition-colors hover:bg-destructive/5"
+        className="mt-4 rounded-2xl bg-card p-5"
       >
-        <div className="flex items-center gap-2">
-          <Trash2 className="h-4 w-4" />
-          <span className="text-sm font-body font-medium">Delete All Data</span>
-        </div>
-        <ChevronRight className="h-4 w-4" />
-      </motion.button>
+        {!showDeleteConfirm ? (
+          <button
+            onClick={handleDeleteAllData}
+            className="flex w-full items-center justify-between text-destructive"
+          >
+            <div className="flex items-center gap-2">
+              <Trash2 className="h-4 w-4" />
+              <span className="text-sm font-body font-medium">Delete All Data</span>
+            </div>
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-sm font-body font-medium text-destructive">
+              Are you sure? This will permanently delete all your closet items, outfits, photos, and profile data. This cannot be undone.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="flex-1 rounded-xl bg-background py-2.5 text-xs font-body font-medium text-muted-foreground transition-colors hover:text-foreground"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteAllData}
+                disabled={deleting}
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-destructive py-2.5 text-xs font-body font-medium text-white transition-opacity disabled:opacity-50"
+              >
+                {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                {deleting ? "Deleting..." : "Delete Everything"}
+              </button>
+            </div>
+          </div>
+        )}
+      </motion.div>
 
       {/* ── Sign Out ── */}
       <motion.button
