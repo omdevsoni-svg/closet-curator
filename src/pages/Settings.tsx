@@ -483,8 +483,8 @@ const ToggleRow = ({
       }`}
     >
       <span
-        className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow-sm transition-transform ${
-          value ? "translate-x-5" : "translate-x-0.5"
+        className={`absolute left-0.5 top-0.5 h-6 w-6 rounded-full bg-white shadow-sm transition-transform ${
+          value ? "translate-x-[1.25rem]" : "translate-x-0"
         }`}
       />
     </button>
