@@ -1,4 +1,4 @@
-import { Moon, Sun, Bell, Settings } from "lucide-react";
+import { Moon, Sun, Settings } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useTheme } from "@/hooks/useTheme";
@@ -29,15 +29,6 @@ const TopBar = () => {
           ) : (
             <Moon className="h-[18px] w-[18px]" />
           )}
-        </motion.button>
-
-        <motion.button
-          whileTap={{ scale: 0.9 }}
-          className="relative flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
-          aria-label="Notifications"
-        >
-          <Bell className="h-[18px] w-[18px]" />
-          <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-ai" />
         </motion.button>
 
         <motion.button
