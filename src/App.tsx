@@ -18,6 +18,7 @@ import ClosetHealth from "./pages/ClosetHealth";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 import ResetPassword from "./pages/ResetPassword";
+import EmailVerification from "./pages/EmailVerification";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -49,6 +50,7 @@ const App = () => {
                 <Route path="/setup" element={<ProfileSetup />} />
                 <Route path="/landing" element={<Landing />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/verify-email" element={<EmailVerification />} />
                 <Route
                   element={
                     <ProtectedRoute>
