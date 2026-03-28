@@ -7,7 +7,6 @@ import {
   ImageIcon,
   Sparkles,
   Check,
-  Pencil,
   Loader2,
 } from "lucide-react";
 import { motion } from "framer-motion";
@@ -186,9 +185,7 @@ const Profile = () => {
             </p>
           </div>
         </div>
-        <button className="flex h-8 w-8 items-center justify-center rounded-full bg-background text-muted-foreground hover:text-foreground">
-          <Pencil className="h-4 w-4" />
-        </button>
+
       </motion.div>
 
       {/* Full-Body Image */}
