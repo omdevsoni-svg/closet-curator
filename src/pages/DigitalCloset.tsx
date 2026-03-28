@@ -140,7 +140,7 @@ const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => 
         if (attrs.category) setCategory(attrs.category);
         if (attrs.color) setColor(attrs.color);
         if (attrs.gender) setGender(attrs.gender as "women" | "men" | "unisex");
-        // Brand is intentionally NOT set by AI — user must enter it manually
+        // Brand is intentionally NOT set by AI -- user must enter it manually
         if (attrs.material) setMaterial(attrs.material);
         if (attrs.tags?.length) setTags(attrs.tags.join(", "));
 
@@ -158,7 +158,7 @@ const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => 
           setImageFile(enhancedFile);
           setImagePreview(URL.createObjectURL(enhancedFile));
         } else if (attrs.rotation_needed && attrs.rotation_needed > 0) {
-          // No enhanced image — apply AI-detected rotation to fix orientation
+          // No enhanced image -- apply AI-detected rotation to fix orientation
           const rotated = await rotateImage(processedFile, attrs.rotation_needed);
           setImageFile(rotated);
           setImagePreview(URL.createObjectURL(rotated));
@@ -166,7 +166,7 @@ const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => 
 
         setAiDetected(true);
       } else if ("is_garment" in result && result.is_garment === false) {
-        // Non-garment image — reject and clear preview
+        // Non-garment image -- reject and clear preview
         setAiRejection(result.rejection_reason);
         setImageFile(null);
         setImagePreview(null);
@@ -201,7 +201,7 @@ const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => 
     setAiRejection(null);
   };
 
-  // Close and reset — prevents stale preview on reopen
+  // Close and reset -- prevents stale preview on reopen
   const handleClose = () => {
     resetForm();
     onClose();
@@ -341,7 +341,7 @@ const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => 
               >
                 <Sparkles className="h-4 w-4 text-green-600 dark:text-green-400" />
                 <span className="text-xs font-body text-green-700 dark:text-green-400 font-medium">
-                  AI auto-filled details — review and adjust below
+                  AI auto-filled details -- review and adjust below
                 </span>
               </motion.div>
             )}
@@ -353,7 +353,7 @@ const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => 
               >
                 <AlertCircle className="h-4 w-4 text-destructive" />
                 <span className="text-xs font-body text-destructive font-medium">
-                  AI detection unavailable — please fill in details manually
+                  AI detection unavailable -- please fill in details manually
                 </span>
               </motion.div>
             )}
@@ -625,7 +625,7 @@ const BatchAddModal = ({ isOpen, onClose, onAdd, userId }: BatchAddModalProps) =
     if (files.length === 0) return;
     e.target.value = "";
 
-    // Convert files → BatchItem entries
+    // Convert files -> BatchItem entries
     const newItems: BatchItem[] = [];
     for (const file of files) {
       let processedFile = file;
@@ -806,7 +806,7 @@ const BatchAddModal = ({ isOpen, onClose, onAdd, userId }: BatchAddModalProps) =
             {/* Header */}
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-display font-bold text-foreground">
-                Quick Add — Batch
+                Quick Add -- Batch
               </h2>
               <button
                 onClick={handleClose}
@@ -1005,7 +1005,7 @@ type ItemRole = "top" | "bottom" | "footwear" | "dress" | "ethnic-top" | "ethnic
 function classifyRole(item: ClothingItem): ItemRole {
   const text = [item.name, ...(item.tags || [])].join(" ");
 
-  // Check ethnic patterns FIRST — items may be stored under generic categories like "Tops"
+  // Check ethnic patterns FIRST -- items may be stored under generic categories like "Tops"
   if (item.category === "Ethnic Wear" || ETHNIC_TOP_RE.test(text)) {
     if (ETHNIC_BOTTOM_RE.test(text)) return "ethnic-bottom";
     if (ETHNIC_SHOE_RE.test(text)) return "ethnic-footwear";
@@ -1047,13 +1047,13 @@ function autoPairItem(item: ClothingItem, allItems: ClothingItem[]): AutoPairRes
   };
 
   if (role === "ethnic-top") {
-    // Search ALL categories for ethnic bottoms/shoes — items may not be under "Ethnic Wear"
+    // Search ALL categories for ethnic bottoms/shoes -- items may not be under "Ethnic Wear"
     const eBottoms = pool.filter((i) => classifyRole(i) === "ethnic-bottom");
     const eShoes = pool.filter((i) => classifyRole(i) === "ethnic-footwear");
     if (eBottoms.length > 0) paired.push(eBottoms[Math.floor(Math.random() * eBottoms.length)]);
-    else warnings.push("No ethnic bottoms (pajama, churidar) found — add some for complete ethnic outfits.");
+    else warnings.push("No ethnic bottoms (pajama, churidar) found -- add some for complete ethnic outfits.");
     if (eShoes.length > 0) paired.push(eShoes[Math.floor(Math.random() * eShoes.length)]);
-    else warnings.push("No ethnic footwear (jutti, mojari, kolhapuri) found — add some for a traditional look.");
+    else warnings.push("No ethnic footwear (jutti, mojari, kolhapuri) found -- add some for a traditional look.");
     return { paired, warnings };
   }
 
@@ -1064,11 +1064,11 @@ function autoPairItem(item: ClothingItem, allItems: ClothingItem[]): AutoPairRes
     if (role === "ethnic-bottom") {
       const eShoes = pool.filter((i) => classifyRole(i) === "ethnic-footwear");
       if (eShoes.length > 0) paired.push(eShoes[Math.floor(Math.random() * eShoes.length)]);
-      else warnings.push("No ethnic footwear found — add jutti or kolhapuri for a complete look.");
+      else warnings.push("No ethnic footwear found -- add jutti or kolhapuri for a complete look.");
     } else {
       const eBottoms = pool.filter((i) => classifyRole(i) === "ethnic-bottom");
       if (eBottoms.length > 0) paired.push(eBottoms[Math.floor(Math.random() * eBottoms.length)]);
-      else warnings.push("No ethnic bottoms found — add pajama or churidar for a complete look.");
+      else warnings.push("No ethnic bottoms found -- add pajama or churidar for a complete look.");
     }
     return { paired, warnings };
   }
@@ -1467,7 +1467,7 @@ const ItemDetailModal = ({ item, allItems, onClose, onToggleFavorite, onDelete, 
                   className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[hsl(43,70%,50%)] to-[hsl(220,10%,65%)] text-white font-display font-semibold shadow-sm"
                 >
                   <Sparkles className="h-4 w-4" />
-                  Try On — Auto Pair
+                  Try On -- Auto Pair
                 </motion.button>
               ) : (
                 <motion.div
@@ -1502,7 +1502,7 @@ const ItemDetailModal = ({ item, allItems, onClose, onToggleFavorite, onDelete, 
                     </div>
                   )}
 
-                  {/* AI Suggest button — shown when ethnic items are missing */}
+                  {/* AI Suggest button -- shown when ethnic items are missing */}
                   {tryOnResult.warnings.length > 0 && classifyRole(item) === "ethnic-top" && suggestedItems.length === 0 && (
                     <motion.button
                       whileTap={{ scale: 0.98 }}
@@ -1549,7 +1549,7 @@ const ItemDetailModal = ({ item, allItems, onClose, onToggleFavorite, onDelete, 
                     </div>
                   )}
 
-                  {/* AI Suggested items — confirmation UI */}
+                  {/* AI Suggested items -- confirmation UI */}
                   {suggestedItems.length > 0 && (
                     <motion.div
                       initial={{ opacity: 0, y: 8 }}
@@ -1708,7 +1708,7 @@ const DigitalCloset = () => {
     );
   };
 
-  // Filter items — category first, then fuzzy search
+  // Filter items -- category first, then fuzzy search
   const categoryFiltered = items.filter((item) => {
     if (activeCategory === "In Laundry") return item.laundry_status === "in_laundry";
     return activeCategory === "All" || item.category === activeCategory;
@@ -1951,7 +1951,7 @@ const DigitalCloset = () => {
         </div>
       )}
 
-      {/* Empty state — no items at all */}
+      {/* Empty state -- no items at all */}
       {!loadingItems && items.length === 0 && (
         <div className="mt-16 flex flex-col items-center text-center">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-card">
@@ -1964,7 +1964,7 @@ const DigitalCloset = () => {
         </div>
       )}
 
-      {/* Empty state — no search results */}
+      {/* Empty state -- no search results */}
       {!loadingItems && items.length > 0 && filtered.length === 0 && (
         <div className="mt-16 flex flex-col items-center text-center">
           <Search className="h-12 w-12 text-muted-foreground/30" />
