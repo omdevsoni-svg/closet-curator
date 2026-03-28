@@ -30,7 +30,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { getClosetItems, getProfile, getStylistHistory, saveStylistResult, type ClothingItem, type Profile, type StylistHistory } from "@/lib/database";
+import { getClosetItems, getProfile, getStylistHistory, saveStylistResult, logWear, uploadImage, saveOutfitPlan, type ClothingItem, type Profile, type StylistHistory } from "@/lib/database";
 import {
   virtualTryOn,
   virtualTryOnMulti,
@@ -246,6 +246,9 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
   const [mode, setMode] = useState<"outfit" | "closet">("outfit");
   // v13: Sequential generation progress
   const [seqProgress, setSeqProgress] = useState<SequentialProgress | null>(null);
+  // Finalise My Outfit — wear tracking
+  const [finalising, setFinalising] = useState(false);
+  const [finalised, setFinalised] = useState(false);
 
   useEffect(() => {
     if (!isOpen || !userId) return;
@@ -432,8 +435,39 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
     setSelectedItem(null);
     setResultImage(null);
     setError(null);
+    setFinalised(false);
+    setFinalising(false);
     if (bodyPhotoBase64) setStep("select");
     else setStep("no-photo");
+  };
+
+  const handleFinaliseOutfit = async () => {
+    setFinalising(true);
+    try {
+      // Log wear for all real outfit items (skip AI-suggested virtual items)
+      const realItemIds = outfitItems
+        .filter((i) => i.id && !i.id.startsWith("ai-suggested-"))
+        .map((i) => i.id);
+      if (realItemIds.length > 0) {
+        await logWear(userId, realItemIds);
+      }
+      // Save the VTO result image to storage
+      if (resultImage) {
+        try {
+          const resp = await fetch(resultImage);
+          const blob = await resp.blob();
+          const file = new File([blob], `vto-${Date.now()}.jpg`, { type: "image/jpeg" });
+          await uploadImage("vto-results", userId, file);
+        } catch (e) {
+          console.warn("VTO image upload skipped:", e);
+        }
+      }
+      setFinalised(true);
+    } catch (err) {
+      console.error("Finalise outfit error:", err);
+    } finally {
+      setFinalising(false);
+    }
   };
 
   const displayItems = mode === "outfit"
@@ -687,7 +721,32 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
                     })()}
                   </div>
                 )}
-                <div className="mt-4 flex gap-2">
+                {/* Finalise My Outfit — wear tracking */}
+                <div className="mt-4">
+                  {finalised ? (
+                    <div className="flex items-center justify-center gap-2 rounded-xl bg-green-500/10 py-3 text-sm font-body font-semibold text-green-600">
+                      <Check className="h-4 w-4" />
+                      Outfit logged!
+                    </div>
+                  ) : (
+                    <button
+                      onClick={handleFinaliseOutfit}
+                      disabled={finalising}
+                      className="w-full rounded-xl bg-gradient-to-r from-purple-600 to-pink-500 py-3.5 text-sm font-body font-semibold text-white shadow-lg disabled:opacity-60"
+                    >
+                      {finalising ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                          Logging outfit…
+                        </span>
+                      ) : (
+                        "Finalise My Outfit"
+                      )}
+                    </button>
+                  )}
+                </div>
+
+                <div className="mt-2 flex gap-2">
                   <button
                     onClick={reset}
                     className="flex-1 rounded-xl bg-card py-3 text-sm font-body font-medium text-foreground"
