@@ -151,14 +151,6 @@ const Profile = () => {
             Your style identity
           </p>
         </div>
-        <motion.button
-          whileTap={{ scale: 0.9 }}
-          onClick={() => navigate("/settings")}
-          className="flex h-9 w-9 items-center justify-center rounded-xl bg-card text-muted-foreground transition-colors hover:text-foreground"
-          aria-label="Settings"
-        >
-          <Settings className="h-[18px] w-[18px]" />
-        </motion.button>
       </div>
 
       {/* Profile card */}
