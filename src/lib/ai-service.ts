@@ -157,6 +157,7 @@ export interface DetectedAttributes {
   material: string;
   tags: string[];
   gender: "men" | "women" | "unisex";
+  rotation_needed?: number; // 0, 90, 180, or 270 degrees clockwise
 }
 
 export type DetectionResult =
@@ -169,8 +170,11 @@ export const detectClothingAttributes = async (
   mimeType = "image/jpeg"
 ): Promise<DetectionResult> => {
   try {
-    // v30: Pre-compress before upload — saves ~1-2s on network + API processing
+    // v30: Pre-compress image before sending to API
+    // 1536px @ q0.85 is more than enough for attribute detection + ghost mannequin
+    // Reduces upload payload by 50-80% and speeds up Gemini processing (~1-2s saved)
     const compressed = await compressBase64Image(imageBase64, mimeType, 1536, 0.85);
+
     const res = await fetch("/api/process-clothing", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -210,7 +214,10 @@ export interface TryOnResult {
 // The canvas-based applyFaceComposite has been replaced with Gemini 2.5 Flash Image
 // which produces much better results (understands facial structure vs simple pixel blending)
 
-// v30: Deferred upscale — show VTO preview immediately, upscale in background
+/* ------------------------------------------------------------------ */
+/*  v30: Background upscale helper — called after VTO preview shown    */
+/*  Same Imagen 4.0 2x upscale, just runs async after user sees result */
+/* ------------------------------------------------------------------ */
 const upscaleInBackground = async (base64: string): Promise<TryOnResult | null> => {
   try {
     const res = await fetch("/api/upscale-image", {
@@ -219,7 +226,10 @@ const upscaleInBackground = async (base64: string): Promise<TryOnResult | null> 
       body: JSON.stringify({ imageBase64: base64 }),
     });
     const data = await res.json();
-    if (data.success && data.image) return data.image as TryOnResult;
+    if (data.success && data.image) {
+      console.log("v30 deferred upscale completed");
+      return data.image as TryOnResult;
+    }
   } catch (e) { console.warn("Deferred upscale failed (non-fatal):", e); }
   return null;
 };
@@ -230,9 +240,10 @@ export const virtualTryOn = async (
   sampleCount = 1,
   personDescription?: string,
   faceImageBase64?: string,
-  onUpscaled?: (result: TryOnResult) => void
+  onUpscaled?: (result: TryOnResult) => void,
 ): Promise<TryOnResult[]> => {
   try {
+    // v30: Skip upscale server-side — return preview faster, upscale in background
     const res = await fetch("/api/virtual-tryon", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -241,7 +252,7 @@ export const virtualTryOn = async (
         faceImageBase64: faceImageBase64 || undefined,
         productImageBase64,
         personDescription: personDescription || undefined,
-        upscale: false, // v30: skip upscale, return preview faster
+        upscale: false,
       }),
     });
 
@@ -259,10 +270,11 @@ export const virtualTryOn = async (
             console.log("v21 face composite applied (single)");
           }
         } catch (e) { console.warn("Face composite failed (non-fatal):", e); }
-        // v30: Fire background upscale after returning preview
+
+        // v30: Fire background upscale — non-blocking, swaps in HD when ready
         if (onUpscaled) {
-          upscaleInBackground(results[0].base64).then((up) => {
-            if (up) onUpscaled(up);
+          upscaleInBackground(results[0].base64).then((upscaled) => {
+            if (upscaled) onUpscaled(upscaled);
           });
         }
       }
@@ -290,9 +302,10 @@ export const virtualTryOnMulti = async (
   garments: GarmentInput[],
   personDescription?: string,
   faceImageBase64?: string,
-  onUpscaled?: (result: TryOnResult) => void
+  onUpscaled?: (result: TryOnResult) => void,
 ): Promise<TryOnResult[]> => {
   try {
+    // v30: Skip upscale server-side
     const res = await fetch("/api/virtual-tryon", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -305,7 +318,7 @@ export const virtualTryOnMulti = async (
           label: g.label,
         })),
         personDescription: personDescription || undefined,
-        upscale: false, // v30: skip upscale, return preview faster
+        upscale: false,
       }),
     });
 
@@ -323,10 +336,11 @@ export const virtualTryOnMulti = async (
             console.log("v21 face composite applied (multi)");
           }
         } catch (e) { console.warn("Face composite failed (non-fatal):", e); }
-        // v30: Fire background upscale after returning preview
+
+        // v30: Fire background upscale
         if (onUpscaled) {
-          upscaleInBackground(results[0].base64).then((up) => {
-            if (up) onUpscaled(up);
+          upscaleInBackground(results[0].base64).then((upscaled) => {
+            if (upscaled) onUpscaled(upscaled);
           });
         }
       }
@@ -374,6 +388,7 @@ export const virtualTryOnSequential = async (
   onUpscaled?: (result: TryOnResult) => void,
 ): Promise<TryOnResult[]> => {
   // v17: Imagen 3 VTO + Smart Quality Tiering — fast intermediates, max quality final
+  // v30: Final step skips server-side upscale — deferred to background
   const totalSteps = garments.length;
   let previousResultBase64: string | null = null;
   let previousResultMimeType = "image/jpeg";
@@ -389,28 +404,26 @@ export const virtualTryOnSequential = async (
     });
 
     try {
-      // v17: isFinalStep flag — only the last step gets full quality + upscale
       const isLast = i === garments.length - 1;
 
       // v29: Compress previousResultBase64 to stay under Vercel's ~4.5MB payload limit
-      // Intermediate results from Imagen are high-res; resize to 1024px and JPEG 0.65
       let compressedPrev = previousResultBase64 || undefined;
       if (previousResultBase64 && i > 0) {
         compressedPrev = await compressBase64Image(previousResultBase64, previousResultMimeType, 1024, 0.65);
         console.log(`v29: Compressed prev result from ${previousResultBase64.length} to ${compressedPrev.length} chars`);
       }
 
+      // v30: Skip upscale on ALL steps (including final) — deferred to background
       const res = await fetch("/api/virtual-tryon", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           mode: i === 0 ? "single" : "sequential-step",
-          bodyImageBase64: (i === 0 || !previousResultBase64) ? bodyImageBase64 : '', // v28: skip body for step 2+
+          bodyImageBase64: (i === 0 || !previousResultBase64) ? bodyImageBase64 : '',
           productImages: [{ base64: garment.base64, mimeType: garment.mimeType || "image/jpeg" }],
-          // For step 2+: previous result becomes the person image
           previousResultBase64: compressedPrev,
           isFinalStep: isLast,
-          upscale: false, // v30: deferred upscale — return preview faster
+          upscale: false,
         }),
       });
 
@@ -448,6 +461,7 @@ export const virtualTryOnSequential = async (
   if (previousResultBase64) {
     // v21: Client-side face composite — restore original face onto VTO result
     // with Reinhard color correction and multi-layer feathered mask
+    let finalResult: TryOnResult = { mimeType: previousResultMimeType, base64: previousResultBase64 };
     try {
       const compositedBase64 = await compositeFaceOntoVTO(
         bodyImageBase64,
@@ -457,24 +471,20 @@ export const virtualTryOnSequential = async (
       );
       if (compositedBase64) {
         console.log("v21 face composite applied successfully");
-        // v30: Fire background upscale on composited result
-        if (onUpscaled) {
-          upscaleInBackground(compositedBase64).then((up) => {
-            if (up) onUpscaled(up);
-          });
-        }
-        return [{ mimeType: "image/png", base64: compositedBase64 }];
+        finalResult = { mimeType: "image/png", base64: compositedBase64 };
       }
     } catch (compErr) {
       console.warn("Face composite failed (non-fatal), returning raw VTO:", compErr);
     }
-    // v30: Fire background upscale even without face composite
+
+    // v30: Fire background upscale — non-blocking, swaps in HD when ready
     if (onUpscaled) {
-      upscaleInBackground(previousResultBase64).then((up) => {
-        if (up) onUpscaled(up);
+      upscaleInBackground(finalResult.base64).then((upscaled) => {
+        if (upscaled) onUpscaled(upscaled);
       });
     }
-    return [{ mimeType: previousResultMimeType, base64: previousResultBase64 }];
+
+    return [finalResult];
   }
   return [];
 };
