@@ -1,9 +1,6 @@
-const LOGO_SRC =
-  "data:image/webp;base64,UklGRuIDAABXRUJQVlA4INYDAABQFQCdASqAAIAAPp1Gnkulo7AlJBYLkgATiWcA1dnESAbaDn1bJ8X7c2PRD4gNKPM98lX0d7BRPwMGybsKu9e6v2bOje4Tq3bGKMljglXf7SXHVX9D6ImGa2y0T3lA00k+dfmTpQ3am5+h7+al2EJNDCRyhPQ+V9nbmCX7sdG18WwMaMH2SKNgorXcL1lJP2tSAFGgI+uRd5t0WnETf0fzIsIZghV0xxe1KqeBrJ1sSY/JYAD++ZyGbiFekf6q+H1y9cqts1wrAvvkeaOM2W1S2/UbpUPIy/okxHIRjVZYFg+3IVP2+FfF6dlzzn8MY3HkmNP5yeVqUiDZeUokAYMowmNm+Qsq5Zb8oga4zznZfXAQ227r/Z4AbHTKF14zSw4FZ+P45PoWtDssFM7soPlKbUS1lB0kgEc/hYXXad4aRg+utLidZNTQNKnDv3hIitrY5DCsDmG1pd7A2JGnz7Y3lY7xMd0nmBbVyr7EuZLKGgJ0yqaBzdtRdXojugw7S7ZzQUDlHBKG9E7WvV3nmvYlaFhXGfcPEloqTQcNNAdaBBotgF5rCq+nGbYeWHm6xOW79lNJXBQZcqB2CpZKT1p2dT79rYghjzFhmuMQWdcCtgpqpVir7vvjqVi1xoHwCsA8PS1S0/j48zHQX58iBlYAraynAbZvVdWfl0W3cz6QOcJQeEkVMGR8bp2JztajgNcJV3bax6LdLxEpxCXIT6Ljayr7l5iM+eaCb6cNloeu/XjLAhg+fkcZm05oTXgc40jFBXRA33yO+grdHvWSYQer4IR/Y/mtSZFlsu3UEwJwODBgaAAw0LnbuAD5kdFs77VUvWM1fsjDO/6RDKyye7LozIxnY2NVOt+TpB2g+l8oZvVMgtJBUfn1o2cUsd2M/VUQEBD+eyafRu3Za/f3Gn8m/vzPOvo+LAmO9Jey/pFVn2lMs3Xdw+Y2pJNpFNWsEWEk1RvPT2UHsDKuI+nUdKD3OHsSkN1Tw4pQnfuy5ooWAb6KaOdd4vKs2Ii/oRi5Lh5Mamn0bVyFZpgGZD8ZFi8hONNgggsiCwS6M3uHIRJCWIejMb7qhocJFiyXwNiIpEvBYNUyR3i4gn9AqhIzbUtO0N+5rgZATvzYJYUDdaF9HrHLUxKnwhQEiyE85xnLEMAODrUaFJQrHKHLPe/OHbUg/YyW3HvCSxEu1okALwVHoqMKymDEQP+mEiNMEqqv+QRIvvi2OilQDukgBBOgbe1Dp18KwvaP84ABanuljo9zJJExM8PqXOVXYWUmft0A/FOTRQmMkOhDhgH1/H4EnQFGIAAAAAAA";
-
 const Logo = ({ className = "h-8 w-8" }: { className?: string }) => (
   <img
-    src={LOGO_SRC}
+    src="/icons/icon-512.png"
     alt="StyleOS"
     className={`${className} rounded-lg object-contain`}
   />
