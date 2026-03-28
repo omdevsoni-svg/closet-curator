@@ -24,7 +24,7 @@ const ProfileSetup = () => {
   }, [user, authLoading, navigate]);
 
   // While auth is loading or user is already logged in, show a minimal spinner
-  // instead of the login form — this prevents the "flash" on PWA launch
+  // instead of the login form -- this prevents the "flash" on PWA launch
   if (authLoading || user) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
