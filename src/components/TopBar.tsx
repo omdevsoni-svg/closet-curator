@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { useTheme } from "@/hooks/useTheme";
 import Logo from "./Logo";
 
-/* Pages that live in the bottom nav — no back button needed */
+/* Pages that live in the bottom nav -- no back button needed */
 const MAIN_PAGES = ["/home", "/closet", "/stylist", "/health", "/profile"];
 
 /* Friendly titles for sub-pages */
