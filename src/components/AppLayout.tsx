@@ -6,7 +6,7 @@ const AppLayout = () => {
   return (
     <div className="min-h-screen bg-background">
       <TopBar />
-      <main className="pb-20">
+      <main className="pb-24">
         <Outlet />
       </main>
       <BottomNav />
