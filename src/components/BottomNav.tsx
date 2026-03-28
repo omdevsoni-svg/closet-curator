@@ -22,6 +22,8 @@ const BottomNav = () => {
       <button
         key={item.path}
         onClick={() => navigate(item.path)}
+        aria-label={item.label}
+        aria-current={isActive ? "page" : undefined}
         className="relative flex flex-col items-center gap-0.5 px-3 py-1.5 transition-colors"
       >
         {isActive && (
@@ -65,9 +67,11 @@ const BottomNav = () => {
           <motion.button
             whileTap={{ scale: 0.9 }}
             onClick={() => navigate("/stylist")}
+            aria-label="AI Stylist"
+            aria-current={isStylistActive ? "page" : undefined}
             className={`flex h-14 w-14 items-center justify-center rounded-2xl shadow-lg transition-all ${
               isStylistActive
-                ? "bg-gradient-to-br from-[hsl(43,70%,50%)] to-[hsl(220,10%,65%)] text-white shadow-ai/30"
+                ? "bg-gradient-to-br from-ai to-muted-foreground text-white shadow-ai/30"
                 : "bg-card text-muted-foreground shadow-black/10 hover:text-foreground dark:shadow-black/30"
             }`}
           >
