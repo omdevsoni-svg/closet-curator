@@ -264,6 +264,39 @@ export const fixImageOrientation = (file: File): Promise<File> =>
   });
 
 /* ------------------------------------------------------------------ */
+/*  Helper: AI-detected rotation — apply clockwise rotation degrees    */
+/* ------------------------------------------------------------------ */
+export const rotateImage = (file: File, degrees: number): Promise<File> =>
+  new Promise((resolve) => {
+    if (!degrees || degrees === 0) { resolve(file); return; }
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const { naturalWidth: w, naturalHeight: h } = img;
+      const swap = degrees === 90 || degrees === 270;
+      const canvas = document.createElement("canvas");
+      canvas.width = swap ? h : w;
+      canvas.height = swap ? w : h;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { URL.revokeObjectURL(url); resolve(file); return; }
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate((degrees * Math.PI) / 180);
+      ctx.drawImage(img, -w / 2, -h / 2);
+      URL.revokeObjectURL(url);
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) { resolve(file); return; }
+          resolve(new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" }));
+        },
+        "image/jpeg",
+        0.92
+      );
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+    img.src = url;
+  });
+
+/* ------------------------------------------------------------------ */
 /*  Helper: convert any image file to a web-friendly JPEG via canvas   */
 /* ------------------------------------------------------------------ */
 const toJpegBlob = (file: File): Promise<Blob> =>
