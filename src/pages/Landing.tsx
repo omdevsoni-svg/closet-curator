@@ -12,9 +12,6 @@ import {
   Star,
   ArrowRight,
   ChevronRight,
-  Instagram,
-  Twitter,
-  Github,
   Menu,
   X,
 } from "lucide-react";
@@ -460,62 +457,17 @@ const Landing = () => {
       {/* Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Footer Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ */}
       <footer className="border-t border-border py-10 sm:py-12">
         <div className="mx-auto max-w-6xl px-4 sm:px-5">
-          <div className="grid gap-8 grid-cols-2 lg:grid-cols-4">
-            <div className="col-span-2 lg:col-span-1">
-              <div className="flex items-center gap-2">
-                <Logo className="h-7 w-7" />
-                <span className="text-base font-display font-bold text-foreground">StyleOS</span>
-              </div>
-              <p className="mt-3 text-sm text-muted-foreground font-body leading-relaxed max-w-xs">
-                Your AI-powered digital wardrobe manager. Dress smarter, shop less, style more.
-              </p>
+          <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-between">
+            <div className="flex items-center gap-2">
+              <Logo className="h-7 w-7" />
+              <span className="text-base font-display font-bold text-foreground">StyleOS</span>
+              <span className="text-sm text-muted-foreground font-body ml-2 hidden sm:inline">
+                Your AI-powered digital wardrobe manager.
+              </span>
             </div>
-            <div>
-              <h4 className="text-sm font-display font-semibold text-foreground">Product</h4>
-              <ul className="mt-3 space-y-2">
-                {["Features", "How It Works", "FAQ"].map((item) => (
-                  <li key={item}>
-                    <a href="#" className="text-sm font-body text-muted-foreground transition-colors hover:text-foreground">{item}</a>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h4 className="text-sm font-display font-semibold text-foreground">Company</h4>
-              <ul className="mt-3 space-y-2">
-                {["About", "Blog", "Careers", "Contact"].map((item) => (
-                  <li key={item}>
-                    <a href="#" className="text-sm font-body text-muted-foreground transition-colors hover:text-foreground">{item}</a>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h4 className="text-sm font-display font-semibold text-foreground">Legal</h4>
-              <ul className="mt-3 space-y-2">
-                {["Privacy Policy", "Terms of Service", "Cookie Policy"].map((item) => (
-                  <li key={item}>
-                    <a href="#" className="text-sm font-body text-muted-foreground transition-colors hover:text-foreground">{item}</a>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-          <div className="mt-10 flex flex-col items-center justify-between gap-4 border-t border-border pt-8 sm:flex-row">
             <p className="text-xs text-muted-foreground font-body">
               &copy; {new Date().getFullYear()} StyleOS. All rights reserved.
             </p>
-            <div className="flex gap-4">
-              <a href="#" className="text-muted-foreground transition-colors hover:text-foreground">
-                <Instagram className="h-4 w-4" />
-              </a>
-              <a href="#" className="text-muted-foreground transition-colors hover:text-foreground">
-                <Twitter className="h-4 w-4" />
-              </a>
-              <a href="#" className="text-muted-foreground transition-colors hover:text-foreground">
-                <Github className="h-4 w-4" />
-              </a>
-            </div>
           </div>
         </div>
       </footer>
