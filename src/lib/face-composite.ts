@@ -245,7 +245,7 @@ function createFeatheredMask(
   ctx.restore();
 
   // v25: Hard clip bottom of mask to prevent collar/neck color bleed
-  const bottomFadeStart = box.y + box.height * 0.35;  // v30: more aggressive — cut above chin/jawline
+  const bottomFadeStart = box.y + box.height * 0.35;  // v30: more aggressive -- cut above chin/jawline
   const bottomFadeEnd = box.y + box.height * 0.50;  // v30: fully transparent by mid-face box
   ctx.globalCompositeOperation = "destination-out";
   const fadeGrad = ctx.createLinearGradient(0, bottomFadeStart, 0, bottomFadeEnd);
