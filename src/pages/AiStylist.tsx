@@ -1166,17 +1166,23 @@ const AiStylist = () => {
       });
 
       if (result.success) {
-        const resolved: ResolvedCombination[] = result.combinations.map((combo) => {
-          const resolvedSlots = combo.slots
-            .map((s) => {
-              const item = closetItems.find((i) => i.id === s.item_id);
-              return item ? { slot: s.slot, item } : null;
-            })
-            .filter(Boolean) as { slot: string; item: ClothingItem }[];
+        const resolved: ResolvedCombination[] = result.combinations
+          .map((combo) => {
+            const resolvedSlots = combo.slots
+              .map((s) => {
+                const item = closetItems.find((i) => i.id === s.item_id);
+                if (!item) console.warn("[AI Stylist] Unmatched slot item_id:", s.item_id, "slot:", s.slot);
+                return item ? { slot: s.slot, item } : null;
+              })
+              .filter(Boolean) as { slot: string; item: ClothingItem }[];
 
-          const resolvedItems = combo.item_ids
-            .map((id) => closetItems.find((i) => i.id === id))
-            .filter(Boolean) as ClothingItem[];
+            const resolvedItems = combo.item_ids
+              .map((id) => {
+                const item = closetItems.find((i) => i.id === id);
+                if (!item) console.warn("[AI Stylist] Unmatched item_id:", id);
+                return item;
+              })
+              .filter(Boolean) as ClothingItem[];
 
           const reasoning = combo.reasoning.map((r) => {
             const item = closetItems.find((i) => i.id === r.id);
@@ -1191,7 +1197,16 @@ const AiStylist = () => {
             reasoning,
             missing: combo.missing,
           };
-        });
+          })
+          .filter((combo) => {
+            // Filter out combinations with fewer than 2 resolved items
+            const itemCount = combo.slots.length > 0 ? combo.slots.length : combo.items.length;
+            if (itemCount < 2) {
+              console.warn("[AI Stylist] Dropping incomplete combo:", combo.label, "- only", itemCount, "items resolved");
+              return false;
+            }
+            return true;
+          });
 
         setCombinations(resolved);
 
