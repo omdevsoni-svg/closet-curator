@@ -31,6 +31,7 @@ import {
   toggleArchive,
   updateClosetItem,
   uploadImage,
+  fixImageOrientation,
   logWear,
   sendToLaundry,
   returnFromLaundry,
@@ -114,6 +115,9 @@ const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => 
         // Fall through with original file as best-effort
       }
     }
+
+    // Fix EXIF orientation so the image is always upright (top-to-bottom)
+    processedFile = await fixImageOrientation(processedFile);
 
     setImageFile(processedFile);
     setImagePreview(URL.createObjectURL(processedFile));
