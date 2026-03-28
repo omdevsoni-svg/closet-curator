@@ -151,9 +151,13 @@ const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => 
           // Convert data URL to File for upload
           const resp = await fetch(enhancedDataUrl);
           const blob = await resp.blob();
-          const enhancedFile = new File([blob], "enhanced.png", { type: result.enhancedImage.mimeType });
+          let enhancedFile = new File([blob], "enhanced.png", { type: result.enhancedImage.mimeType });
+          // Also apply AI-detected rotation to enhanced image if needed
+          if (attrs.rotation_needed && attrs.rotation_needed > 0) {
+            enhancedFile = await rotateImage(enhancedFile, attrs.rotation_needed);
+          }
           setImageFile(enhancedFile);
-          setImagePreview(enhancedDataUrl);
+          setImagePreview(URL.createObjectURL(enhancedFile));
         } else if (attrs.rotation_needed && attrs.rotation_needed > 0) {
           // No enhanced image — apply AI-detected rotation to fix orientation
           const rotated = await rotateImage(processedFile, attrs.rotation_needed);
