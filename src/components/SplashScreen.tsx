@@ -23,7 +23,6 @@ const SplashScreen = ({ onFinish }: SplashScreenProps) => {
 
   return (
     <AnimatePresence>
-      {phase !== "exit" ? null : null}
       <motion.div
         key="splash"
         initial={{ opacity: 1 }}
