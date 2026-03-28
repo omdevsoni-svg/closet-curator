@@ -174,7 +174,7 @@ const Settings = () => {
         Manage your preferences and account
       </p>
 
-      {/* ── Appearance ── */}
+      {/* -- Appearance -- */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -217,7 +217,7 @@ const Settings = () => {
         </div>
       </motion.div>
 
-      {/* ── Notifications ── */}
+      {/* -- Notifications -- */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -270,7 +270,7 @@ const Settings = () => {
         </div>
       </motion.div>
 
-      {/* ── Personalization ── */}
+      {/* -- Personalization -- */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -296,7 +296,7 @@ const Settings = () => {
         </div>
       </motion.div>
 
-      {/* ── Change Password ── */}
+      {/* -- Change Password -- */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -421,7 +421,7 @@ const Settings = () => {
         )}
       </motion.div>
 
-      {/* ── Danger zone ── */}
+      {/* -- Danger zone -- */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -464,7 +464,7 @@ const Settings = () => {
         )}
       </motion.div>
 
-      {/* ── Sign Out ── */}
+      {/* -- Sign Out -- */}
       <motion.button
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
