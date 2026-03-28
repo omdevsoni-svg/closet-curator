@@ -108,7 +108,7 @@ const computeHealth = (items: ClothingItem[]): HealthData => {
   // Laundry items
   const laundryItems = activeItems.filter((i) => i.laundry_status === "in_laundry");
 
-  // ── Comprehensive recommendations engine ──
+  // -- Comprehensive recommendations engine --
   const recommendations: string[] = [];
   const topCount = catCounts["Tops"] || 0;
   const bottomCount = catCounts["Bottoms"] || 0;
@@ -127,11 +127,11 @@ const computeHealth = (items: ClothingItem[]): HealthData => {
       const extraBottoms = 3;
       const newCombos = topCount * (bottomCount + extraBottoms);
       recommendations.push(
-        `You have ${topCount} tops but only ${bottomCount} bottoms — your bottoms are the bottleneck. Adding just ${extraBottoms} versatile bottoms would jump your outfit combos from ${combos} to ${newCombos}.`
+        `You have ${topCount} tops but only ${bottomCount} bottoms -- your bottoms are the bottleneck. Adding just ${extraBottoms} versatile bottoms would jump your outfit combos from ${combos} to ${newCombos}.`
       );
     } else if (ratio < 0.5) {
       recommendations.push(
-        `You have ${bottomCount} bottoms but only ${topCount} tops — a few more tops would multiply your outfit options significantly.`
+        `You have ${bottomCount} bottoms but only ${topCount} tops -- a few more tops would multiply your outfit options significantly.`
       );
     }
   }
@@ -143,7 +143,7 @@ const computeHealth = (items: ClothingItem[]): HealthData => {
   if (footCount === 0) missingEssentials.push("footwear");
   if (missingEssentials.length > 0) {
     recommendations.push(
-      `Essential gap: You're missing ${missingEssentials.join(" and ")} entirely — these are the building blocks of every outfit.`
+      `Essential gap: You're missing ${missingEssentials.join(" and ")} entirely -- these are the building blocks of every outfit.`
     );
   }
 
@@ -167,7 +167,7 @@ const computeHealth = (items: ClothingItem[]): HealthData => {
   // 4. No outerwear / layering pieces
   if (outerwearCount === 0) {
     recommendations.push(
-      `No outerwear in your closet — a versatile jacket or blazer opens up layering options for cooler days and dressier occasions.`
+      `No outerwear in your closet -- a versatile jacket or blazer opens up layering options for cooler days and dressier occasions.`
     );
   } else if (outerwearCount === 1) {
     recommendations.push(
@@ -178,7 +178,7 @@ const computeHealth = (items: ClothingItem[]): HealthData => {
   // 5. Accessory deficit
   if (accessoryCount === 0) {
     recommendations.push(
-      `No accessories yet — even one watch, belt, or scarf can elevate a basic outfit from ordinary to put-together.`
+      `No accessories yet -- even one watch, belt, or scarf can elevate a basic outfit from ordinary to put-together.`
     );
   }
 
@@ -203,7 +203,7 @@ const computeHealth = (items: ClothingItem[]): HealthData => {
   // 7. No activewear
   if (activewearCount === 0) {
     recommendations.push(
-      `No activewear in your closet — if you work out or enjoy sporty looks, adding a set of athletic wear keeps your regular clothes workout-free.`
+      `No activewear in your closet -- if you work out or enjoy sporty looks, adding a set of athletic wear keeps your regular clothes workout-free.`
     );
   }
 
@@ -236,7 +236,7 @@ const computeHealth = (items: ClothingItem[]): HealthData => {
   if (neverWorn.length > 3) {
     const pct = Math.round((neverWorn.length / activeItems.length) * 100);
     recommendations.push(
-      `${neverWorn.length} pieces (${pct}% of your closet) have never been worn. Try styling one this week — or consider if some should be donated to make room for pieces you'll actually reach for.`
+      `${neverWorn.length} pieces (${pct}% of your closet) have never been worn. Try styling one this week -- or consider if some should be donated to make room for pieces you'll actually reach for.`
     );
   }
 
@@ -245,7 +245,7 @@ const computeHealth = (items: ClothingItem[]): HealthData => {
     const combos = topCount * bottomCount * footCount;
     if (combos < 50) {
       recommendations.push(
-        `Your current ${topCount} tops × ${bottomCount} bottoms × ${footCount} shoes = ${combos} possible outfits. Aim for 100+ combos — the easiest boost is adding items in your weakest category.`
+        `Your current ${topCount} tops × ${bottomCount} bottoms × ${footCount} shoes = ${combos} possible outfits. Aim for 100+ combos -- the easiest boost is adding items in your weakest category.`
       );
     }
   }
@@ -265,7 +265,7 @@ const computeHealth = (items: ClothingItem[]): HealthData => {
       const daysSince = Math.floor((Date.now() - new Date(oldestLaundry.laundry_sent_at).getTime()) / 86400000);
       if (daysSince >= 3) {
         recommendations.push(
-          `${laundryItems.length} piece${laundryItems.length > 1 ? "s have" : " has"} been in laundry for ${daysSince}+ days — that's reducing your available outfit options by ${Math.round((laundryItems.length / activeItems.length) * 100)}%.`
+          `${laundryItems.length} piece${laundryItems.length > 1 ? "s have" : " has"} been in laundry for ${daysSince}+ days -- that's reducing your available outfit options by ${Math.round((laundryItems.length / activeItems.length) * 100)}%.`
         );
       }
     }
@@ -276,13 +276,13 @@ const computeHealth = (items: ClothingItem[]): HealthData => {
   const basics = activeItems.filter(i => [i.name, ...(i.tags || [])].join(" ").toLowerCase().match(basicKeywords));
   if (basics.length < 3 && activeItems.length >= 10) {
     recommendations.push(
-      `Your closet could use more basics — plain tees, solid shirts, and classic jeans are the "glue" that ties statement pieces together.`
+      `Your closet could use more basics -- plain tees, solid shirts, and classic jeans are the "glue" that ties statement pieces together.`
     );
   }
 
   // Fallback
   if (recommendations.length === 0 && activeItems.length > 0) {
-    recommendations.push("Your wardrobe is well-balanced across categories, colors, and occasions. Keep logging outfits — the more data, the smarter your insights get.");
+    recommendations.push("Your wardrobe is well-balanced across categories, colors, and occasions. Keep logging outfits -- the more data, the smarter your insights get.");
   }
 
   return { versatility, occasionCoverage, colorBalance, gaps, colorBreakdown, categoryBreakdown, mostWorn, leastWorn, laundryItems, recommendations };
