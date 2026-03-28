@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#1c1c2e"/>
+      <stop offset="100%" stop-color="#111827"/>
+    </linearGradient>
+    <linearGradient id="goldGrad" x1="140" y1="180" x2="380" y2="380" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#d4a843"/>
+      <stop offset="35%" stop-color="#f0d078"/>
+      <stop offset="65%" stop-color="#c9a040"/>
+      <stop offset="100%" stop-color="#96772a"/>
+    </linearGradient>
+    <linearGradient id="silverGrad" x1="180" y1="140" x2="330" y2="380" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#c0c0c0"/>
+      <stop offset="40%" stop-color="#e8e8e8"/>
+      <stop offset="70%" stop-color="#b0b0b0"/>
+      <stop offset="100%" stop-color="#909090"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)"/>
+  <path d="M140 320 Q160 150 290 135 Q360 125 380 170 Q395 210 340 245 Q300 265 260 272"
+        fill="none" stroke="url(#goldGrad)" stroke-width="18" stroke-linecap="round"/>
+  <path d="M290 168 Q258 148 222 158 Q182 170 178 210 Q174 248 222 264 Q270 280 296 298 Q338 326 328 362 Q318 398 268 404 Q220 408 188 380"
+        fill="none" stroke="url(#silverGrad)" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M250 350 Q310 400 370 370 Q400 354 390 320"
+        fill="none" stroke="url(#goldGrad)" stroke-width="14" stroke-linecap="round"/>
+</svg>
