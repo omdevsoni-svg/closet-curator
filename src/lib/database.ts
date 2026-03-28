@@ -166,6 +166,104 @@ export const toggleArchive = async (itemId: string, archived: boolean) => {
 };
 
 /* ------------------------------------------------------------------ */
+/*  Helper: read EXIF orientation tag from a JPEG file                  */
+/* ------------------------------------------------------------------ */
+const getExifOrientation = (file: File): Promise<number> =>
+  new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const view = new DataView(e.target?.result as ArrayBuffer);
+      // Not a JPEG
+      if (view.getUint16(0, false) !== 0xFFD8) { resolve(1); return; }
+      let offset = 2;
+      while (offset < view.byteLength) {
+        if (view.getUint16(offset, false) === 0xFFE1) {
+          // Found APP1 (EXIF)
+          const exifOffset = offset + 4;
+          // Check "Exif\0\0"
+          if (view.getUint32(exifOffset, false) !== 0x45786966) { resolve(1); return; }
+          const tiffOffset = exifOffset + 6;
+          const littleEndian = view.getUint16(tiffOffset, false) === 0x4949;
+          const ifdOffset = tiffOffset + view.getUint32(tiffOffset + 4, littleEndian);
+          const tags = view.getUint16(ifdOffset, littleEndian);
+          for (let i = 0; i < tags; i++) {
+            const tagOffset = ifdOffset + 2 + i * 12;
+            if (view.getUint16(tagOffset, littleEndian) === 0x0112) {
+              resolve(view.getUint16(tagOffset + 8, littleEndian));
+              return;
+            }
+          }
+          resolve(1); return;
+        }
+        offset += 2 + view.getUint16(offset + 2, false);
+      }
+      resolve(1);
+    };
+    reader.onerror = () => resolve(1);
+    // Only read first 64KB for EXIF — much faster than reading entire file
+    reader.readAsArrayBuffer(file.slice(0, 65536));
+  });
+
+/* ------------------------------------------------------------------ */
+/*  Helper: fix EXIF orientation + ensure top-to-bottom via canvas      */
+/* ------------------------------------------------------------------ */
+export const fixImageOrientation = (file: File): Promise<File> =>
+  new Promise(async (resolve, reject) => {
+    try {
+      const orientation = await getExifOrientation(file);
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        let { naturalWidth: w, naturalHeight: h } = img;
+
+        // Determine if EXIF requires a dimension swap (orientations 5-8)
+        const needsSwap = orientation >= 5 && orientation <= 8;
+        const canvasW = needsSwap ? h : w;
+        const canvasH = needsSwap ? w : h;
+
+        const canvas = document.createElement("canvas");
+        canvas.width = canvasW;
+        canvas.height = canvasH;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { URL.revokeObjectURL(url); resolve(file); return; }
+
+        // Apply EXIF orientation transform
+        switch (orientation) {
+          case 2: ctx.transform(-1, 0, 0, 1, canvasW, 0); break;           // flip horizontal
+          case 3: ctx.transform(-1, 0, 0, -1, canvasW, canvasH); break;    // rotate 180
+          case 4: ctx.transform(1, 0, 0, -1, 0, canvasH); break;           // flip vertical
+          case 5: ctx.transform(0, 1, 1, 0, 0, 0); break;                  // transpose
+          case 6: ctx.transform(0, 1, -1, 0, canvasH, 0); break;           // rotate 90 CW
+          case 7: ctx.transform(0, -1, -1, 0, canvasH, canvasW); break;    // transverse
+          case 8: ctx.transform(0, -1, 1, 0, 0, canvasW); break;           // rotate 90 CCW
+          default: break; // orientation 1 = no transform needed
+        }
+
+        ctx.drawImage(img, 0, 0);
+        URL.revokeObjectURL(url);
+
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) { resolve(file); return; }
+            const fixed = new File(
+              [blob],
+              file.name.replace(/\.[^.]+$/, ".jpg"),
+              { type: "image/jpeg" }
+            );
+            resolve(fixed);
+          },
+          "image/jpeg",
+          0.92
+        );
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+      img.src = url;
+    } catch {
+      resolve(file); // graceful fallback
+    }
+  });
+
+/* ------------------------------------------------------------------ */
 /*  Helper: convert any image file to a web-friendly JPEG via canvas   */
 /* ------------------------------------------------------------------ */
 const toJpegBlob = (file: File): Promise<Blob> =>
