@@ -4,7 +4,6 @@ import {
   Search,
   Mic,
   MicOff,
-  SlidersHorizontal,
   X,
   Camera,
   ImageIcon,
@@ -1800,9 +1799,7 @@ const DigitalCloset = () => {
             )}
           </button>
         </div>
-        <button className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground transition-colors hover:text-foreground">
-          <SlidersHorizontal className="h-4 w-4" />
-        </button>
+
       </div>
 
       {/* Category filter chips */}
