@@ -32,6 +32,7 @@ import {
   updateClosetItem,
   uploadImage,
   fixImageOrientation,
+  rotateImage,
   logWear,
   sendToLaundry,
   returnFromLaundry,
@@ -153,6 +154,11 @@ const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => 
           const enhancedFile = new File([blob], "enhanced.png", { type: result.enhancedImage.mimeType });
           setImageFile(enhancedFile);
           setImagePreview(enhancedDataUrl);
+        } else if (attrs.rotation_needed && attrs.rotation_needed > 0) {
+          // No enhanced image — apply AI-detected rotation to fix orientation
+          const rotated = await rotateImage(processedFile, attrs.rotation_needed);
+          setImageFile(rotated);
+          setImagePreview(URL.createObjectURL(rotated));
         }
 
         setAiDetected(true);
@@ -1289,18 +1295,32 @@ const ItemDetailModal = ({ item, allItems, onClose, onToggleFavorite, onDelete, 
                 <p className="mt-0.5 text-sm font-medium font-body text-foreground">{item.brand}</p>
               </div>
             )}
-            {item.size && (
-              <div className="rounded-xl bg-card p-3">
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">Size</p>
+            <div className="rounded-xl bg-card p-3">
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">Size</p>
+              {item.size ? (
                 <p className="mt-0.5 text-sm font-medium font-body text-foreground">{item.size}</p>
-              </div>
-            )}
-            {item.fit_notes && (
-              <div className="rounded-xl bg-card p-3">
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">Fit</p>
+              ) : (
+                <button
+                  onClick={() => setEditing(true)}
+                  className="mt-0.5 text-xs font-body text-ai hover:underline"
+                >
+                  + Add size
+                </button>
+              )}
+            </div>
+            <div className="rounded-xl bg-card p-3">
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">Fit</p>
+              {item.fit_notes ? (
                 <p className="mt-0.5 text-sm font-medium font-body text-foreground">{item.fit_notes}</p>
-              </div>
-            )}
+              ) : (
+                <button
+                  onClick={() => setEditing(true)}
+                  className="mt-0.5 text-xs font-body text-ai hover:underline"
+                >
+                  + Add fit
+                </button>
+              )}
+            </div>
             {item.gender && (
               <div className="rounded-xl bg-card p-3">
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">Gender</p>
