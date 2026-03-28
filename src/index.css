@@ -120,4 +120,17 @@
   .font-emoji {
     font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', 'Twemoji Mozilla', 'Android Emoji', sans-serif;
   }
+
+  /* ── Clothing image orientation & display fix ── */
+  img {
+      image-orientation: from-image;
+  }
+
+  .closet-item img,
+  [data-closet-item] img {
+      image-orientation: from-image;
+      object-fit: contain;
+      object-position: center;
+  }
+  
 }
