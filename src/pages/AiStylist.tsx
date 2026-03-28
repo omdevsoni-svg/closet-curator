@@ -62,7 +62,7 @@ type ResolvedCombination = {
 };
 
 /* ------------------------------------------------------------------ */
-/*  VTO Loading Screen â garment showcase + creative waiting messages  */
+/*  VTO Loading Screen -- garment showcase + creative waiting messages  */
 /* ------------------------------------------------------------------ */
 
 const CREATIVE_MESSAGES = [
@@ -114,7 +114,7 @@ const VtoLoadingScreen = ({ items, isSequential, currentStep, seqProgress }: Vto
 
   return (
     <div className="mt-6 flex flex-col items-center py-6">
-      {/* Garment showcase â cycling image */}
+      {/* Garment showcase -- cycling image */}
       <div className="relative mb-5">
         <div className="h-36 w-28 overflow-hidden rounded-2xl bg-card shadow-lg ring-1 ring-border/30">
           <AnimatePresence mode="wait">
@@ -147,7 +147,7 @@ const VtoLoadingScreen = ({ items, isSequential, currentStep, seqProgress }: Vto
         )}
       </div>
 
-      {/* Item dots â show which garment is currently showcased */}
+      {/* Item dots -- show which garment is currently showcased */}
       {items.length > 1 && (
         <div className="flex items-center gap-1.5 mb-4">
           {items.map((_, i) => (
@@ -222,7 +222,7 @@ const VtoLoadingScreen = ({ items, isSequential, currentStep, seqProgress }: Vto
 };
 
 /* ------------------------------------------------------------------ */
-/*  Virtual Try-On Modal â now accepts specific outfit items           */
+/*  Virtual Try-On Modal -- now accepts specific outfit items           */
 /* ------------------------------------------------------------------ */
 interface TryOnModalProps {
   isOpen: boolean;
@@ -246,7 +246,7 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
   const [mode, setMode] = useState<"outfit" | "closet">("outfit");
   // v13: Sequential generation progress
   const [seqProgress, setSeqProgress] = useState<SequentialProgress | null>(null);
-  // Finalise My Outfit â wear tracking
+  // Finalise My Outfit -- wear tracking
   const [finalising, setFinalising] = useState(false);
   const [finalised, setFinalised] = useState(false);
 
@@ -275,7 +275,7 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
             }
           }
 
-          // v15: Imagen 3 VTO doesn't need text descriptions â it preserves identity automatically
+          // v15: Imagen 3 VTO doesn't need text descriptions -- it preserves identity automatically
           // Keep personDescription for potential future use but don't hardcode facial features
           const descParts: string[] = [];
           if (profile?.model_gender) descParts.push(profile.model_gender === "neutral" ? "person" : profile.model_gender === "men" ? "male" : "female");
@@ -295,12 +295,12 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
               let results: { mimeType: string; base64: string }[] = [];
 
               if (itemsWithImages.length === 1) {
-                // Single garment â use direct one-shot
+                // Single garment -- use direct one-shot
                 const productBase64 = await urlToBase64(itemsWithImages[0].image_url, { removeBackground: true });
                 results = await virtualTryOn(bodyB64, productBase64, 1, desc, faceB64 || undefined);
               } else {
-                // v22: SEQUENTIAL generation â one garment at a time
-                // Sort garments: shoes â bottomwear â topwear (topwear LAST for max quality & print fidelity)
+                // v22: SEQUENTIAL generation -- one garment at a time
+                // Sort garments: shoes -> bottomwear -> topwear (topwear LAST for max quality & print fidelity)
                 const categoryOrder: Record<string, number> = {
                   shoes: 0, footwear: 0, sneakers: 0, boots: 0, sandals: 0,
                   bottomwear: 1, bottom: 1, pants: 1, jeans: 1, trousers: 1, shorts: 1, skirt: 1,
@@ -384,7 +384,7 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
         const productBase64 = await urlToBase64(itemsToTry[0].image_url, { removeBackground: true });
         results = await virtualTryOn(bodyPhotoBase64, productBase64, 1, personDescription, facePhotoBase64 || undefined);
       } else {
-        // v22: Sequential generation â shoes â bottomwear â topwear (topwear LAST for best fidelity)
+        // v22: Sequential generation -- shoes -> bottomwear -> topwear (topwear LAST for best fidelity)
         const categoryOrder: Record<string, number> = {
           shoes: 0, footwear: 0, sneakers: 0, boots: 0, sandals: 0,
           bottomwear: 1, bottom: 1, pants: 1, jeans: 1, trousers: 1, shorts: 1, skirt: 1,
@@ -652,7 +652,7 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
               </div>
             )}
 
-            {/* Generating â garment showcase with creative messages */}
+            {/* Generating -- garment showcase with creative messages */}
             {step === "generating" && (() => {
               const previewItems = mode === "outfit" && outfitItems.filter(i => i.image_url).length > 0
                 ? outfitItems.filter(i => i.image_url)
@@ -721,7 +721,7 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
                     })()}
                   </div>
                 )}
-                {/* Finalise My Outfit â wear tracking */}
+                {/* Finalise My Outfit -- wear tracking */}
                 <div className="mt-4">
                   {finalised ? (
                     <div className="flex items-center justify-center gap-2 rounded-xl bg-green-500/10 py-3 text-sm font-body font-semibold text-green-600">
@@ -737,7 +737,7 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
                       {finalising ? (
                         <span className="flex items-center justify-center gap-2">
                           <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                          Logging outfitâ¦
+                          Logging outfit...
                         </span>
                       ) : (
                         "Finalise My Outfit"
@@ -945,7 +945,7 @@ const CombinationCard = ({ combo, index, isActive, onTryOn, occasion }: Combinat
         </div>
       </div>
 
-      {/* Outfit items â horizontal scroll with slot labels */}
+      {/* Outfit items -- horizontal scroll with slot labels */}
       <div className="flex gap-3 overflow-x-auto px-4 py-3 scrollbar-none">
         {combo.slots.length > 0
           ? combo.slots.map(({ slot, item }, i) => (
@@ -1307,11 +1307,11 @@ const AiStylist = () => {
           </div>
           <p className="mt-1 text-sm text-muted-foreground font-body">
             {activeTab === "ai"
-              ? `Tell me the occasion â I'll dress you (${closetItems.length} items)`
+              ? `Tell me the occasion -- I'll dress you (${closetItems.length} items)`
               : activeTab === "mix"
               ? "Swipe & pick items to create your own outfit"
               : activeTab === "tryon"
-              ? "Upload a product photo â see how it looks on you"
+              ? "Upload a product photo -- see how it looks on you"
               : "Your past outfit recommendations"}
           </p>
         </div>
@@ -1437,7 +1437,7 @@ const AiStylist = () => {
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-green-100 text-green-600 text-xs font-bold dark:bg-green-900/30 dark:text-green-400">3</div>
                   <div>
                     <p className="text-sm font-body font-medium text-foreground">Decide before you buy</p>
-                    <p className="text-xs font-body text-muted-foreground">Save money on returns â only buy what looks great on you</p>
+                    <p className="text-xs font-body text-muted-foreground">Save money on returns -- only buy what looks great on you</p>
                   </div>
                 </div>
               </div>
@@ -1459,7 +1459,7 @@ const AiStylist = () => {
               <p className="mt-3 text-sm font-body font-medium text-foreground">Product uploaded</p>
               <p className="mt-1 text-xs font-body text-muted-foreground">
                 {profile?.body_image_url
-                  ? "Ready to try on â we'll use your profile body photo"
+                  ? "Ready to try on -- we'll use your profile body photo"
                   : "You need a body photo in your profile to use this feature"}
               </p>
               <motion.button
@@ -1480,7 +1480,7 @@ const AiStylist = () => {
                     if (results.length > 0) {
                       setTryOnResult(`data:${results[0].mimeType};base64,${results[0].base64}`);
                     } else {
-                      setTryOnError("No result generated â try a clearer product photo");
+                      setTryOnError("No result generated -- try a clearer product photo");
                     }
                   } catch (e: any) {
                     setTryOnError(e?.message || "Failed to generate try-on");
@@ -1703,7 +1703,7 @@ const AiStylist = () => {
         </motion.button>
       </div>
 
-      {/* Generating state â full-page overlay */}
+      {/* Generating state -- full-page overlay */}
       <AnimatePresence>
         {generating && (
           <motion.div
