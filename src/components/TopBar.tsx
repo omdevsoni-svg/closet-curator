@@ -42,7 +42,7 @@ const TopBar = () => {
           </>
         ) : (
           <>
-            <Logo className="h-7 w-7" />
+            <Logo className="h-8 w-8" />
             <span className="text-base font-display font-bold tracking-tight text-foreground">
               StyleOS
             </span>
