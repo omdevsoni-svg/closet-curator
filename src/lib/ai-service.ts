@@ -36,7 +36,7 @@ const compressBase64Image = (
   });
 
 /* ------------------------------------------------------------------ */
-/*  Helper: convert File → base64 string (no data: prefix)            */
+/*  Helper: convert File -> base64 string (no data: prefix)            */
 /* ------------------------------------------------------------------ */
 export const fileToBase64 = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -51,7 +51,7 @@ export const fileToBase64 = (file: File): Promise<string> =>
   });
 
 /* ------------------------------------------------------------------ */
-/*  Helper: convert image URL → base64 string                         */
+/*  Helper: convert image URL -> base64 string                         */
 /* ------------------------------------------------------------------ */
 export const urlToBase64 = async (
   url: string,
@@ -148,7 +148,7 @@ export const urlToBase64 = async (
 };
 
 /* ------------------------------------------------------------------ */
-/*  AI Attribute Detection — calls Gemini API directly                 */
+/*  AI Attribute Detection -- calls Gemini API directly                 */
 /* ------------------------------------------------------------------ */
 export interface DetectedAttributes {
   name: string;
@@ -203,7 +203,7 @@ export const detectClothingAttributes = async (
 };
 
 /* ------------------------------------------------------------------ */
-/*  Virtual Try-On — calls Vercel serverless function with face + body */
+/*  Virtual Try-On -- calls Vercel serverless function with face + body */
 /* ------------------------------------------------------------------ */
 export interface TryOnResult {
   mimeType: string;
@@ -215,7 +215,7 @@ export interface TryOnResult {
 // which produces much better results (understands facial structure vs simple pixel blending)
 
 /* ------------------------------------------------------------------ */
-/*  v30: Background upscale helper — called after VTO preview shown    */
+/*  v30: Background upscale helper -- called after VTO preview shown    */
 /*  Same Imagen 4.0 2x upscale, just runs async after user sees result */
 /* ------------------------------------------------------------------ */
 const upscaleInBackground = async (base64: string): Promise<TryOnResult | null> => {
@@ -243,7 +243,7 @@ export const virtualTryOn = async (
   onUpscaled?: (result: TryOnResult) => void,
 ): Promise<TryOnResult[]> => {
   try {
-    // v30: Skip upscale server-side — return preview faster, upscale in background
+    // v30: Skip upscale server-side -- return preview faster, upscale in background
     const res = await fetch("/api/virtual-tryon", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -271,7 +271,7 @@ export const virtualTryOn = async (
           }
         } catch (e) { console.warn("Face composite failed (non-fatal):", e); }
 
-        // v30: Fire background upscale — non-blocking, swaps in HD when ready
+        // v30: Fire background upscale -- non-blocking, swaps in HD when ready
         if (onUpscaled) {
           upscaleInBackground(results[0].base64).then((upscaled) => {
             if (upscaled) onUpscaled(upscaled);
@@ -289,7 +289,7 @@ export const virtualTryOn = async (
 };
 
 /* ------------------------------------------------------------------ */
-/*  Virtual Try-On (Multi-Garment) — sends all outfit items at once    */
+/*  Virtual Try-On (Multi-Garment) -- sends all outfit items at once    */
 /* ------------------------------------------------------------------ */
 export interface GarmentInput {
   base64: string;
@@ -355,13 +355,13 @@ export const virtualTryOnMulti = async (
 };
 
 /* ------------------------------------------------------------------ */
-/*  Virtual Try-On (Sequential) — Imagen 3 VTO, one garment at a time */
+/*  Virtual Try-On (Sequential) -- Imagen 3 VTO, one garment at a time */
 /*                                                                      */
-/*  Step 1: body photo + topwear → result1                             */
-/*  Step 2: result1 (as person) + bottomwear → result2                 */
-/*  Step 3: result2 (as person) + footwear → final                     */
+/*  Step 1: body photo + topwear -> result1                             */
+/*  Step 2: result1 (as person) + bottomwear -> result2                 */
+/*  Step 3: result2 (as person) + footwear -> final                     */
 /*                                                                      */
-/*  Imagen 3 VTO preserves identity automatically — no face refinement  */
+/*  Imagen 3 VTO preserves identity automatically -- no face refinement  */
 /*  needed. Previous result becomes the personImage for the next step.  */
 /* ------------------------------------------------------------------ */
 
@@ -387,8 +387,8 @@ export const virtualTryOnSequential = async (
   _faceImageBase64?: string,
   onUpscaled?: (result: TryOnResult) => void,
 ): Promise<TryOnResult[]> => {
-  // v17: Imagen 3 VTO + Smart Quality Tiering — fast intermediates, max quality final
-  // v30: Final step skips server-side upscale — deferred to background
+  // v17: Imagen 3 VTO + Smart Quality Tiering -- fast intermediates, max quality final
+  // v30: Final step skips server-side upscale -- deferred to background
   const totalSteps = garments.length;
   let previousResultBase64: string | null = null;
   let previousResultMimeType = "image/jpeg";
@@ -413,7 +413,7 @@ export const virtualTryOnSequential = async (
         console.log(`v29: Compressed prev result from ${previousResultBase64.length} to ${compressedPrev.length} chars`);
       }
 
-      // v30: Skip upscale on ALL steps (including final) — deferred to background
+      // v30: Skip upscale on ALL steps (including final) -- deferred to background
       const res = await fetch("/api/virtual-tryon", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -459,7 +459,7 @@ export const virtualTryOnSequential = async (
   }
 
   if (previousResultBase64) {
-    // v21: Client-side face composite — restore original face onto VTO result
+    // v21: Client-side face composite -- restore original face onto VTO result
     // with Reinhard color correction and multi-layer feathered mask
     let finalResult: TryOnResult = { mimeType: previousResultMimeType, base64: previousResultBase64 };
     try {
@@ -477,7 +477,7 @@ export const virtualTryOnSequential = async (
       console.warn("Face composite failed (non-fatal), returning raw VTO:", compErr);
     }
 
-    // v30: Fire background upscale — non-blocking, swaps in HD when ready
+    // v30: Fire background upscale -- non-blocking, swaps in HD when ready
     if (onUpscaled) {
       upscaleInBackground(finalResult.base64).then((upscaled) => {
         if (upscaled) onUpscaled(upscaled);
@@ -490,7 +490,7 @@ export const virtualTryOnSequential = async (
 };
 
 /* ------------------------------------------------------------------ */
-/*  AI Outfit Recommendation — calls Gemini via serverless function    */
+/*  AI Outfit Recommendation -- calls Gemini via serverless function    */
 /* ------------------------------------------------------------------ */
 
 export interface RecommendationRequest {
