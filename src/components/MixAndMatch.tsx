@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import {
   Sparkles,
   ChevronUp,
@@ -168,6 +168,47 @@ const ColumnCarousel = ({ slot, items, selectedItem, onSelect }: ColumnCarouselP
     });
   }, [items, onSelect]);
 
+  const goTo = useCallback((idx: number) => {
+    const clamped = Math.max(0, Math.min(items.length - 1, idx));
+    setActiveIndex(clamped);
+    onSelect(items[clamped]);
+  }, [items, onSelect]);
+
+  // Touch handlers for swipe
+  const touchStartY = useRef<number | null>(null);
+  const touchDelta = useRef(0);
+  const SWIPE_THRESHOLD = 30;
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartY.current = e.touches[0].clientY;
+    touchDelta.current = 0;
+  }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (touchStartY.current === null) return;
+    e.preventDefault();
+    touchDelta.current = touchStartY.current - e.touches[0].clientY;
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    if (Math.abs(touchDelta.current) >= SWIPE_THRESHOLD) {
+      if (touchDelta.current > 0) goTo(activeIndex + 1);
+      else goTo(activeIndex - 1);
+    }
+    touchStartY.current = null;
+    touchDelta.current = 0;
+  }, [activeIndex, goTo]);
+
+  // Mouse wheel handler (debounced)
+  const wheelTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.stopPropagation();
+    if (wheelTimer.current) return;
+    wheelTimer.current = setTimeout(() => { wheelTimer.current = null; }, 200);
+    if (e.deltaY > 0) goTo(activeIndex + 1);
+    else if (e.deltaY < 0) goTo(activeIndex - 1);
+  }, [activeIndex, goTo]);
+
   if (items.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full rounded-xl bg-card/30 p-4">
@@ -204,7 +245,11 @@ const ColumnCarousel = ({ slot, items, selectedItem, onSelect }: ColumnCarouselP
       </button>
 
       {/* 3-row reel */}
-      <div className="relative w-full overflow-hidden rounded-2xl bg-card/20" style={{ height: 320 }}>
+      <div className="relative w-full overflow-hidden rounded-2xl bg-card/20 touch-none cursor-grab" style={{ height: 320 }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onWheel={handleWheel}>
         <AnimatePresence initial={false}>
           {rows.map(({ idx, position }) => {
             const topOffset = position === "top" ? 0 : position === "middle" ? 107 : 214;
