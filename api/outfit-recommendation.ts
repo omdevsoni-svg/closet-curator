@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import crypto from "crypto";
 
 /* ------------------------------------------------------------------ */
-/*  GCP Service Account Auth: JWT → Access Token                       */
+/*  GCP Service Account Auth: JWT -> Access Token                       */
 /* ------------------------------------------------------------------ */
 
 interface ServiceAccountKey {
@@ -83,7 +83,7 @@ interface WeatherInfo {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Build the Gemini prompt — now returns 3 combinations               */
+/*  Build the Gemini prompt -- now returns 3 combinations               */
 /* ------------------------------------------------------------------ */
 
 function buildPrompt(
@@ -95,7 +95,7 @@ function buildPrompt(
   const itemList = items
     .map(
       (item, i) =>
-        `${i + 1}. [ID: ${item.id}] "${item.name}" — Category: ${item.category}, Color: ${item.color}, Material: ${item.material || "unknown"}, Tags: [${item.tags.join(", ")}], Gender: ${item.gender}`
+        `${i + 1}. [ID: ${item.id}] "${item.name}" -- Category: ${item.category}, Color: ${item.color}, Material: ${item.material || "unknown"}, Tags: [${item.tags.join(", ")}], Gender: ${item.gender}`
     )
     .join("\n");
 
@@ -107,14 +107,14 @@ function buildPrompt(
     if (profile.model_gender) parts.push(`Gender preference: ${profile.model_gender}`);
     if (parts.length > 0) {
       personalization = `\n\nUser profile:\n${parts.join("\n")}
-Consider these when making recommendations — suggest items that complement the user's body type, flatter their skin tone, and match their gender preference.`;
+Consider these when making recommendations -- suggest items that complement the user's body type, flatter their skin tone, and match their gender preference.`;
     }
   }
 
   let weatherContext = "";
   if (weather) {
     weatherContext = `\n\nCurrent weather: ${weather.temp}°C, ${weather.condition}, Humidity: ${weather.humidity}%, Wind: ${weather.windSpeed} km/h.
-Factor weather into your picks — suggest weather-appropriate fabrics, layers, and styles.`;
+Factor weather into your picks -- suggest weather-appropriate fabrics, layers, and styles.`;
   }
 
   return `You are an expert fashion stylist AI. A user wants outfit recommendations for: "${occasion}".
@@ -129,7 +129,7 @@ Your task:
 3. For each combination, structure items into SLOTS:
    - For men or unisex: "topwear", "bottomwear", "footwear" (3 slots)
    - For women: either "topwear"+"bottomwear"+"footwear" (3 slots) OR "dress"+"footwear" (2 slots) if a dress/gown/one-piece is chosen
-4. ONLY use items from the list above — reference them by their exact ID.
+4. ONLY use items from the list above -- reference them by their exact ID.
 5. Each combination should have a DISTINCT style direction (e.g. one classic, one trendy, one relaxed).
 6. Give each combination a short creative label (2-3 words, e.g. "Classic Elegance", "Street Smart").
 7. Provide a styling tip and reasoning for each combination.
