@@ -108,56 +108,63 @@ const computeHealth = (items: ClothingItem[]): HealthData => {
   // Laundry items
   const laundryItems = activeItems.filter((i) => i.laundry_status === "in_laundry");
 
-  // AI-style recommendations
+  // ── Comprehensive recommendations engine ──
   const recommendations: string[] = [];
+  const topCount = catCounts["Tops"] || 0;
+  const bottomCount = catCounts["Bottoms"] || 0;
+  const footCount = catCounts["Footwear"] || 0;
+  const outerwearCount = catCounts["Outerwear"] || 0;
+  const accessoryCount = catCounts["Accessories"] || 0;
+  const activewearCount = catCounts["Activewear"] || 0;
+  const ethnicCount = catCounts["Ethnic Wear"] || 0;
+  const dressCount = catCounts["Dresses"] || 0;
 
-  // Category imbalance
-  const maxCat = categoryBreakdown.reduce((a, b) => (a.count > b.count ? a : b));
-  const minCats = categoryBreakdown.filter((c) => c.count === 0);
-  if (maxCat.count > 5 && minCats.length > 0) {
-    recommendations.push(
-      `Your closet is really loving ${maxCat.category.toLowerCase()} right now (${maxCat.count} pieces!). Adding some ${minCats.map((c) => c.category.toLowerCase()).join(" or ")} could open up a whole new world of outfit combos.`
-    );
+  // 1. Top-to-bottom ratio imbalance
+  if (topCount > 0 && bottomCount > 0) {
+    const ratio = topCount / bottomCount;
+    if (ratio > 2) {
+      const combos = topCount * bottomCount;
+      const extraBottoms = 3;
+      const newCombos = topCount * (bottomCount + extraBottoms);
+      recommendations.push(
+        `You have ${topCount} tops but only ${bottomCount} bottoms — your bottoms are the bottleneck. Adding just ${extraBottoms} versatile bottoms would jump your outfit combos from ${combos} to ${newCombos}.`
+      );
+    } else if (ratio < 0.5) {
+      recommendations.push(
+        `You have ${bottomCount} bottoms but only ${topCount} tops — a few more tops would multiply your outfit options significantly.`
+      );
+    }
   }
 
-  // Items never worn
-  const neverWorn = activeItems.filter((i) => !i.worn_count || i.worn_count === 0);
-  if (neverWorn.length > 3) {
+  // 2. Missing essential categories
+  const missingEssentials: string[] = [];
+  if (topCount === 0) missingEssentials.push("tops");
+  if (bottomCount === 0) missingEssentials.push("bottoms");
+  if (footCount === 0) missingEssentials.push("footwear");
+  if (missingEssentials.length > 0) {
     recommendations.push(
-      `${neverWorn.length} pieces are waiting for their moment to shine! They've never been worn yet — maybe this week's the week to give them some love?`
-    );
-  }
-
-  // Color monotony
-  if (colorBreakdown.length > 0 && colorBreakdown[0].count > activeItems.length * 0.4) {
-    recommendations.push(
-      `Your closet is craving some color variety! Over 40% is ${colorBreakdown[0].color.toLowerCase()} — a pop of a contrasting color could really make your outfits sing.`
-    );
-  }
-
-  // Laundry reminder
-  if (laundryItems.length > 0) {
-    const oldestLaundry = laundryItems.find((i) => i.laundry_sent_at);
-    if (oldestLaundry?.laundry_sent_at) {
+      `Essential gap: You're missing ${missingEssentials.join(" and ")} entirely — these are the building blocks of  {
       const daysSince = Math.floor((Date.now() - new Date(oldestLaundry.laundry_sent_at).getTime()) / 86400000);
       if (daysSince >= 3) {
         recommendations.push(
-          `Friendly nudge: ${laundryItems.length} piece${laundryItems.length > 1 ? "s have" : " has"} been in the laundry pile for ${daysSince}+ days. Your fresh outfits miss them!`
+          `${laundryItems.length} piece${laundryItems.length > 1 ? "s have" : " has"} been in laundry for ${daysSince}+ days — that's reducing your available outfit options by ${Math.round((laundryItems.length / activeItems.length) * 100)}%.`
         );
       }
     }
   }
 
-  // Low occasion coverage
-  if (occasionsFound.length < 4) {
-    const missing = ALL_OCCASIONS.filter((o) => !allTags.includes(o));
+  // 13. No basics / versatile neutrals
+  const basicKeywords = /\b(basic|plain|solid|crew\s?neck|v-neck|t-shirt|tee|white\s?shirt|jeans|chino)\b/;
+  const basics = activeItems.filter(i => [i.name, ...(i.tags || [])].join(" ").toLowerCase().match(basicKeywords));
+  if (basics.length < 3 && activeItems.length >= 10) {
     recommendations.push(
-      `Your wardrobe covers ${occasionsFound.length} occasion type${occasionsFound.length === 1 ? "" : "s"} so far — you're building something great! A few pieces tagged for ${missing.slice(0, 3).join(", ")} would round things out beautifully.`
+      `Your closet could use more basics — plain tees, solid shirts, and classic jeans are the "glue" that ties statement pieces together.`
     );
   }
 
+  // Fallback
   if (recommendations.length === 0 && activeItems.length > 0) {
-    recommendations.push("Your wardrobe is looking fantastic and well-balanced! Keep logging your outfits — the more you wear, the smarter your style insights get.");
+    recommendations.push("Your wardrobe is well-balanced across categories, colors, and occasions. Keep logging outfits — the more data, the smarter your insights get.");
   }
 
   return { versatility, occasionCoverage, colorBalance, gaps, colorBreakdown, categoryBreakdown, mostWorn, leastWorn, laundryItems, recommendations };
@@ -207,84 +214,8 @@ const DonutChart = ({ data, size = 140 }: { data: { color: string; count: number
         colors
       </text>
     </svg>
-  );
-};
-
-/* ------------------------------------------------------------------ */
-/*  Main component                                                     */
-/* ------------------------------------------------------------------ */
-const ClosetHealth = () => {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const [items, setItems] = useState<ClothingItem[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!user) return;
-    const load = async () => {
-      const data = await getClosetItems(user.id);
-      setItems(data);
-      setLoading(false);
-    };
-    load();
-  }, [user]);
-
-  if (loading) {
-    return (
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
-  if (items.length === 0) {
-    return (
-      <div className="px-5 pt-8">
-        <div className="flex items-center gap-2">
-          <HeartPulse className="h-5 w-5 text-shop" />
-          <h1 className="text-2xl font-display font-bold tracking-tight">Closet Health</h1>
-        </div>
-        <p className="mt-1 text-sm text-muted-foreground font-body">
-          AI analysis of your wardrobe completeness
-        </p>
-        <div className="mt-16 flex flex-col items-center text-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-card">
-            <Shirt className="h-8 w-8 text-muted-foreground/30" />
-          </div>
-          <h2 className="mt-4 text-base font-display font-semibold text-foreground">
-            No items in your closet
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground font-body">
-            Add items to your closet first to see your wardrobe health analysis
-          </p>
-          <button
-            onClick={() => navigate("/closet")}
-            className="mt-4 rounded-xl bg-primary px-6 py-2.5 text-sm font-display font-semibold text-primary-foreground"
-          >
-            Go to Closet
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const health = computeHealth(items);
-
-  const healthStats = [
-    { label: "Versatility Score", value: health.versatility, max: 100, color: "text-ai" },
-    { label: "Occasion Coverage", value: health.occasionCoverage.found, max: health.occasionCoverage.total, color: "text-shop" },
-    { label: "Color Balance", value: health.colorBalance, max: 100, color: "text-amber-500" },
-  ];
-
-  const handleReturnAll = async () => {
-    const ids = health.laundryItems.map((i) => i.id);
-    await returnFromLaundry(ids);
-    setItems((prev) =>
-      prev.map((i) =>
-        ids.includes(i.id) ? { ...i, laundry_status: "available" as const, laundry_sent_at: undefined } : i
-      )
-    );
-  };
+  
+ "�
 
   return (
     <div className="px-5 pt-8 pb-28">
@@ -304,8 +235,7 @@ const ClosetHealth = () => {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.1 }}
-            className="flex flex-col items-center rounded-2xl bg-card p-4"
-          >
+            className="flex flex-col items-center rounded-2xl bg-card p-4">
             <div className="relative h-16 w-16">
               <svg className="h-16 w-16 -rotate-90" viewBox="0 0 64 64">
                 <circle cx="32" cy="32" r="28" fill="none" stroke="hsl(var(--border))" strokeWidth="5" />
@@ -432,9 +362,11 @@ const ClosetHealth = () => {
                 Some items have been in laundry for over 3 days!
               </p>
             </div>
-          )}
-        </motion.div>
-      )}
+          
+l
+        }
+      </motion.div>
+      ))}
 
       {/* Most Worn Items */}
       {health.mostWorn.length > 0 && (
@@ -526,7 +458,7 @@ const ClosetHealth = () => {
                   className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
                     gap.severity === "high"
                       ? "bg-destructive/10 text-destructive"
-                      : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                      : "bg-amber-100 text-amber-700 dark:bg-amber-930/30 dark:text-amber-400"
                   }`}
                 >
                   {gap.severity}
@@ -564,7 +496,6 @@ const ClosetHealth = () => {
         </div>
       </motion.div>
     </div>
-  );
-};
+  9c�;
 
 export default ClosetHealth;
