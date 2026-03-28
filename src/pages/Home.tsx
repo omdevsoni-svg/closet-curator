@@ -38,8 +38,8 @@ interface WeatherData {
 
 const weatherTips: Record<string, string> = {
   hot: "Opt for light fabrics, breathable cotton, and open footwear.",
-  warm: "Go with light layers — a tee with optional light jacket works great.",
-  mild: "Perfect layering weather — try a shirt with a light blazer.",
+  warm: "Go with light layers -- a tee with optional light jacket works great.",
+  mild: "Perfect layering weather -- try a shirt with a light blazer.",
   cool: "Add a structured jacket or sweater over your outfit.",
   cold: "Bundle up with coats, scarves, and warm boots.",
 };
@@ -385,7 +385,7 @@ const Home = () => {
         >
           <Shirt className="h-5 w-5 text-ai" />
           <span className="mt-1.5 text-xl font-display font-bold text-foreground">
-            {loadingStats ? "—" : stats.totalItems}
+            {loadingStats ? "--" : stats.totalItems}
           </span>
           <span className="text-[10px] font-body text-muted-foreground">Total Items</span>
         </motion.div>
@@ -397,7 +397,7 @@ const Home = () => {
         >
           <Heart className="h-5 w-5 text-rose-500" />
           <span className="mt-1.5 text-xl font-display font-bold text-foreground">
-            {loadingStats ? "—" : stats.favorites}
+            {loadingStats ? "--" : stats.favorites}
           </span>
           <span className="text-[10px] font-body text-muted-foreground">Favorites</span>
         </motion.div>
@@ -409,7 +409,7 @@ const Home = () => {
         >
           <Star className="h-5 w-5 text-amber-500" />
           <span className="mt-1.5 text-xl font-display font-bold text-foreground">
-            {loadingStats ? "—" : stats.styleScore || "—"}
+            {loadingStats ? "--" : stats.styleScore || "--"}
           </span>
           <span className="text-[10px] font-body text-muted-foreground">Style Score</span>
         </motion.div>
@@ -433,7 +433,7 @@ const Home = () => {
               <div>
                 <p className={`text-xs font-body font-medium ${oldItems.length > 0 ? "text-amber-700 dark:text-amber-400" : "text-blue-700 dark:text-blue-400"}`}>
                   {laundryItems.length} item{laundryItems.length > 1 ? "s" : ""} in laundry
-                  {oldItems.length > 0 && " — some over 3 days!"}
+                  {oldItems.length > 0 && " -- some over 3 days!"}
                 </p>
               </div>
             </div>
