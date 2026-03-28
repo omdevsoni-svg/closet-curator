@@ -200,7 +200,7 @@ const getExifOrientation = (file: File): Promise<number> =>
       resolve(1);
     };
     reader.onerror = () => resolve(1);
-    // Only read first 64KB for EXIF — much faster than reading entire file
+    // Only read first 64KB for EXIF -- much faster than reading entire file
     reader.readAsArrayBuffer(file.slice(0, 65536));
   });
 
@@ -264,7 +264,7 @@ export const fixImageOrientation = (file: File): Promise<File> =>
   });
 
 /* ------------------------------------------------------------------ */
-/*  Helper: AI-detected rotation — apply clockwise rotation degrees    */
+/*  Helper: AI-detected rotation -- apply clockwise rotation degrees    */
 /* ------------------------------------------------------------------ */
 export const rotateImage = (file: File, degrees: number): Promise<File> =>
   new Promise((resolve) => {
@@ -489,7 +489,7 @@ export const logWear = async (
   // 2. Increment worn_count & set last_worn on each real item
   for (const id of itemIds) {
     if (id.startsWith("ai-suggested-")) continue;
-    // Use RPC or manual update — Supabase JS doesn't have atomic increment,
+    // Use RPC or manual update -- Supabase JS doesn't have atomic increment,
     // so we fetch current value first (acceptable for low-contention use case)
     const { data: current } = await supabase
       .from("closet_items")
