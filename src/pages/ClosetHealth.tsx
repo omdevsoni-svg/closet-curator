@@ -108,7 +108,7 @@ const computeHealth = (items: ClothingItem[]): HealthData => {
   // Laundry items
   const laundryItems = activeItems.filter((i) => i.laundry_status === "in_laundry");
 
-  // ─── Comprehensive recommendations engine ───
+  // ── Comprehensive recommendations engine ──
   const recommendations: string[] = [];
   const topCount = catCounts["Tops"] || 0;
   const bottomCount = catCounts["Bottoms"] || 0;
@@ -683,7 +683,7 @@ const ClosetHealth = () => {
               className="flex items-start gap-2.5"
             >
               <ChevronRight className="h-3.5 w-3.5 text-ai mt-0.5 shrink-0" />
-              <p className="text-xs font-body text-foreground/80 leading-relaxed">{rec}
+              <p className="text-xs font-body text-foreground/80 leading-relaxed">{rec}</p>
             </motion.div>
           ))}
         </div>
