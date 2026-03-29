@@ -26,6 +26,7 @@ import {
   Download,
   ShoppingBag,
   Upload,
+  ZoomIn,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -246,6 +247,8 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
   const [mode, setMode] = useState<"outfit" | "closet">("outfit");
   // v13: Sequential generation progress
   const [seqProgress, setSeqProgress] = useState<SequentialProgress | null>(null);
+  // Fullscreen image zoom
+  const [zoomImage, setZoomImage] = useState<string | null>(null);
   // Finalise My Outfit -- wear tracking
   const [finalising, setFinalising] = useState(false);
   const [finalised, setFinalised] = useState(false);
@@ -484,6 +487,7 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
     : "Try It On";
 
   return (
+    <>
     <AnimatePresence>
       {isOpen && (
         <motion.div
@@ -686,8 +690,11 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
             {/* Result */}
             {step === "result" && resultImage && (
               <div className="mt-4">
-                <div className="overflow-hidden rounded-2xl bg-card">
+                <div className="overflow-hidden rounded-2xl bg-card cursor-pointer relative group" onClick={() => setZoomImage(resultImage)}>
                   <img src={resultImage} alt="Virtual Try-On Result" className="w-full object-contain" />
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/20 transition-colors">
+                    <ZoomIn className="h-8 w-8 text-white opacity-0 group-hover:opacity-80 transition-opacity" />
+                  </div>
                 </div>
                 <div className="mt-3 flex items-center gap-2 rounded-xl bg-ai/10 px-4 py-2.5">
                   <Sparkles className="h-4 w-4 text-ai" />
@@ -766,6 +773,19 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
         </motion.div>
       )}
     </AnimatePresence>
+    {zoomImage && (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm"
+        onClick={() => setZoomImage(null)}>
+        <button onClick={() => setZoomImage(null)}
+          className="absolute top-4 right-4 z-[101] flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-white">
+          <X className="h-5 w-5" />
+        </button>
+        <img src={zoomImage} alt="Full-size VTO result"
+          className="max-h-[90vh] max-w-[95vw] object-contain rounded-lg"
+          onClick={(e) => e.stopPropagation()} style={{ touchAction: "pinch-zoom" }} />
+      </div>
+    )}
+    </>
   );
 };
 
@@ -857,7 +877,7 @@ async function shareOutfitAsImage(combo: ResolvedCombination, occasion: string) 
   // Branding
   ctx.fillStyle = "#bbb";
   ctx.font = "11px system-ui, sans-serif";
-  ctx.fillText("StyleOS â¢ AI Digital Closet", 24, H - 16);
+  ctx.fillText("StyleOS Ã¢ÂÂ¢ AI Digital Closet", 24, H - 16);
 
   // Convert to blob and share/download
   canvas.toBlob(async (blob) => {
@@ -1073,6 +1093,7 @@ const AiStylist = () => {
   const [tryOnPreview, setTryOnPreview] = useState<string | null>(null);
   const [tryOnGenerating, setTryOnGenerating] = useState(false);
   const [tryOnResult, setTryOnResult] = useState<string | null>(null);
+  const [zoomImageMain, setZoomImageMain] = useState<string | null>(null);
   const [tryOnError, setTryOnError] = useState<string | null>(null);
   const [mixTryOnItems, setMixTryOnItems] = useState<ClothingItem[]>([]);
   const [history, setHistory] = useState<StylistHistory[]>([]);
@@ -1520,7 +1541,12 @@ const AiStylist = () => {
           {/* Result */}
           {tryOnResult && (
             <div className="flex flex-col items-center">
-              <img src={tryOnResult} alt="Try-on result" className="w-full max-w-sm rounded-2xl shadow-lg" />
+              <div className="relative cursor-pointer group w-full max-w-sm" onClick={() => setZoomImageMain(tryOnResult)}>
+                    <img src={tryOnResult} alt="Try-on result" className="w-full rounded-2xl shadow-lg" />
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/20 rounded-2xl transition-colors">
+                      <ZoomIn className="h-8 w-8 text-white opacity-0 group-hover:opacity-80 transition-opacity" />
+                    </div>
+                  </div>
               <div className="mt-4 flex items-center gap-3">
                 <motion.button
                   whileTap={{ scale: 0.95 }}
@@ -1780,6 +1806,19 @@ const AiStylist = () => {
         userId={user?.id || ""}
         comboLabel={tryOnCombo?.label || (mixTryOnItems.length > 0 ? "Mix & Match" : undefined)}
       />
+
+      {zoomImageMain && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm"
+          onClick={() => setZoomImageMain(null)}>
+          <button onClick={() => setZoomImageMain(null)}
+            className="absolute top-4 right-4 z-[101] flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-white">
+            <X className="h-5 w-5" />
+          </button>
+          <img src={zoomImageMain} alt="Full-size VTO result"
+            className="max-h-[90vh] max-w-[95vw] object-contain rounded-lg"
+            onClick={(e) => e.stopPropagation()} style={{ touchAction: "pinch-zoom" }} />
+        </div>
+      )}
     </div>
   );
 };
