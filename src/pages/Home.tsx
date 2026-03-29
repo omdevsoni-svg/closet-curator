@@ -86,7 +86,6 @@ const useWeather = (): WeatherData | null => {
         const temp = Math.round(current.temperature_2m);
         const cat = getWeatherCategory(temp);
         const isDay = current.is_day === 1;
-
         const getWeatherIcon = (code: number, day: boolean): string => {
           if (code <= 1) return day ? "☀️" : "🌙";
           if (code <= 3) return day ? "⛅" : "☁️";
@@ -113,7 +112,7 @@ const useWeather = (): WeatherData | null => {
           humidity: 65,
           windSpeed: 12,
           city: "Your Location",
-          icon: "â",
+          icon: "⛅",
           tip: weatherTips.warm,
         });
       }
@@ -144,7 +143,7 @@ const useWeather = (): WeatherData | null => {
             humidity: 65,
             windSpeed: 12,
             city: "Your Location",
-            icon: "â",
+            icon: "⛅",
             tip: weatherTips.warm,
           });
         }
@@ -231,7 +230,7 @@ const Home = () => {
     const fetchWeatherOutfit = async () => {
       setLoadingWeatherOutfit(true);
       try {
-        const occasion = `Everyday outfit for ${weather.temp}Â°C ${weather.condition} weather`;
+        const occasion = `Everyday outfit for ${weather.temp}°C ${weather.condition} weather`;
         const result = await getOutfitRecommendation({
           occasion,
           items: stats.items.map((item: ClothingItem) => ({
@@ -456,7 +455,7 @@ const Home = () => {
           >
             <div className="flex items-center gap-2.5">
               <div className={`flex h-8 w-8 items-center justify-center rounded-full ${oldItems.length > 0 ? "bg-amber-500/20" : "bg-blue-500/20"}`}>
-                <span className="text-base">ð§º</span>
+                <span className="text-base">🧺</span>
               </div>
               <div>
                 <p className={`text-xs font-body font-medium ${oldItems.length > 0 ? "text-amber-700 dark:text-amber-400" : "text-blue-700 dark:text-blue-400"}`}>
@@ -586,10 +585,10 @@ const Home = () => {
                 <span className="text-3xl font-emoji">{weather.icon}</span>
                 <div>
                   <span className="text-2xl font-display font-bold text-foreground">
-                    {weather.temp}Â°C
+                    {weather.temp}°C
                   </span>
                   <p className="text-xs font-body text-muted-foreground">
-                    {weather.condition} Â· {weather.city}
+                    {weather.condition} · {weather.city}
                   </p>
                 </div>
               </div>
