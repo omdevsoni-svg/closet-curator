@@ -21,9 +21,20 @@ interface SlotDef {
 
 const SLOT_DEFS: SlotDef[] = [
   { key: "topwear", label: "Top", categories: ["Tops", "Outerwear", "Activewear"] },
-  { key: "bottomwear", label: "Bottom", categories: ["Bottoms"] },
+  { key: "bottomwear", label: "Bottom", categories: ["Bottoms", "Activewear"] },
   { key: "footwear", label: "Shoes", categories: ["Footwear"] },
 ];
+
+/** Keywords that identify an Activewear item as a bottom rather than a top */
+const ACTIVEWEAR_BOTTOM_KEYWORDS =
+  /\b(sweatpant|jogger|track\s?pant|legging|shorts|gym\s?short|running\s?short|yoga\s?pant|cargo\s?pant|athletic\s?pant|training\s?pant|warm[- ]?up\s?pant)/i;
+
+/** Check if an Activewear-category item is actually a bottom */
+function isActivewearBottom(item: ClothingItem): boolean {
+  if (item.category !== "Activewear") return false;
+  const text = [item.name, ...(item.tags || []), item.material || ""].join(" ");
+  return ACTIVEWEAR_BOTTOM_KEYWORDS.test(text);
+}
 
 const DRESS_SLOT: SlotDef = {
   key: "dress",
@@ -221,7 +232,7 @@ const VerticalCarousel = ({ slot, items, selectedItem, onSelect }: VerticalCarou
 
       {/* Casino reel -- scrollable via touch swipe & mouse wheel */}
       <div
-        className="relative overflow-hidden rounded-2xl w-full border border-border/20 bg-gradientt-to-b from-card/40 via-card/60 to-card/40 touch-none cursor-grab backdrop-blur-sm"
+        className="relative overflow-hidden rounded-2xl w-full border border-border/20 bg-gradient-to-b from-card/40 via-card/60 to-card/40 touch-none cursor-grab backdrop-blur-sm"
         style={{ height: ITEM_HEIGHT * VISIBLE_COUNT }}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
@@ -355,9 +366,20 @@ const MixAndMatch = ({ closetItems, onTryOn, onClose, inline = false }: MixAndMa
     dress: null,
   });
 
-  // Filter items by slot
+  // Filter items by slot (with Activewear secondary filter)
   const getSlotItems = (slot: SlotDef) =>
-    closetItems.filter((i) => slot.categories.includes(i.category) && i.image_url);
+    closetItems.filter((i) => {
+      if (!slot.categories.includes(i.category) || !i.image_url) return false;
+      // Activewear items need secondary filtering:
+      // - Top slot keeps only activewear TOPS (exclude activewear bottoms)
+      // - Bottom slot keeps only activewear BOTTOMS (exclude activewear tops)
+      if (i.category === "Activewear") {
+        const isBottom = isActivewearBottom(i);
+        if (slot.key === "topwear") return !isBottom;
+        if (slot.key === "bottomwear") return isBottom;
+      }
+      return true;
+    });
 
   const activeSlots = mode === "dress"
     ? [DRESS_SLOT, SLOT_DEFS[2]] // dress + footwear
