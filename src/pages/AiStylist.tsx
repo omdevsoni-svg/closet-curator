@@ -877,7 +877,7 @@ async function shareOutfitAsImage(combo: ResolvedCombination, occasion: string) 
   // Branding
   ctx.fillStyle = "#bbb";
   ctx.font = "11px system-ui, sans-serif";
-  ctx.fillText("StyleOS Ã¢ÂÂ¢ AI Digital Closet", 24, H - 16);
+  ctx.fillText("StyleOS â¢ AI Digital Closet", 24, H - 16);
 
   // Convert to blob and share/download
   canvas.toBlob(async (blob) => {
