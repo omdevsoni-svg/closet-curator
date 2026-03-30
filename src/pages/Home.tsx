@@ -621,6 +621,7 @@ const Home = () => {
                 </span>
               </div>
             ) : weatherOutfit.length > 0 ? (
+              <>
               <div className="flex gap-3 overflow-x-auto px-4 pb-4 scrollbar-none">
                 {weatherOutfit.map((item: ClothingItem, i: number) => (
                   <motion.div
@@ -660,6 +661,7 @@ const Home = () => {
                   Try On This Outfit
                 </motion.button>
               </div>
+              </>
             ) : stats.items.length > 0 ? (
               <div className="flex gap-3 overflow-x-auto px-4 pb-4 scrollbar-none">
                 {stats.items.slice(0, 4).map((item: any, i: number) => (
