@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   Sparkles,
   Send,
@@ -225,6 +225,88 @@ const VtoLoadingScreen = ({ items, isSequential, currentStep, seqProgress }: Vto
 /* ------------------------------------------------------------------ */
 /*  Virtual Try-On Modal -- now accepts specific outfit items           */
 /* ------------------------------------------------------------------ */
+/* ---- Pinch-to-Zoom Fullscreen Viewer ---- */
+const PinchZoomViewer = ({ src, onClose }: { src: string; onClose: () => void }) => {
+  const imgRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  const [translate, setTranslate] = useState({ x: 0, y: 0 });
+  const lastDist = useRef(0);
+  const isPinching = useRef(false);
+  const isPanning = useRef(false);
+  const panStart = useRef({ x: 0, y: 0 });
+  const transStart = useRef({ x: 0, y: 0 });
+
+  const getDist = (t1: React.Touch, t2: React.Touch) =>
+    Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      e.preventDefault();
+      isPinching.current = true;
+      isPanning.current = false;
+      lastDist.current = getDist(e.touches[0], e.touches[1]);
+    } else if (e.touches.length === 1 && scale > 1) {
+      isPanning.current = true;
+      panStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      transStart.current = { ...translate };
+    }
+  }, [scale, translate]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 2 && isPinching.current) {
+      e.preventDefault();
+      const dist = getDist(e.touches[0], e.touches[1]);
+      const ratio = dist / lastDist.current;
+      lastDist.current = dist;
+      setScale(s => Math.min(Math.max(s * ratio, 1), 5));
+    } else if (e.touches.length === 1 && isPanning.current && scale > 1) {
+      const dx = e.touches[0].clientX - panStart.current.x;
+      const dy = e.touches[0].clientY - panStart.current.y;
+      setTranslate({ x: transStart.current.x + dx, y: transStart.current.y + dy });
+    }
+  }, [scale]);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length < 2) isPinching.current = false;
+    if (e.touches.length < 1) isPanning.current = false;
+  }, []);
+
+  const handleDoubleClick = useCallback(() => {
+    if (scale > 1) { setScale(1); setTranslate({ x: 0, y: 0 }); }
+    else setScale(2.5);
+  }, [scale]);
+
+  const resetAndClose = useCallback(() => {
+    setScale(1); setTranslate({ x: 0, y: 0 }); onClose();
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm"
+      onClick={() => { if (scale <= 1) resetAndClose(); }}>
+      <button onClick={resetAndClose}
+        className="absolute top-4 right-4 z-[101] flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-white">
+        <X className="h-5 w-5" />
+      </button>
+      {scale > 1 && (
+        <button onClick={() => { setScale(1); setTranslate({ x: 0, y: 0 }); }}
+          className="absolute top-4 left-4 z-[101] px-3 py-1.5 rounded-full bg-white/20 text-white text-xs font-medium">
+          Reset Zoom
+        </button>
+      )}
+      <div ref={imgRef} className="max-h-[90vh] max-w-[95vw] overflow-hidden"
+        onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
+        onDoubleClick={handleDoubleClick}
+        onClick={(e) => e.stopPropagation()}
+        style={{ touchAction: "none" }}>
+        <img src={src} alt="Full-size VTO result"
+          className="max-h-[90vh] max-w-[95vw] object-contain rounded-lg select-none"
+          draggable={false}
+          style={{ transform: `scale(${scale}) translate(${translate.x / scale}px, ${translate.y / scale}px)`, transition: isPinching.current || isPanning.current ? "none" : "transform 0.2s ease-out" }} />
+      </div>
+    </div>
+  );
+};
+
 interface TryOnModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -774,16 +856,7 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
       )}
     </AnimatePresence>
     {zoomImage && (
-      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm"
-        onClick={() => setZoomImage(null)}>
-        <button onClick={() => setZoomImage(null)}
-          className="absolute top-4 right-4 z-[101] flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-white">
-          <X className="h-5 w-5" />
-        </button>
-        <img src={zoomImage} alt="Full-size VTO result"
-          className="max-h-[90vh] max-w-[95vw] object-contain rounded-lg"
-          onClick={(e) => e.stopPropagation()} style={{ touchAction: "pinch-zoom" }} />
-      </div>
+      <PinchZoomViewer src={zoomImage} onClose={() => setZoomImage(null)} />
     )}
     </>
   );
@@ -1808,17 +1881,8 @@ const AiStylist = () => {
       />
 
       {zoomImageMain && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm"
-          onClick={() => setZoomImageMain(null)}>
-          <button onClick={() => setZoomImageMain(null)}
-            className="absolute top-4 right-4 z-[101] flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-white">
-            <X className="h-5 w-5" />
-          </button>
-          <img src={zoomImageMain} alt="Full-size VTO result"
-            className="max-h-[90vh] max-w-[95vw] object-contain rounded-lg"
-            onClick={(e) => e.stopPropagation()} style={{ touchAction: "pinch-zoom" }} />
-        </div>
-      )}
+      <PinchZoomViewer src={zoomImageMain} onClose={() => setZoomImageMain(null)} />
+    )}
     </div>
   );
 };
