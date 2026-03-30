@@ -649,6 +649,17 @@ const Home = () => {
                   </motion.div>
                 ))}
               </div>
+              {/* Try On button */}
+              <div className="px-4 pb-3 pt-1">
+                <motion.button
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => navigate(`/stylist?tryOn=${weatherOutfit.map(i => i.id).join(",")}`)}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-ai/10 py-2.5 text-sm font-display font-semibold text-ai hover:bg-ai/20 transition-colors"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Try On This Outfit
+                </motion.button>
+              </div>
             ) : stats.items.length > 0 ? (
               <div className="flex gap-3 overflow-x-auto px-4 pb-4 scrollbar-none">
                 {stats.items.slice(0, 4).map((item: any, i: number) => (
