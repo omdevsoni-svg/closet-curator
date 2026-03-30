@@ -25,10 +25,14 @@ import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
 const App = () => {
-  // Show splash every time the app launches
-  const [showSplash, setShowSplash] = useState(true);
+  // Show splash only once per browser session
+  const [showSplash, setShowSplash] = useState(() => {
+    if (sessionStorage.getItem("styleos_splash_shown")) return false;
+    return true;
+  });
 
   const handleSplashFinish = useCallback(() => {
+    sessionStorage.setItem("styleos_splash_shown", "1");
     setShowSplash(false);
   }, []);
 
