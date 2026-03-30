@@ -403,43 +403,55 @@ const Home = () => {
       </AnimatePresence>
 
       {/* Wardrobe stats */}
-      <div className="mb-5 grid grid-cols-3 gap-3">
-        <motion.div
+      <div className="mb-5 grid grid-cols-3 gap-2">
+        <motion.button
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.05 }}
-          className="flex flex-col items-center rounded-2xl bg-card p-4"
+          whileTap={{ scale: 0.96 }}
+          onClick={() => navigate("/closet")}
+          className="flex items-center gap-2.5 rounded-xl bg-card px-3 py-2.5 text-left active:bg-card/80 transition-colors"
         >
-          <Shirt className="h-5 w-5 text-ai" />
-          <span className="mt-1.5 text-xl font-display font-bold text-foreground">
-            {loadingStats ? "--" : stats.totalItems}
-          </span>
-          <span className="text-[10px] font-body text-muted-foreground">Total Items</span>
-        </motion.div>
-        <motion.div
+          <Shirt className="h-4 w-4 shrink-0 text-ai" />
+          <div className="min-w-0">
+            <span className="block text-lg font-display font-bold leading-tight text-foreground">
+              {loadingStats ? "--" : stats.totalItems}
+            </span>
+            <span className="block text-[9px] font-body text-muted-foreground leading-tight">Items</span>
+          </div>
+        </motion.button>
+        <motion.button
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="flex flex-col items-center rounded-2xl bg-card p-4"
+          whileTap={{ scale: 0.96 }}
+          onClick={() => navigate("/closet")}
+          className="flex items-center gap-2.5 rounded-xl bg-card px-3 py-2.5 text-left active:bg-card/80 transition-colors"
         >
-          <Heart className="h-5 w-5 text-rose-500" />
-          <span className="mt-1.5 text-xl font-display font-bold text-foreground">
-            {loadingStats ? "--" : stats.favorites}
-          </span>
-          <span className="text-[10px] font-body text-muted-foreground">Favorites</span>
-        </motion.div>
-        <motion.div
+          <Heart className="h-4 w-4 shrink-0 text-rose-500" />
+          <div className="min-w-0">
+            <span className="block text-lg font-display font-bold leading-tight text-foreground">
+              {loadingStats ? "--" : stats.favorites}
+            </span>
+            <span className="block text-[9px] font-body text-muted-foreground leading-tight">Favorites</span>
+          </div>
+        </motion.button>
+        <motion.button
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.15 }}
-          className="flex flex-col items-center rounded-2xl bg-card p-4"
+          whileTap={{ scale: 0.96 }}
+          onClick={() => navigate("/health")}
+          className="flex items-center gap-2.5 rounded-xl bg-card px-3 py-2.5 text-left active:bg-card/80 transition-colors"
         >
-          <Star className="h-5 w-5 text-amber-500" />
-          <span className="mt-1.5 text-xl font-display font-bold text-foreground">
-            {loadingStats ? "--" : stats.styleScore || "--"}
-          </span>
-          <span className="text-[10px] font-body text-muted-foreground">Style Score</span>
-        </motion.div>
+          <Star className="h-4 w-4 shrink-0 text-amber-500" />
+          <div className="min-w-0">
+            <span className="block text-lg font-display font-bold leading-tight text-foreground">
+              {loadingStats ? "--" : stats.styleScore || "--"}
+            </span>
+            <span className="block text-[9px] font-body text-muted-foreground leading-tight">Score</span>
+          </div>
+        </motion.button>
       </div>
 
       {/* Laundry reminder */}
