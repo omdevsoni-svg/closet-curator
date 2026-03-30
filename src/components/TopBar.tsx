@@ -4,11 +4,15 @@ import { motion } from "framer-motion";
 import { useTheme } from "@/hooks/useTheme";
 import Logo from "./Logo";
 
-/* Pages that live in the bottom nav -- no back button needed */
-const MAIN_PAGES = ["/home", "/closet", "/stylist", "/health", "/profile"];
+/* Only the home page has no back button */
+const NO_BACK_PAGES = ["/home"];
 
-/* Friendly titles for sub-pages */
-const SUB_PAGE_TITLES: Record<string, string> = {
+/* Friendly titles for pages (shown alongside back button) */
+const PAGE_TITLES: Record<string, string> = {
+  "/closet": "My Closet",
+  "/stylist": "AI Stylist",
+  "/health": "Closet Health",
+  "/profile": "Profile",
   "/settings": "Settings",
   "/calendar": "Outfit Calendar",
 };
@@ -18,13 +22,13 @@ const TopBar = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const isSubPage = !MAIN_PAGES.includes(location.pathname);
-  const subPageTitle = SUB_PAGE_TITLES[location.pathname];
+  const showBack = !NO_BACK_PAGES.includes(location.pathname);
+  const pageTitle = PAGE_TITLES[location.pathname];
 
   return (
     <header className="sticky top-0 z-40 flex items-center justify-between border-b border-border/50 bg-background/80 px-5 py-3 backdrop-blur-xl">
       <div className="flex items-center gap-2.5">
-        {isSubPage ? (
+        {showBack ? (
           <>
             <motion.button
               whileTap={{ scale: 0.9 }}
@@ -34,9 +38,9 @@ const TopBar = () => {
             >
               <ArrowLeft className="h-5 w-5" />
             </motion.button>
-            {subPageTitle && (
+            {pageTitle && (
               <span className="text-base font-display font-bold tracking-tight text-foreground">
-                {subPageTitle}
+                {pageTitle}
               </span>
             )}
           </>
@@ -64,7 +68,7 @@ const TopBar = () => {
           )}
         </motion.button>
 
-        {!isSubPage && (
+        {!showBack && (
           <motion.button
             whileTap={{ scale: 0.9 }}
             onClick={() => navigate("/settings")}
