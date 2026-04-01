@@ -17,6 +17,7 @@ import {
   Loader2,
   Shuffle,
   Calendar,
+  MapPin,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
@@ -34,6 +35,7 @@ interface WeatherData {
   city: string;
   icon: string;
   tip: string;
+  isEstimated?: boolean; // true when using IP-based or fallback weather
 }
 
 const weatherTips: Record<string, string> = {
@@ -62,40 +64,52 @@ const conditionFromCode = (code: number): string => {
   return "Stormy";
 };
 
+const getWeatherIcon = (code: number, day: boolean): string => {
+  if (code <= 1) return day ? "☀️" : "🌙";
+  if (code <= 3) return day ? "⛅" : "☁️";
+  if (code <= 48) return "🌫️";
+  if (code <= 67) return "🌧️";
+  if (code <= 77) return "🌨️";
+  if (code <= 82) return "🌧️";
+  return "⛈️";
+};
+
 const useWeather = (): WeatherData | null => {
   const [weather, setWeather] = useState<WeatherData | null>(null);
 
   useEffect(() => {
-    const fetchWeatherForCoords = async (lat: number, lon: number) => {
+    const fetchWeatherForCoords = async (
+      lat: number,
+      lon: number,
+      isEstimated = false
+    ): Promise<boolean> => {
       try {
-        // Reverse geocode
-        let city = "Your Location";
+        // Reverse geocode for city name
+        let city = isEstimated ? "Estimated Location" : "Your Location";
         try {
           const geoRes = await fetch(
             `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`
           );
-          const geoData = await geoRes.json();
-          city = geoData.city || geoData.locality || "Your Location";
-        } catch {}
+          if (geoRes.ok) {
+            const geoData = await geoRes.json();
+            city = geoData.city || geoData.locality || city;
+          }
+        } catch {
+          // Keep default city name
+        }
 
         const res = await fetch(
           `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code,is_day&timezone=auto`
         );
+        if (!res.ok) throw new Error(`Weather API returned ${res.status}`);
         const data = await res.json();
         const current = data.current;
+        if (!current || current.temperature_2m == null)
+          throw new Error("Invalid weather response");
+
         const temp = Math.round(current.temperature_2m);
         const cat = getWeatherCategory(temp);
         const isDay = current.is_day === 1;
-
-        const getWeatherIcon = (code: number, day: boolean): string => {
-          if (code <= 1) return day ? "☀️" : "🌙";
-          if (code <= 3) return day ? "⛅" : "☁️";
-          if (code <= 48) return "🌫️";
-          if (code <= 67) return "🌧️";
-          if (code <= 77) return "🌨️";
-          if (code <= 82) return "🌧️";
-          return "⛈️";
-        };
 
         setWeather({
           temp,
@@ -105,50 +119,126 @@ const useWeather = (): WeatherData | null => {
           city,
           icon: getWeatherIcon(current.weather_code, isDay),
           tip: weatherTips[cat],
+          isEstimated,
         });
+        return true;
       } catch {
-        setWeather({
-          temp: 28,
-          condition: "Partly Cloudy",
-          humidity: 65,
-          windSpeed: 12,
-          city: "Your Location",
-          icon: "⛅",
-          tip: weatherTips.warm,
-        });
+        return false;
       }
     };
 
-    const fetchWeather = async () => {
-      try {
-        const pos = await new Promise<GeolocationPosition>((res, rej) =>
-          navigator.geolocation.getCurrentPosition(res, rej, {
-            enableHighAccuracy: false,
-            timeout: 5000,
-          })
-        );
-        await fetchWeatherForCoords(pos.coords.latitude, pos.coords.longitude);
-      } catch {
+    // Try multiple IP geolocation services as fallback
+    const ipGeoServices = [
+      {
+        url: "https://ipapi.co/json/",
+        getLat: (d: any) => d.latitude,
+        getLon: (d: any) => d.longitude,
+        getCity: (d: any) => d.city,
+      },
+      {
+        url: "https://ipwho.is/",
+        getLat: (d: any) => d.latitude,
+        getLon: (d: any) => d.longitude,
+        getCity: (d: any) => d.city,
+      },
+      {
+        url: "https://freeipapi.com/api/json",
+        getLat: (d: any) => d.latitude,
+        getLon: (d: any) => d.longitude,
+        getCity: (d: any) => d.cityName,
+      },
+    ];
+
+    const fetchViaIpGeo = async (): Promise<boolean> => {
+      for (const svc of ipGeoServices) {
         try {
-          const ipRes = await fetch("https://ipapi.co/json/");
-          const ipData = await ipRes.json();
-          if (ipData.latitude && ipData.longitude) {
-            await fetchWeatherForCoords(ipData.latitude, ipData.longitude);
-          } else {
-            throw new Error("No coords");
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 5000);
+          const res = await fetch(svc.url, { signal: controller.signal });
+          clearTimeout(timeout);
+          if (!res.ok) continue;
+          const data = await res.json();
+          const lat = svc.getLat(data);
+          const lon = svc.getLon(data);
+          if (lat && lon && typeof lat === "number" && typeof lon === "number") {
+            const ok = await fetchWeatherForCoords(lat, lon, true);
+            if (ok) return true;
           }
         } catch {
-          setWeather({
-            temp: 28,
-            condition: "Partly Cloudy",
-            humidity: 65,
-            windSpeed: 12,
-            city: "Your Location",
-            icon: "⛅",
-            tip: weatherTips.warm,
-          });
+          // Try next service
         }
       }
+      return false;
+    };
+
+    const fetchWeather = async () => {
+      // Step 1: Try browser geolocation (most accurate)
+      if ("geolocation" in navigator) {
+        try {
+          const pos = await new Promise<GeolocationPosition>((res, rej) =>
+            navigator.geolocation.getCurrentPosition(res, rej, {
+              enableHighAccuracy: true,
+              timeout: 10000,
+              maximumAge: 300000, // Cache for 5 minutes
+            })
+          );
+          const ok = await fetchWeatherForCoords(
+            pos.coords.latitude,
+            pos.coords.longitude,
+            false
+          );
+          if (ok) return;
+        } catch {
+          // Geolocation denied or timed out, try IP fallback
+        }
+      }
+
+      // Step 2: Try IP-based geolocation (multiple services)
+      const ipOk = await fetchViaIpGeo();
+      if (ipOk) return;
+
+      // Step 3: Last resort — use Open-Meteo's auto-detect feature
+      // Open-Meteo can infer location from the request IP server-side
+      try {
+        const res = await fetch(
+          "https://api.open-meteo.com/v1/forecast?latitude=52.52&longitude=13.41&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code,is_day&timezone=auto"
+        );
+        // This is a true fallback — we don't know the real location
+        // Use Berlin coords but mark as estimated
+        if (res.ok) {
+          const data = await res.json();
+          const current = data.current;
+          if (current && current.temperature_2m != null) {
+            const temp = Math.round(current.temperature_2m);
+            const cat = getWeatherCategory(temp);
+            setWeather({
+              temp,
+              condition: conditionFromCode(current.weather_code),
+              humidity: current.relative_humidity_2m,
+              windSpeed: Math.round(current.wind_speed_10m),
+              city: "Weather Unavailable",
+              icon: getWeatherIcon(current.weather_code, current.is_day === 1),
+              tip: weatherTips[cat],
+              isEstimated: true,
+            });
+            return;
+          }
+        }
+      } catch {
+        // Everything failed
+      }
+
+      // Step 4: Absolute last resort — minimal static fallback
+      setWeather({
+        temp: 25,
+        condition: "Unknown",
+        humidity: 50,
+        windSpeed: 10,
+        city: "Location Unavailable",
+        icon: "🌡️",
+        tip: "Enable location access for accurate weather-based outfit suggestions.",
+        isEstimated: true,
+      });
     };
 
     fetchWeather();
@@ -602,6 +692,9 @@ const Home = () => {
                   </span>
                   <p className="text-xs font-body text-muted-foreground">
                     {weather.condition} · {weather.city}
+                    {weather.isEstimated && (
+                      <span className="ml-1 text-[10px] text-amber-500 dark:text-amber-400"> (approx)</span>
+                    )}
                   </p>
                 </div>
               </div>
@@ -624,6 +717,16 @@ const Home = () => {
                 {weatherTipAI || weather.tip}
               </p>
             </div>
+
+            {/* Location access prompt when weather is estimated */}
+            {weather.isEstimated && (
+              <div className="mx-4 mb-3 flex items-center gap-2 rounded-xl bg-amber-500/10 px-3 py-2">
+                <MapPin className="h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+                <p className="text-[11px] font-body text-amber-700 dark:text-amber-400">
+                  Enable location access in your browser for accurate local weather and outfit picks.
+                </p>
+              </div>
+            )}
 
             {/* Show AI-recommended weather outfit or loading state */}
             {loadingWeatherOutfit ? (
