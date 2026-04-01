@@ -14,9 +14,36 @@ import {
   Clock,
   BarChart3,
   Palette,
+  ShoppingBag,
+  Paintbrush,
+  Footprints,
+  Layers,
+  Gem,
+  Dumbbell,
+  Ribbon,
+  Repeat,
+  Target,
+  Zap,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { getClosetItems, returnFromLaundry, type ClothingItem } from "@/lib/database";
+
+/* ------------------------------------------------------------------ */
+/*  Recommendation types                                               */
+/* ------------------------------------------------------------------ */
+type RecTag = "Style Gap" | "Quick Win" | "Color Tip" | "Wardrobe Upgrade" | "Action Needed" | "Great Job";
+type RecIconName = "ShoppingBag" | "Paintbrush" | "Footprints" | "Layers" | "Gem" | "Dumbbell" | "Ribbon" | "Shirt" | "Repeat" | "Target" | "WashingMachine" | "Zap" | "Sparkles";
+
+interface StyleRec {
+  text: string;
+  tag: RecTag;
+  icon: RecIconName;
+  tagColor: string; // tailwind classes
+}
+
+const REC_ICONS: Record<RecIconName, React.ComponentType<any>> = {
+  ShoppingBag, Paintbrush, Footprints, Layers, Gem, Dumbbell, Ribbon, Shirt, Repeat, Target, WashingMachine, Zap, Sparkles,
+};
 
 /* ------------------------------------------------------------------ */
 /*  Constants & helpers                                                 */
@@ -109,7 +136,7 @@ const computeHealth = (items: ClothingItem[]): HealthData => {
   const laundryItems = activeItems.filter((i) => i.laundry_status === "in_laundry");
 
   // -- Comprehensive recommendations engine --
-  const recommendations: string[] = [];
+  const recommendations: StyleRec[] = [];
   const topCount = catCounts["Tops"] || 0;
   const bottomCount = catCounts["Bottoms"] || 0;
   const footCount = catCounts["Footwear"] || 0;
@@ -126,13 +153,15 @@ const computeHealth = (items: ClothingItem[]): HealthData => {
       const combos = topCount * bottomCount;
       const extraBottoms = 3;
       const newCombos = topCount * (bottomCount + extraBottoms);
-      recommendations.push(
-        `You have ${topCount} tops but only ${bottomCount} bottoms -- your bottoms are the bottleneck. Adding just ${extraBottoms} versatile bottoms would jump your outfit combos from ${combos} to ${newCombos}.`
-      );
+      recommendations.push({
+        text: `${topCount} tops but only ${bottomCount} bottoms â bottoms are the bottleneck. Adding ${extraBottoms} versatile bottoms jumps your combos from ${combos} to ${newCombos}.`,
+        tag: "Quick Win", icon: "ShoppingBag", tagColor: "bg-emerald-500/15 text-emerald-500",
+      });
     } else if (ratio < 0.5) {
-      recommendations.push(
-        `You have ${bottomCount} bottoms but only ${topCount} tops -- a few more tops would multiply your outfit options significantly.`
-      );
+      recommendations.push({
+        text: `${bottomCount} bottoms but only ${topCount} tops â a few more tops would multiply your outfit options.`,
+        tag: "Quick Win", icon: "ShoppingBag", tagColor: "bg-emerald-500/15 text-emerald-500",
+      });
     }
   }
 
@@ -142,9 +171,10 @@ const computeHealth = (items: ClothingItem[]): HealthData => {
   if (bottomCount === 0) missingEssentials.push("bottoms");
   if (footCount === 0) missingEssentials.push("footwear");
   if (missingEssentials.length > 0) {
-    recommendations.push(
-      `Essential gap: You're missing ${missingEssentials.join(" and ")} entirely -- these are the building blocks of every outfit.`
-    );
+    recommendations.push({
+      text: `Missing ${missingEssentials.join(" and ")} entirely â these are the building blocks of every outfit.`,
+      tag: "Style Gap", icon: "Shirt", tagColor: "bg-rose-500/15 text-rose-500",
+    });
   }
 
   // 3. Footwear variety
@@ -154,32 +184,36 @@ const computeHealth = (items: ClothingItem[]): HealthData => {
     const hasFormal = footNames.some(n => n.match(/oxford|loafer|derby|brogue|dress\s?shoe|monk/));
     const hasCasual = footNames.some(n => n.match(/boot|chelsea|sandal|slip|canvas|espadrille/));
     const missing: string[] = [];
-    if (!hasRunning) missing.push("athletic/running shoes");
-    if (!hasFormal) missing.push("formal shoes (loafers or oxfords)");
-    if (!hasCasual) missing.push("casual boots or sandals");
+    if (!hasRunning) missing.push("athletic shoes");
+    if (!hasFormal) missing.push("formal shoes");
+    if (!hasCasual) missing.push("casual boots/sandals");
     if (missing.length > 0) {
-      recommendations.push(
-        `Footwear gap: You only have ${footCount} pair${footCount > 1 ? "s" : ""}. Consider adding ${missing.slice(0, 2).join(" or ")} to cover more occasions.`
-      );
+      recommendations.push({
+        text: `Only ${footCount} pair${footCount > 1 ? "s" : ""} of footwear. Consider adding ${missing.slice(0, 2).join(" or ")} to cover more occasions.`,
+        tag: "Style Gap", icon: "Footprints", tagColor: "bg-rose-500/15 text-rose-500",
+      });
     }
   }
 
   // 4. No outerwear / layering pieces
   if (outerwearCount === 0) {
-    recommendations.push(
-      `No outerwear in your closet -- a versatile jacket or blazer opens up layering options for cooler days and dressier occasions.`
-    );
+    recommendations.push({
+      text: `No outerwear yet â a versatile jacket or blazer opens up layering options for cooler days and dressier occasions.`,
+      tag: "Wardrobe Upgrade", icon: "Layers", tagColor: "bg-blue-500/15 text-blue-500",
+    });
   } else if (outerwearCount === 1) {
-    recommendations.push(
-      `You have just 1 outerwear piece. A second option (casual jacket if yours is formal, or a blazer if yours is casual) adds flexibility.`
-    );
+    recommendations.push({
+      text: `Just 1 outerwear piece. A second option (casual if yours is formal, or vice versa) adds flexibility.`,
+      tag: "Quick Win", icon: "Layers", tagColor: "bg-emerald-500/15 text-emerald-500",
+    });
   }
 
   // 5. Accessory deficit
   if (accessoryCount === 0) {
-    recommendations.push(
-      `No accessories yet -- even one watch, belt, or scarf can elevate a basic outfit from ordinary to put-together.`
-    );
+    recommendations.push({
+      text: `No accessories yet â even one watch, belt, or scarf can elevate a basic outfit from ordinary to put-together.`,
+      tag: "Quick Win", icon: "Gem", tagColor: "bg-emerald-500/15 text-emerald-500",
+    });
   }
 
   // 6. Ethnic wardrobe completeness
@@ -191,20 +225,22 @@ const computeHealth = (items: ClothingItem[]): HealthData => {
     const hasEthnicBottom = allEthnicText.match(/churidar|dhoti|pajama|salwar|palazzo|lehenga/);
     const hasEthnicFoot = allEthnicText.match(/mojari|jutti|kolhapuri|sandal|ethnic/);
     const missingEthnic: string[] = [];
-    if (!hasEthnicBottom) missingEthnic.push("ethnic bottoms (churidar or dhoti pants)");
-    if (!hasEthnicFoot) missingEthnic.push("ethnic footwear (mojari or kolhapuri)");
+    if (!hasEthnicBottom) missingEthnic.push("ethnic bottoms");
+    if (!hasEthnicFoot) missingEthnic.push("ethnic footwear");
     if (missingEthnic.length > 0) {
-      recommendations.push(
-        `Ethnic set incomplete: You have ${ethnicCount} ethnic top${ethnicCount > 1 ? "s" : ""} but no ${missingEthnic.join(" or ")} to pair them with. Completing the set unlocks full traditional looks.`
-      );
+      recommendations.push({
+        text: `${ethnicCount} ethnic top${ethnicCount > 1 ? "s" : ""} but no ${missingEthnic.join(" or ")}. Completing the set unlocks full traditional looks.`,
+        tag: "Style Gap", icon: "Ribbon", tagColor: "bg-rose-500/15 text-rose-500",
+      });
     }
   }
 
   // 7. No activewear
   if (activewearCount === 0) {
-    recommendations.push(
-      `No activewear in your closet -- if you work out or enjoy sporty looks, adding a set of athletic wear keeps your regular clothes workout-free.`
-    );
+    recommendations.push({
+      text: `No activewear â adding athletic wear keeps your regular clothes workout-free and opens up sporty looks.`,
+      tag: "Wardrobe Upgrade", icon: "Dumbbell", tagColor: "bg-blue-500/15 text-blue-500",
+    });
   }
 
   // 8. Color monotony
@@ -213,21 +249,21 @@ const computeHealth = (items: ClothingItem[]): HealthData => {
     if (topColor.count > activeItems.length * 0.35) {
       const neutrals = ["black", "white", "grey", "navy", "beige"];
       const isNeutral = neutrals.includes(topColor.color.toLowerCase());
-      recommendations.push(
-        isNeutral
-          ? `Over ${Math.round((topColor.count / activeItems.length) * 100)}% of your closet is ${topColor.color.toLowerCase()}. Neutrals are great foundations, but adding accent colors like burgundy, olive, or rust creates more visual interest.`
-          : `${topColor.color} dominates your closet at ${Math.round((topColor.count / activeItems.length) * 100)}%. Mixing in some neutrals (navy, beige, grey) would make it easier to build balanced outfits.`
-      );
+      recommendations.push({
+        text: isNeutral
+          ? `${Math.round((topColor.count / activeItems.length) * 100)}% of your closet is ${topColor.color.toLowerCase()}. Add accent colors like burgundy, olive, or rust for more visual interest.`
+          : `${topColor.color} dominates at ${Math.round((topColor.count / activeItems.length) * 100)}%. Mix in some neutrals (navy, beige, grey) for balanced outfits.`,
+        tag: "Color Tip", icon: "Paintbrush", tagColor: "bg-amber-500/15 text-amber-500",
+      });
     }
-    // Only warm or only cool tones
     const warmColors = ["red", "orange", "yellow", "brown", "coral", "rust", "peach", "gold", "burgundy"];
     const coolColors = ["blue", "navy", "green", "teal", "purple", "lavender", "mint", "indigo"];
     const hasWarm = colorBreakdown.some(c => warmColors.includes(c.color.toLowerCase()));
     const hasCool = colorBreakdown.some(c => coolColors.includes(c.color.toLowerCase()));
     if (hasWarm && !hasCool && colorBreakdown.length >= 3) {
-      recommendations.push(`Your palette leans entirely warm-toned. A cool accent (navy, teal, or olive) would add depth to your outfits.`);
+      recommendations.push({ text: `Palette leans all warm. A cool accent (navy, teal, or olive) would add depth.`, tag: "Color Tip", icon: "Paintbrush", tagColor: "bg-amber-500/15 text-amber-500" });
     } else if (hasCool && !hasWarm && colorBreakdown.length >= 3) {
-      recommendations.push(`Your palette is all cool tones. A warm accent (rust, brown, or burgundy) would create nice contrast.`);
+      recommendations.push({ text: `Palette is all cool tones. A warm accent (rust, brown, or burgundy) creates nice contrast.`, tag: "Color Tip", icon: "Paintbrush", tagColor: "bg-amber-500/15 text-amber-500" });
     }
   }
 
@@ -235,27 +271,30 @@ const computeHealth = (items: ClothingItem[]): HealthData => {
   const neverWorn = activeItems.filter((i) => !i.worn_count || i.worn_count === 0);
   if (neverWorn.length > 3) {
     const pct = Math.round((neverWorn.length / activeItems.length) * 100);
-    recommendations.push(
-      `${neverWorn.length} pieces (${pct}% of your closet) have never been worn. Try styling one this week -- or consider if some should be donated to make room for pieces you'll actually reach for.`
-    );
+    recommendations.push({
+      text: `${neverWorn.length} pieces (${pct}%) never worn. Style one this week â or donate to make room for pieces you'll actually reach for.`,
+      tag: "Action Needed", icon: "Repeat", tagColor: "bg-orange-500/15 text-orange-500",
+    });
   }
 
   // 10. Outfit combinatorics opportunity
   if (topCount > 0 && bottomCount > 0 && footCount > 0) {
     const combos = topCount * bottomCount * footCount;
     if (combos < 50) {
-      recommendations.push(
-        `Your current ${topCount} tops × ${bottomCount} bottoms × ${footCount} shoes = ${combos} possible outfits. Aim for 100+ combos -- the easiest boost is adding items in your weakest category.`
-      );
+      recommendations.push({
+        text: `${topCount} tops x ${bottomCount} bottoms x ${footCount} shoes = ${combos} outfits. Target 100+ â boost your weakest category.`,
+        tag: "Quick Win", icon: "Zap", tagColor: "bg-emerald-500/15 text-emerald-500",
+      });
     }
   }
 
   // 11. Low occasion coverage
   if (occasionsFound.length < 4) {
     const missing = ALL_OCCASIONS.filter((o) => !allTags.includes(o));
-    recommendations.push(
-      `Your wardrobe covers ${occasionsFound.length} of ${ALL_OCCASIONS.length} occasion types. You're missing coverage for: ${missing.slice(0, 4).join(", ")}. Tag existing items or add pieces for those occasions.`
-    );
+    recommendations.push({
+      text: `Covers ${occasionsFound.length}/${ALL_OCCASIONS.length} occasion types. Missing: ${missing.slice(0, 3).join(", ")}. Tag existing items or add pieces.`,
+      tag: "Style Gap", icon: "Target", tagColor: "bg-rose-500/15 text-rose-500",
+    });
   }
 
   // 12. Laundry pile-up
@@ -264,9 +303,10 @@ const computeHealth = (items: ClothingItem[]): HealthData => {
     if (oldestLaundry?.laundry_sent_at) {
       const daysSince = Math.floor((Date.now() - new Date(oldestLaundry.laundry_sent_at).getTime()) / 86400000);
       if (daysSince >= 3) {
-        recommendations.push(
-          `${laundryItems.length} piece${laundryItems.length > 1 ? "s have" : " has"} been in laundry for ${daysSince}+ days -- that's reducing your available outfit options by ${Math.round((laundryItems.length / activeItems.length) * 100)}%.`
-        );
+        recommendations.push({
+          text: `${laundryItems.length} piece${laundryItems.length > 1 ? "s" : ""} in laundry for ${daysSince}+ days â reducing available outfits by ${Math.round((laundryItems.length / activeItems.length) * 100)}%.`,
+          tag: "Action Needed", icon: "WashingMachine", tagColor: "bg-orange-500/15 text-orange-500",
+        });
       }
     }
   }
@@ -275,14 +315,18 @@ const computeHealth = (items: ClothingItem[]): HealthData => {
   const basicKeywords = /\b(basic|plain|solid|crew\s?neck|v-neck|t-shirt|tee|white\s?shirt|jeans|chino)\b/;
   const basics = activeItems.filter(i => [i.name, ...(i.tags || [])].join(" ").toLowerCase().match(basicKeywords));
   if (basics.length < 3 && activeItems.length >= 10) {
-    recommendations.push(
-      `Your closet could use more basics -- plain tees, solid shirts, and classic jeans are the "glue" that ties statement pieces together.`
-    );
+    recommendations.push({
+      text: `Need more basics â plain tees, solid shirts, and classic jeans are the "glue" that ties statement pieces together.`,
+      tag: "Wardrobe Upgrade", icon: "Shirt", tagColor: "bg-blue-500/15 text-blue-500",
+    });
   }
 
   // Fallback
   if (recommendations.length === 0 && activeItems.length > 0) {
-    recommendations.push("Your wardrobe is well-balanced across categories, colors, and occasions. Keep logging outfits -- the more data, the smarter your insights get.");
+    recommendations.push({
+      text: "Your wardrobe is well-balanced across categories, colors, and occasions. Keep logging outfits for smarter insights!",
+      tag: "Great Job", icon: "Sparkles", tagColor: "bg-ai/15 text-ai",
+    });
   }
 
   return { versatility, occasionCoverage, colorBalance, gaps, colorBreakdown, categoryBreakdown, mostWorn, leastWorn, laundryItems, recommendations };
@@ -420,6 +464,47 @@ const ClosetHealth = () => {
       <p className="mt-1 text-sm text-muted-foreground font-body">
         AI analysis of your wardrobe completeness
       </p>
+
+      {/* AI Recommendations â Tip Cards */}
+      {health.recommendations.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+          className="mt-5"
+        >
+          <div className="flex items-center gap-2 mb-3">
+            <Sparkles className="h-4 w-4 text-ai" />
+            <h2 className="text-base font-display font-semibold">Your Style Story</h2>
+          </div>
+          <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory" style={{ WebkitOverflowScrolling: "touch", scrollbarWidth: "none", msOverflowStyle: "none" } as any}>
+            {health.recommendations.map((rec: any, i: number) => {
+              const IconComp = REC_ICONS[rec.icon as RecIconName] || Sparkles;
+              return (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, scale: 0.92 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.1 + i * 0.06 }}
+                  className="snap-start shrink-0 w-[200px] rounded-2xl bg-card p-4 flex flex-col gap-3 shadow-sm"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-ai/10">
+                      <IconComp className="h-4 w-4 text-ai" />
+                    </div>
+                    <span className={`rounded-full px-2 py-0.5 text-[9px] font-semibold font-display ${rec.tagColor}`}>
+                      {rec.tag}
+                    </span>
+                  </div>
+                  <p className="text-xs font-body text-foreground/80 leading-relaxed line-clamp-3">
+                    {rec.text}
+                  </p>
+                </motion.div>
+              );
+            })}
+          </div>
+        </motion.div>
+      )}
 
       {/* Score rings */}
       <div className="mt-6 grid grid-cols-3 gap-3">
@@ -662,32 +747,6 @@ const ClosetHealth = () => {
         </div>
       )}
 
-      {/* AI Recommendations */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.7 }}
-        className="mt-6 rounded-2xl bg-gradient-to-br from-ai/10 to-shop/10 p-5"
-      >
-        <div className="flex items-center gap-2 mb-3">
-          <Sparkles className="h-4 w-4 text-ai" />
-          <h2 className="text-base font-display font-semibold">Your Style Story</h2>
-        </div>
-        <div className="space-y-2.5">
-          {health.recommendations.map((rec, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, x: -8 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.8 + i * 0.1 }}
-              className="flex items-start gap-2.5"
-            >
-              <ChevronRight className="h-3.5 w-3.5 text-ai mt-0.5 shrink-0" />
-              <p className="text-xs font-body text-foreground/80 leading-relaxed">{rec}</p>
-            </motion.div>
-          ))}
-        </div>
-      </motion.div>
     </div>
   );
 };
