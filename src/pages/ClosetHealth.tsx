@@ -311,7 +311,7 @@ const computeHealth = (items: ClothingItem[]): HealthData => {
     }
   }
 
-  o/ 13. No basics / versatile neutrals
+  // 13. No basics / versatile neutrals
   const basicKeywords = /\b(basic|plain|solid|crew\s?neck|v-neck|t-shirt|tee|white\s?shirt|jeans|chino)\b/;
   const basics = activeItems.filter(i => [i.name, ...(i.tags || [])].join(" ").toLowerCase().match(basicKeywords));
   if (basics.length < 3 && activeItems.length >= 10) {
