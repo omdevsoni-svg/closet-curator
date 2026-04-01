@@ -118,7 +118,8 @@ const VerticalCarousel = ({ slot, items, selectedItem, onSelect }: VerticalCarou
   // Touch / drag tracking
   const touchStartY = useRef<number | null>(null);
   const touchDelta = useRef(0);
-  const SWIPE_THRESHOLD = 30; // px to trigger item change
+  const swiped = useRef(false); // lock to prevent multi-step per gesture
+  const SWIPE_THRESHOLD = 40; // px to trigger item change
 
   // Sync activeIndex when selectedItem changes externally (e.g. shuffle)
   useEffect(() => {
@@ -161,37 +162,45 @@ const VerticalCarousel = ({ slot, items, selectedItem, onSelect }: VerticalCarou
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     touchStartY.current = e.touches[0].clientY;
     touchDelta.current = 0;
+    swiped.current = false;
   }, []);
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
     if (touchStartY.current === null) return;
     e.preventDefault(); // prevent page scroll while swiping carousel
     touchDelta.current = touchStartY.current - e.touches[0].clientY;
-  }, []);
-
-  const handleTouchEnd = useCallback(() => {
-    if (Math.abs(touchDelta.current) >= SWIPE_THRESHOLD) {
+    // Trigger exactly one item change per swipe gesture
+    if (!swiped.current && Math.abs(touchDelta.current) >= SWIPE_THRESHOLD) {
+      swiped.current = true;
       if (touchDelta.current > 0) {
-        scrollDown(); // Swiped up -> next item (wraps)
+        scrollDown();
       } else {
-        scrollUp(); // Swiped down -> previous item (wraps)
+        scrollUp();
       }
     }
-    touchStartY.current = null;
-    touchDelta.current = 0;
   }, [scrollDown, scrollUp]);
 
-  // Mouse wheel handler
+  const handleTouchEnd = useCallback(() => {
+    // Scroll already triggered in touchMove; just reset state
+    touchStartY.current = null;
+    touchDelta.current = 0;
+    swiped.current = false;
+  }, []);
+
+  // Mouse wheel handler — heavily debounced so trackpad momentum doesn't skip items
   const wheelTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.stopPropagation();
-    // Debounce wheel events so one scroll tick = one item
+    e.preventDefault();
+    // Block rapid-fire wheel events (trackpads send many per gesture)
     if (wheelTimer.current) return;
-    wheelTimer.current = setTimeout(() => { wheelTimer.current = null; }, 200);
+    // Ignore tiny deltas from trackpad momentum
+    if (Math.abs(e.deltaY) < 4) return;
+    wheelTimer.current = setTimeout(() => { wheelTimer.current = null; }, 350);
     if (e.deltaY > 0) {
-      scrollDown(); // wraps around
+      scrollDown();
     } else if (e.deltaY < 0) {
-      scrollUp(); // wraps around
+      scrollUp();
     }
   }, [scrollDown, scrollUp]);
 
