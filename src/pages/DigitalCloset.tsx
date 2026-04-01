@@ -1951,12 +1951,21 @@ const DigitalCloset = () => {
                       <ImageIcon className="h-10 w-10 text-muted-foreground/30" />
                     </div>
                   )}
-                  {/* Favorite badge */}
-                  {item.favorite && (
-                    <div className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-white/80 shadow-sm backdrop-blur-sm text-rose-500">
-                      <Heart className="h-3 w-3 fill-current" />
-                    </div>
-                  )}
+                  {/* Favorite toggle button */}
+                  <motion.button
+                    whileTap={{ scale: 0.75 }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleToggleFavorite(item);
+                    }}
+                    className={`absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full shadow-sm backdrop-blur-sm transition-colors ${
+                      item.favorite
+                        ? "bg-rose-500 text-white"
+                        : "bg-black/40 text-white/70 hover:text-white"
+                    }`}
+                  >
+                    <Heart className={`h-3.5 w-3.5 ${item.favorite ? "fill-current" : ""}`} />
+                  </motion.button>
                   {/* Laundry badge */}
                   {item.laundry_status === "in_laundry" && (
                     <div className="absolute left-1.5 top-1.5 flex items-center gap-1 rounded-full bg-blue-500/90 px-2 py-0.5 shadow-sm backdrop-blur-sm">
