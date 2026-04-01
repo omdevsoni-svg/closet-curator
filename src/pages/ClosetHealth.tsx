@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   HeartPulse,
   AlertTriangle,
@@ -154,12 +154,12 @@ const computeHealth = (items: ClothingItem[]): HealthData => {
       const extraBottoms = 3;
       const newCombos = topCount * (bottomCount + extraBottoms);
       recommendations.push({
-        text: `${topCount} tops but only ${bottomCount} bottoms â bottoms are the bottleneck. Adding ${extraBottoms} versatile bottoms jumps your combos from ${combos} to ${newCombos}.`,
+        text: `${topCount} tops but only ${bottomCount} bottoms - bottoms are the bottleneck. Adding ${extraBottoms} versatile bottoms jumps your combos from ${combos} to ${newCombos}.`,
         tag: "Quick Win", icon: "ShoppingBag", tagColor: "bg-emerald-500/15 text-emerald-500",
       });
     } else if (ratio < 0.5) {
       recommendations.push({
-        text: `${bottomCount} bottoms but only ${topCount} tops â a few more tops would multiply your outfit options.`,
+        text: `${bottomCount} bottoms but only ${topCount} tops - a few more tops would multiply your outfit options.`,
         tag: "Quick Win", icon: "ShoppingBag", tagColor: "bg-emerald-500/15 text-emerald-500",
       });
     }
@@ -172,7 +172,7 @@ const computeHealth = (items: ClothingItem[]): HealthData => {
   if (footCount === 0) missingEssentials.push("footwear");
   if (missingEssentials.length > 0) {
     recommendations.push({
-      text: `Missing ${missingEssentials.join(" and ")} entirely â these are the building blocks of every outfit.`,
+      text: `Missing ${missingEssentials.join(" and ")} entirely - these are the building blocks of every outfit.`,
       tag: "Style Gap", icon: "Shirt", tagColor: "bg-rose-500/15 text-rose-500",
     });
   }
@@ -198,7 +198,7 @@ const computeHealth = (items: ClothingItem[]): HealthData => {
   // 4. No outerwear / layering pieces
   if (outerwearCount === 0) {
     recommendations.push({
-      text: `No outerwear yet â a versatile jacket or blazer opens up layering options for cooler days and dressier occasions.`,
+      text: `No outerwear yet - a versatile jacket or blazer opens up layering options for cooler days and dressier occasions.`,
       tag: "Wardrobe Upgrade", icon: "Layers", tagColor: "bg-blue-500/15 text-blue-500",
     });
   } else if (outerwearCount === 1) {
@@ -211,7 +211,7 @@ const computeHealth = (items: ClothingItem[]): HealthData => {
   // 5. Accessory deficit
   if (accessoryCount === 0) {
     recommendations.push({
-      text: `No accessories yet â even one watch, belt, or scarf can elevate a basic outfit from ordinary to put-together.`,
+      text: `No accessories yet - even one watch, belt, or scarf can elevate a basic outfit from ordinary to put-together.`,
       tag: "Quick Win", icon: "Gem", tagColor: "bg-emerald-500/15 text-emerald-500",
     });
   }
@@ -238,7 +238,7 @@ const computeHealth = (items: ClothingItem[]): HealthData => {
   // 7. No activewear
   if (activewearCount === 0) {
     recommendations.push({
-      text: `No activewear â adding athletic wear keeps your regular clothes workout-free and opens up sporty looks.`,
+      text: `No activewear - adding athletic wear keeps your regular clothes workout-free and opens up sporty looks.`,
       tag: "Wardrobe Upgrade", icon: "Dumbbell", tagColor: "bg-blue-500/15 text-blue-500",
     });
   }
@@ -272,7 +272,7 @@ const computeHealth = (items: ClothingItem[]): HealthData => {
   if (neverWorn.length > 3) {
     const pct = Math.round((neverWorn.length / activeItems.length) * 100);
     recommendations.push({
-      text: `${neverWorn.length} pieces (${pct}%) never worn. Style one this week â or donate to make room for pieces you'll actually reach for.`,
+      text: `${neverWorn.length} pieces (${pct}%) never worn. Style one this week - or donate to make room for pieces you'll actually reach for.`,
       tag: "Action Needed", icon: "Repeat", tagColor: "bg-orange-500/15 text-orange-500",
     });
   }
@@ -282,7 +282,7 @@ const computeHealth = (items: ClothingItem[]): HealthData => {
     const combos = topCount * bottomCount * footCount;
     if (combos < 50) {
       recommendations.push({
-        text: `${topCount} tops x ${bottomCount} bottoms x ${footCount} shoes = ${combos} outfits. Target 100+ â boost your weakest category.`,
+        text: `${topCount} tops x ${bottomCount} bottoms x ${footCount} shoes = ${combos} outfits. Target 100+ — boost your weakest category.`,
         tag: "Quick Win", icon: "Zap", tagColor: "bg-emerald-500/15 text-emerald-500",
       });
     }
@@ -292,7 +292,7 @@ const computeHealth = (items: ClothingItem[]): HealthData => {
   if (occasionsFound.length < 4) {
     const missing = ALL_OCCASIONS.filter((o) => !allTags.includes(o));
     recommendations.push({
-      text: `Covers ${occasionsFound.length}/${ALL_OCCASIONS.length} occasion types. Missing: ${missing.slice(0, 3).join(", ")}. Tag existing items or add pieces.`,
+      text: `Covers ${occasionsFound.length}/${ALL_OCCASIONS.length} occasion types. Missing: ${missing.slice(0, 3).join(", ")}. Tag items or add key pieces.`,
       tag: "Style Gap", icon: "Target", tagColor: "bg-rose-500/15 text-rose-500",
     });
   }
@@ -304,7 +304,7 @@ const computeHealth = (items: ClothingItem[]): HealthData => {
       const daysSince = Math.floor((Date.now() - new Date(oldestLaundry.laundry_sent_at).getTime()) / 86400000);
       if (daysSince >= 3) {
         recommendations.push({
-          text: `${laundryItems.length} piece${laundryItems.length > 1 ? "s" : ""} in laundry for ${daysSince}+ days â reducing available outfits by ${Math.round((laundryItems.length / activeItems.length) * 100)}%.`,
+          text: `${laundryItems.length} piece${laundryItems.length > 1 ? "s" : ""} in laundry for ${daysSince}+ days - reducing available outfits by ${Math.round((laundryItems.length / activeItems.length) * 100)}%.`,
           tag: "Action Needed", icon: "WashingMachine", tagColor: "bg-orange-500/15 text-orange-500",
         });
       }
@@ -316,7 +316,7 @@ const computeHealth = (items: ClothingItem[]): HealthData => {
   const basics = activeItems.filter(i => [i.name, ...(i.tags || [])].join(" ").toLowerCase().match(basicKeywords));
   if (basics.length < 3 && activeItems.length >= 10) {
     recommendations.push({
-      text: `Need more basics â plain tees, solid shirts, and classic jeans are the "glue" that ties statement pieces together.`,
+      text: `Need more basics - plain tees, solid shirts, and classic jeans are the "glue" that ties statement pieces together.`,
       tag: "Wardrobe Upgrade", icon: "Shirt", tagColor: "bg-blue-500/15 text-blue-500",
     });
   }
@@ -387,6 +387,7 @@ const ClosetHealth = () => {
   const navigate = useNavigate();
   const [items, setItems] = useState<ClothingItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expandedCard, setExpandedCard] = useState<number | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -465,7 +466,7 @@ const ClosetHealth = () => {
         AI analysis of your wardrobe completeness
       </p>
 
-      {/* AI Recommendations â Tip Cards */}
+      {/* AI Recommendations — Tip Cards */}
       {health.recommendations.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 12 }}
@@ -486,7 +487,8 @@ const ClosetHealth = () => {
                   initial={{ opacity: 0, scale: 0.92 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: 0.1 + i * 0.06 }}
-                  className="snap-start shrink-0 w-[200px] rounded-2xl bg-card p-4 flex flex-col gap-3 shadow-sm"
+                  className="snap-start shrink-0 w-[200px] rounded-2xl bg-card p-4 flex flex-col gap-3 shadow-sm cursor-pointer active:scale-[0.97] transition-transform"
+                  onClick={() => setExpandedCard(expandedCard === i ? null : i)}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-ai/10">
@@ -499,10 +501,53 @@ const ClosetHealth = () => {
                   <p className="text-xs font-body text-foreground/80 leading-relaxed line-clamp-3">
                     {rec.text}
                   </p>
+                  <span className="text-[10px] text-ai font-medium font-display">Tap to read more</span>
                 </motion.div>
               );
             })}
           </div>
+
+          {/* Expanded card overlay */}
+          <AnimatePresence>
+            {expandedCard !== null && health.recommendations[expandedCard] && (() => {
+              const rec = health.recommendations[expandedCard] as any;
+              const IconComp = REC_ICONS[rec.icon as RecIconName] || Sparkles;
+              return (
+                <motion.div
+                  key="overlay"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 px-4 pb-8"
+                  onClick={() => setExpandedCard(null)}
+                >
+                  <motion.div
+                    initial={{ y: 80, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    exit={{ y: 80, opacity: 0 }}
+                    transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                    className="w-full max-w-sm rounded-2xl bg-card p-6 shadow-xl"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-ai/10">
+                          <IconComp className="h-5 w-5 text-ai" />
+                        </div>
+                        <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold font-display ${rec.tagColor}`}>
+                          {rec.tag}
+                        </span>
+                      </div>
+                      <button onClick={() => setExpandedCard(null)} className="text-muted-foreground text-lg font-bold leading-none">&times;</button>
+                    </div>
+                    <p className="text-sm font-body text-foreground/90 leading-relaxed">
+                      {rec.text}
+                    </p>
+                  </motion.div>
+                </motion.div>
+              );
+            })()}
+          </AnimatePresence>
         </motion.div>
       )}
 
