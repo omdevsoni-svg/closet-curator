@@ -1651,6 +1651,14 @@ const DigitalCloset = () => {
   const [showFilterSheet, setShowFilterSheet] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
+  // Lock body scroll when filter sheet is open
+  useEffect(() => {
+    if (showFilterSheet) {
+      document.body.style.overflow = "hidden";
+      return () => { document.body.style.overflow = ""; };
+    }
+  }, [showFilterSheet]);
+
   // Load items from Supabase
   useEffect(() => {
     if (!user) return;
@@ -1855,6 +1863,7 @@ const DigitalCloset = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            onTouchMove={(e) => e.stopPropagation()}
             className="fixed inset-0 z-50 flex items-end justify-center sm:items-center"
           >
             <motion.div
@@ -1863,13 +1872,14 @@ const DigitalCloset = () => {
               exit={{ opacity: 0 }}
               onClick={() => setShowFilterSheet(false)}
               className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+              style={{ touchAction: "none" }}
             />
             <motion.div
               initial={{ y: "100%" }}
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
               transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
-              className="relative z-10 w-full max-w-lg rounded-t-3xl bg-background p-5 pb-10 sm:rounded-3xl sm:pb-5"
+              className="relative z-10 w-full max-w-lg max-h-[70vh] overflow-y-auto overscroll-contain rounded-t-3xl bg-background p-5 pb-10 sm:rounded-3xl sm:pb-5"
             >
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-display font-bold text-foreground">Filter by Category</h3>
