@@ -396,6 +396,60 @@ export const saveStylistResult = async (
 };
 
 /* ------------------------------------------------------------------ */
+/*  Lookbook (VTO images)                                              */
+/* ------------------------------------------------------------------ */
+export interface LookbookEntry {
+  id: string;
+  image_url: string;
+  item_names: string[];
+  created_at: string;
+}
+
+const LOOKBOOK_KEY = "styleos_lookbook";
+
+export const getLookbook = (userId: string): LookbookEntry[] => {
+  try {
+    const raw = localStorage.getItem(`${LOOKBOOK_KEY}_${userId}`);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+};
+
+export const saveLookbookEntry = async (
+  userId: string,
+  base64Image: string,
+  itemNames: string[]
+): Promise<LookbookEntry | null> => {
+  try {
+    // Upload VTO image to Supabase storage
+    const blob = await fetch(base64Image).then(r => r.blob());
+    const file = new File([blob], `vto_${Date.now()}.png`, { type: "image/png" });
+    const imageUrl = await uploadImage("closet-images", userId, file);
+    if (!imageUrl) return null;
+
+    const entry: LookbookEntry = {
+      id: `lb_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+      image_url: imageUrl,
+      item_names: itemNames,
+      created_at: new Date().toISOString(),
+    };
+
+    const existing = getLookbook(userId);
+    const updated = [entry, ...existing].slice(0, 50); // keep max 50
+    localStorage.setItem(`${LOOKBOOK_KEY}_${userId}`, JSON.stringify(updated));
+    return entry;
+  } catch (err) {
+    console.error("saveLookbookEntry error:", err);
+    return null;
+  }
+};
+
+export const deleteLookbookEntry = (userId: string, entryId: string): void => {
+  const existing = getLookbook(userId);
+  const updated = existing.filter(e => e.id !== entryId);
+  localStorage.setItem(`${LOOKBOOK_KEY}_${userId}`, JSON.stringify(updated));
+};
+
+/* ------------------------------------------------------------------ */
 /*  Outfit plans (calendar)                                            */
 /* ------------------------------------------------------------------ */
 export interface OutfitPlan {

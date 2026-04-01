@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect } from "react";
 import {
   Sparkles,
   Send,
@@ -27,11 +27,12 @@ import {
   ShoppingBag,
   Upload,
   ZoomIn,
+  Trash2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { getClosetItems, getProfile, getStylistHistory, saveStylistResult, logWear, uploadImage, saveOutfitPlan, type ClothingItem, type Profile, type StylistHistory } from "@/lib/database";
+import { getClosetItems, getProfile, getStylistHistory, saveStylistResult, logWear, uploadImage, saveOutfitPlan, getLookbook, saveLookbookEntry, deleteLookbookEntry, type ClothingItem, type Profile, type StylistHistory, type LookbookEntry } from "@/lib/database";
 import {
   virtualTryOn,
   virtualTryOnMulti,
@@ -225,88 +226,6 @@ const VtoLoadingScreen = ({ items, isSequential, currentStep, seqProgress }: Vto
 /* ------------------------------------------------------------------ */
 /*  Virtual Try-On Modal -- now accepts specific outfit items           */
 /* ------------------------------------------------------------------ */
-/* ---- Pinch-to-Zoom Fullscreen Viewer ---- */
-const PinchZoomViewer = ({ src, onClose }: { src: string; onClose: () => void }) => {
-  const imgRef = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(1);
-  const [translate, setTranslate] = useState({ x: 0, y: 0 });
-  const lastDist = useRef(0);
-  const isPinching = useRef(false);
-  const isPanning = useRef(false);
-  const panStart = useRef({ x: 0, y: 0 });
-  const transStart = useRef({ x: 0, y: 0 });
-
-  const getDist = (t1: React.Touch, t2: React.Touch) =>
-    Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
-
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    if (e.touches.length === 2) {
-      e.preventDefault();
-      isPinching.current = true;
-      isPanning.current = false;
-      lastDist.current = getDist(e.touches[0], e.touches[1]);
-    } else if (e.touches.length === 1 && scale > 1) {
-      isPanning.current = true;
-      panStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-      transStart.current = { ...translate };
-    }
-  }, [scale, translate]);
-
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (e.touches.length === 2 && isPinching.current) {
-      e.preventDefault();
-      const dist = getDist(e.touches[0], e.touches[1]);
-      const ratio = dist / lastDist.current;
-      lastDist.current = dist;
-      setScale(s => Math.min(Math.max(s * ratio, 1), 5));
-    } else if (e.touches.length === 1 && isPanning.current && scale > 1) {
-      const dx = e.touches[0].clientX - panStart.current.x;
-      const dy = e.touches[0].clientY - panStart.current.y;
-      setTranslate({ x: transStart.current.x + dx, y: transStart.current.y + dy });
-    }
-  }, [scale]);
-
-  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
-    if (e.touches.length < 2) isPinching.current = false;
-    if (e.touches.length < 1) isPanning.current = false;
-  }, []);
-
-  const handleDoubleClick = useCallback(() => {
-    if (scale > 1) { setScale(1); setTranslate({ x: 0, y: 0 }); }
-    else setScale(2.5);
-  }, [scale]);
-
-  const resetAndClose = useCallback(() => {
-    setScale(1); setTranslate({ x: 0, y: 0 }); onClose();
-  }, [onClose]);
-
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm"
-      onClick={() => { if (scale <= 1) resetAndClose(); }}>
-      <button onClick={resetAndClose}
-        className="absolute top-4 right-4 z-[101] flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-white">
-        <X className="h-5 w-5" />
-      </button>
-      {scale > 1 && (
-        <button onClick={() => { setScale(1); setTranslate({ x: 0, y: 0 }); }}
-          className="absolute top-4 left-4 z-[101] px-3 py-1.5 rounded-full bg-white/20 text-white text-xs font-medium">
-          Reset Zoom
-        </button>
-      )}
-      <div ref={imgRef} className="max-h-[90vh] max-w-[95vw] overflow-hidden"
-        onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
-        onDoubleClick={handleDoubleClick}
-        onClick={(e) => e.stopPropagation()}
-        style={{ touchAction: "none" }}>
-        <img src={src} alt="Full-size VTO result"
-          className="max-h-[90vh] max-w-[95vw] object-contain rounded-lg select-none"
-          draggable={false}
-          style={{ transform: `scale(${scale}) translate(${translate.x / scale}px, ${translate.y / scale}px)`, transition: isPinching.current || isPanning.current ? "none" : "transform 0.2s ease-out" }} />
-      </div>
-    </div>
-  );
-};
-
 interface TryOnModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -314,9 +233,10 @@ interface TryOnModalProps {
   allClosetItems: ClothingItem[];
   userId: string;
   comboLabel?: string;
+  onVtoResult?: (imageDataUrl: string, itemNames: string[]) => void;
 }
 
-const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comboLabel }: TryOnModalProps) => {
+const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comboLabel, onVtoResult }: TryOnModalProps) => {
   const navigate = useNavigate();
   const [step, setStep] = useState<"loading" | "no-photo" | "select" | "generating" | "result">("loading");
   const [personPhoto, setPersonPhoto] = useState<string | null>(null);
@@ -419,8 +339,10 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
               }
 
               if (results.length > 0) {
-                setResultImage(`data:${results[0].mimeType};base64,${results[0].base64}`);
+                const dataUrl = `data:${results[0].mimeType};base64,${results[0].base64}`;
+                setResultImage(dataUrl);
                 setStep("result");
+                onVtoResult?.(dataUrl, selectedItems.map(i => i.name));
               } else {
                 setError("Couldn't generate try-on with full outfit. Please try again.");
                 setStep("select");
@@ -503,8 +425,10 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
       }
 
       if (results.length > 0) {
-        setResultImage(`data:${results[0].mimeType};base64,${results[0].base64}`);
+        const dataUrl = `data:${results[0].mimeType};base64,${results[0].base64}`;
+        setResultImage(dataUrl);
         setStep("result");
+        onVtoResult?.(dataUrl, selectedItems.map(i => i.name));
       } else {
         setError("Couldn't generate try-on with full outfit. Please try again.");
         setStep("select");
@@ -855,8 +779,27 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
         </motion.div>
       )}
     </AnimatePresence>
+
+    {/* Fullscreen zoomable image viewer */}
     {zoomImage && (
-      <PinchZoomViewer src={zoomImage} onClose={() => setZoomImage(null)} />
+      <div
+        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm"
+        onClick={() => setZoomImage(null)}
+      >
+        <button
+          onClick={() => setZoomImage(null)}
+          className="absolute top-4 right-4 z-[101] flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-white"
+        >
+          <X className="h-5 w-5" />
+        </button>
+        <img
+          src={zoomImage}
+          alt="Full-size VTO result"
+          className="max-h-[90vh] max-w-[95vw] object-contain rounded-lg"
+          onClick={(e) => e.stopPropagation()}
+          style={{ touchAction: "pinch-zoom" }}
+        />
+      </div>
     )}
     </>
   );
@@ -950,7 +893,7 @@ async function shareOutfitAsImage(combo: ResolvedCombination, occasion: string) 
   // Branding
   ctx.fillStyle = "#bbb";
   ctx.font = "11px system-ui, sans-serif";
-  ctx.fillText("StyleOS â¢ AI Digital Closet", 24, H - 16);
+  ctx.fillText("StyleOS \u2022 AI Digital Closet", 24, H - 16);
 
   // Convert to blob and share/download
   canvas.toBlob(async (blob) => {
@@ -1158,19 +1101,21 @@ const AiStylist = () => {
   const [aiError, setAiError] = useState<string | null>(null);
   const [tryOnCombo, setTryOnCombo] = useState<ResolvedCombination | null>(null);
   const [showTryOn, setShowTryOn] = useState(false);
-  const [activeTab, setActiveTab] = useState<"ai" | "mix" | "history" | "tryon">(
-    searchParams.get("tab") === "mix" ? "mix" : searchParams.get("tab") === "history" ? "history" : searchParams.get("tab") === "tryon" ? "tryon" : "ai"
+  const [activeTab, setActiveTab] = useState<"ai" | "mix" | "lookbook" | "tryon">(
+    searchParams.get("tab") === "mix" ? "mix" : searchParams.get("tab") === "lookbook" ? "lookbook" : searchParams.get("tab") === "tryon" ? "tryon" : "ai"
   );
   // Try Before You Buy state
   const [tryOnFile, setTryOnFile] = useState<File | null>(null);
   const [tryOnPreview, setTryOnPreview] = useState<string | null>(null);
   const [tryOnGenerating, setTryOnGenerating] = useState(false);
   const [tryOnResult, setTryOnResult] = useState<string | null>(null);
-  const [zoomImageMain, setZoomImageMain] = useState<string | null>(null);
   const [tryOnError, setTryOnError] = useState<string | null>(null);
+  const [zoomImageMain, setZoomImageMain] = useState<string | null>(null);
   const [mixTryOnItems, setMixTryOnItems] = useState<ClothingItem[]>([]);
   const [history, setHistory] = useState<StylistHistory[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [lookbook, setLookbook] = useState<LookbookEntry[]>([]);
+  const [lookbookLoading, setLookbookLoading] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -1186,17 +1131,23 @@ const AiStylist = () => {
     load();
   }, [user]);
 
-  // Load history when history tab is active
+  // Load lookbook when lookbook tab is active
   useEffect(() => {
-    if (activeTab !== "history" || !user) return;
-    const loadHistory = async () => {
-      setHistoryLoading(true);
-      const data = await getStylistHistory(user.id);
-      setHistory(data);
-      setHistoryLoading(false);
-    };
-    loadHistory();
+    if (activeTab !== "lookbook" || !user) return;
+    setLookbookLoading(true);
+    const data = getLookbook(user.id);
+    setLookbook(data);
+    setLookbookLoading(false);
   }, [activeTab, user]);
+
+  // Save VTO result to lookbook
+  const saveToLookbook = async (imageDataUrl: string, itemNames: string[]) => {
+    if (!user) return;
+    const entry = await saveLookbookEntry(user.id, imageDataUrl, itemNames);
+    if (entry) {
+      setLookbook(prev => [entry, ...prev]);
+    }
+  };
 
   // Handle tryOn query param from Digital Closet's Try On button
   useEffect(() => {
@@ -1278,19 +1229,19 @@ const AiStylist = () => {
               })
               .filter(Boolean) as ClothingItem[];
 
-          const reasoning = combo.reasoning.map((r) => {
-            const item = closetItems.find((i) => i.id === r.id);
-            return `${item?.name || "Item"}: ${r.reason}`;
-          });
+            const reasoning = combo.reasoning.map((r) => {
+              const item = closetItems.find((i) => i.id === r.id);
+              return `${item?.name || "Item"}: ${r.reason}`;
+            });
 
-          return {
-            label: combo.label,
-            slots: resolvedSlots,
-            items: resolvedItems,
-            tip: combo.tip,
-            reasoning,
-            missing: combo.missing,
-          };
+            return {
+              label: combo.label,
+              slots: resolvedSlots,
+              items: resolvedItems,
+              tip: combo.tip,
+              reasoning,
+              missing: combo.missing,
+            };
           })
           .filter((combo) => {
             // Filter out combinations with fewer than 2 resolved items
@@ -1406,7 +1357,7 @@ const AiStylist = () => {
               ? "Swipe & pick items to create your own outfit"
               : activeTab === "tryon"
               ? "Upload a product photo -- see how it looks on you"
-              : "Your past outfit recommendations"}
+              : "Your virtual try-on collection"}
           </p>
         </div>
       </div>
@@ -1417,7 +1368,7 @@ const AiStylist = () => {
           { key: "ai" as const, icon: Wand2, label: "Dress Me" },
           { key: "mix" as const, icon: Shuffle, label: "Mix & Match" },
           { key: "tryon" as const, icon: ShoppingBag, label: "Try On" },
-          { key: "history" as const, icon: Clock, label: "History" },
+          { key: "lookbook" as const, icon: Bookmark, label: "Lookbook" },
         ] as const).map(({ key, icon: Icon, label }) => {
           const isActive = activeTab === key;
           return (
@@ -1572,7 +1523,9 @@ const AiStylist = () => {
                     }
                     const results = await virtualTryOn(bodyB64, productB64, 1, profile.model_gender || undefined, faceB64);
                     if (results.length > 0) {
-                      setTryOnResult(`data:${results[0].mimeType};base64,${results[0].base64}`);
+                      const dataUrl = `data:${results[0].mimeType};base64,${results[0].base64}`;
+                      setTryOnResult(dataUrl);
+                      saveToLookbook(dataUrl, [tryOnFile?.name?.replace(/\.[^.]+$/, "") || "Product"]);
                     } else {
                       setTryOnError("No result generated -- try a clearer product photo");
                     }
@@ -1615,11 +1568,11 @@ const AiStylist = () => {
           {tryOnResult && (
             <div className="flex flex-col items-center">
               <div className="relative cursor-pointer group w-full max-w-sm" onClick={() => setZoomImageMain(tryOnResult)}>
-                    <img src={tryOnResult} alt="Try-on result" className="w-full rounded-2xl shadow-lg" />
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/20 rounded-2xl transition-colors">
-                      <ZoomIn className="h-8 w-8 text-white opacity-0 group-hover:opacity-80 transition-opacity" />
-                    </div>
-                  </div>
+                <img src={tryOnResult} alt="Try-on result" className="w-full rounded-2xl shadow-lg" />
+                <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/20 rounded-2xl transition-colors">
+                  <ZoomIn className="h-8 w-8 text-white opacity-0 group-hover:opacity-80 transition-opacity" />
+                </div>
+              </div>
               <div className="mt-4 flex items-center gap-3">
                 <motion.button
                   whileTap={{ scale: 0.95 }}
@@ -1666,36 +1619,36 @@ const AiStylist = () => {
         </motion.div>
       )}
 
-      {/* History tab */}
-      {activeTab === "history" && (
+      {/* Lookbook tab */}
+      {activeTab === "lookbook" && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           className="mt-4"
         >
-          {historyLoading ? (
+          {lookbookLoading ? (
             <div className="flex items-center justify-center py-16">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
-          ) : history.length === 0 ? (
+          ) : lookbook.length === 0 ? (
             <div className="flex flex-col items-center text-center py-16">
               <div className="flex h-16 w-16 items-center justify-center rounded-full bg-card">
-                <Clock className="h-8 w-8 text-muted-foreground/30" />
+                <Bookmark className="h-8 w-8 text-muted-foreground/30" />
               </div>
-              <p className="mt-3 text-sm font-body font-medium text-foreground">No outfit history yet</p>
+              <p className="mt-3 text-sm font-body font-medium text-foreground">No looks yet</p>
               <p className="mt-1 text-xs font-body text-muted-foreground">
-                Get AI outfit recommendations to build your history
+                Try on outfits and they'll appear here automatically
               </p>
               <button
-                onClick={() => setActiveTab("ai")}
+                onClick={() => setActiveTab("tryon")}
                 className="mt-4 rounded-xl bg-ai px-6 py-2.5 text-sm font-display font-semibold text-ai-foreground"
               >
-                Get AI Picks
+                Try On an Outfit
               </button>
             </div>
           ) : (
-            <div className="space-y-4">
-              {history.map((entry) => {
+            <div className="grid grid-cols-2 gap-3">
+              {lookbook.map((entry) => {
                 const date = new Date(entry.created_at);
                 const dateStr = date.toLocaleDateString("en-IN", {
                   day: "numeric",
@@ -1705,51 +1658,34 @@ const AiStylist = () => {
                 return (
                   <motion.div
                     key={entry.id}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="rounded-2xl bg-card p-4 border border-border"
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="group relative overflow-hidden rounded-2xl bg-card border border-border"
                   >
-                    {/* Header with occasion & date */}
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <Sparkles className="h-3.5 w-3.5 text-ai" />
-                        <span className="text-sm font-display font-semibold text-foreground">
-                          {entry.occasion}
-                        </span>
-                      </div>
-                      <span className="text-[10px] font-body text-muted-foreground">{dateStr}</span>
+                    <div className="aspect-[3/4] overflow-hidden cursor-pointer" onClick={() => setZoomImageMain(entry.image_url)}>
+                      <img
+                        src={entry.image_url}
+                        alt="VTO Look"
+                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      />
                     </div>
-
-                    {/* Item thumbnails */}
-                    <div className="flex gap-2 overflow-x-auto scrollbar-none pb-1">
-                      {entry.result_items.map((ri, idx) => (
-                        <div key={idx} className="shrink-0">
-                          <div className="h-20 w-16 overflow-hidden rounded-xl bg-background border border-border p-1">
-                            {ri.image_url ? (
-                              <img
-                                src={ri.image_url}
-                                alt={ri.name}
-                                className="h-full w-full object-contain"
-                              />
-                            ) : (
-                              <div className="flex h-full w-full items-center justify-center">
-                                <ImageIcon className="h-4 w-4 text-muted-foreground/30" />
-                              </div>
-                            )}
-                          </div>
-                          <p className="mt-0.5 text-center text-[9px] font-body text-muted-foreground truncate w-16">
-                            {ri.name}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Tip */}
-                    {entry.tip && (
-                      <p className="mt-3 text-xs font-body text-muted-foreground italic">
-                        "{entry.tip}"
+                    <div className="p-2.5">
+                      <p className="text-[10px] font-body text-muted-foreground truncate">
+                        {entry.item_names.join(" + ")}
                       </p>
-                    )}
+                      <div className="mt-1 flex items-center justify-between">
+                        <span className="text-[9px] font-body text-muted-foreground/60">{dateStr}</span>
+                        <button
+                          onClick={() => {
+                            deleteLookbookEntry(user!.id, entry.id);
+                            setLookbook(prev => prev.filter(e => e.id !== entry.id));
+                          }}
+                          className="text-muted-foreground/40 hover:text-rose-500 transition-colors"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </div>
                   </motion.div>
                 );
               })}
@@ -1878,11 +1814,30 @@ const AiStylist = () => {
         allClosetItems={closetItems}
         userId={user?.id || ""}
         comboLabel={tryOnCombo?.label || (mixTryOnItems.length > 0 ? "Mix & Match" : undefined)}
+        onVtoResult={saveToLookbook}
       />
 
+      {/* Fullscreen zoomable image viewer (main page VTO) */}
       {zoomImageMain && (
-      <PinchZoomViewer src={zoomImageMain} onClose={() => setZoomImageMain(null)} />
-    )}
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm"
+          onClick={() => setZoomImageMain(null)}
+        >
+          <button
+            onClick={() => setZoomImageMain(null)}
+            className="absolute top-4 right-4 z-[101] flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-white"
+          >
+            <X className="h-5 w-5" />
+          </button>
+          <img
+            src={zoomImageMain}
+            alt="Full-size VTO result"
+            className="max-h-[90vh] max-w-[95vw] object-contain rounded-lg"
+            onClick={(e) => e.stopPropagation()}
+            style={{ touchAction: "pinch-zoom" }}
+          />
+        </div>
+      )}
     </div>
   );
 };

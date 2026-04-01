@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   Plus,
   Search,
@@ -19,6 +20,8 @@ import {
   WashingMachine,
   CheckCircle2,
   CalendarCheck,
+  SlidersHorizontal,
+  Check,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
@@ -1635,14 +1638,17 @@ const ItemDetailModal = ({ item, allItems, onClose, onToggleFavorite, onDelete, 
 /* ------------------------------------------------------------------ */
 const DigitalCloset = () => {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const [items, setItems] = useState<ClothingItem[]>([]);
   const [loadingItems, setLoadingItems] = useState(true);
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(searchParams.get("filter") === "favorites");
   const [activeCategory, setActiveCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [isListening, setIsListening] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showBatchModal, setShowBatchModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<ClothingItem | null>(null);
+  const [showFilterSheet, setShowFilterSheet] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
   // Load items from Supabase
@@ -1708,8 +1714,9 @@ const DigitalCloset = () => {
     );
   };
 
-  // Filter items -- category first, then fuzzy search
+  // Filter items -- favorites first, then category, then fuzzy search
   const categoryFiltered = items.filter((item) => {
+    if (showFavoritesOnly && !item.favorite) return false;
     if (activeCategory === "In Laundry") return item.laundry_status === "in_laundry";
     return activeCategory === "All" || item.category === activeCategory;
   });
@@ -1738,7 +1745,7 @@ const DigitalCloset = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-display font-bold tracking-tight text-foreground">
-            My Closet
+            {showFavoritesOnly ? "Favorites" : "My Closet"}
           </h1>
           <p className="text-sm text-muted-foreground font-body">
             {items.filter(i => !i.archived).length} {items.filter(i => !i.archived).length === 1 ? "item" : "items"}
@@ -1767,7 +1774,7 @@ const DigitalCloset = () => {
         </div>
       </div>
 
-      {/* Search bar */}
+      {/* Search bar + filter button */}
       <div className="mt-4 flex items-center gap-2">
         <div className="relative flex-1">
           <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -1799,25 +1806,117 @@ const DigitalCloset = () => {
             )}
           </button>
         </div>
-
+        <motion.button
+          whileTap={{ scale: 0.9 }}
+          onClick={() => setShowFilterSheet(true)}
+          className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-colors ${
+            activeCategory !== "All"
+              ? "border-ai bg-ai/10 text-ai"
+              : "border-border bg-card text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <SlidersHorizontal className="h-4.5 w-4.5" />
+          {activeCategory !== "All" && (
+            <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-ai text-[8px] font-bold text-white">
+              1
+            </span>
+          )}
+        </motion.button>
       </div>
 
-      {/* Category filter chips */}
-      <div className="mt-4 flex gap-2 overflow-x-auto pb-2 scrollbar-none">
-        {categories.map((cat) => (
-          <button
-            key={cat}
-            onClick={() => setActiveCategory(cat)}
-            className={`shrink-0 rounded-full px-4 py-2 text-xs font-medium font-body transition-colors ${
-              activeCategory === cat
-                ? "bg-primary text-primary-foreground"
-                : "bg-card text-muted-foreground hover:text-foreground"
-            }`}
+      {/* Active filter tags */}
+      {(activeCategory !== "All" || showFavoritesOnly) && (
+        <div className="mt-2.5 flex items-center gap-2">
+          {showFavoritesOnly && (
+            <button
+              onClick={() => setShowFavoritesOnly(false)}
+              className="flex items-center gap-1.5 rounded-full bg-rose-500/10 px-3 py-1.5 text-xs font-body font-medium text-rose-500 transition-colors hover:bg-rose-500/20"
+            >
+              <Heart className="h-3 w-3 fill-current" /> Favorites
+              <X className="h-3 w-3" />
+            </button>
+          )}
+          {activeCategory !== "All" && (
+            <button
+              onClick={() => setActiveCategory("All")}
+              className="flex items-center gap-1.5 rounded-full bg-ai/10 px-3 py-1.5 text-xs font-body font-medium text-ai transition-colors hover:bg-ai/20"
+            >
+              {activeCategory}
+              <X className="h-3 w-3" />
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Category filter bottom sheet */}
+      <AnimatePresence>
+        {showFilterSheet && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-end justify-center sm:items-center"
           >
-            {cat}
-          </button>
-        ))}
-      </div>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowFilterSheet(false)}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
+              className="relative z-10 w-full max-w-lg rounded-t-3xl bg-background p-5 pb-10 sm:rounded-3xl sm:pb-5"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-display font-bold text-foreground">Filter by Category</h3>
+                <button
+                  onClick={() => setShowFilterSheet(false)}
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-card text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {categories.map((cat) => {
+                  const isActive = activeCategory === cat;
+                  return (
+                    <button
+                      key={cat}
+                      onClick={() => {
+                        setActiveCategory(cat);
+                        setShowFilterSheet(false);
+                      }}
+                      className={`flex items-center justify-between rounded-xl px-4 py-3 text-sm font-body font-medium transition-all ${
+                        isActive
+                          ? "bg-ai/10 text-ai ring-1 ring-ai/40"
+                          : "bg-card text-muted-foreground hover:text-foreground hover:bg-card/80"
+                      }`}
+                    >
+                      <span>{cat}</span>
+                      {isActive && <Check className="h-4 w-4" />}
+                    </button>
+                  );
+                })}
+              </div>
+              {activeCategory !== "All" && (
+                <button
+                  onClick={() => {
+                    setActiveCategory("All");
+                    setShowFilterSheet(false);
+                  }}
+                  className="mt-3 w-full rounded-xl border border-border py-2.5 text-sm font-body font-medium text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Clear Filter
+                </button>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Loading state */}
       {loadingItems && (

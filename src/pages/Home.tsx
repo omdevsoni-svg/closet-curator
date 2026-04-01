@@ -86,6 +86,7 @@ const useWeather = (): WeatherData | null => {
         const temp = Math.round(current.temperature_2m);
         const cat = getWeatherCategory(temp);
         const isDay = current.is_day === 1;
+
         const getWeatherIcon = (code: number, day: boolean): string => {
           if (code <= 1) return day ? "☀️" : "🌙";
           if (code <= 3) return day ? "⛅" : "☁️";
@@ -258,9 +259,10 @@ const Home = () => {
           },
         });
 
-        if (result.success) {
-          // Use first combination from the new multi-combo response
+        if (result.success && result.combinations.length > 0) {
+          // Store all combinations so user can shuffle between them
           setAllWeatherCombos(result.combinations);
+          // Pick a random starting combination for variety on each visit
           const startIdx = Math.floor(Math.random() * result.combinations.length);
           setCurrentComboIdx(startIdx);
           const combo = result.combinations[startIdx];
@@ -280,6 +282,19 @@ const Home = () => {
     fetchWeatherOutfit();
   }, [weather, stats.items, loadingStats]);
 
+  // Shuffle to next weather outfit combination
+  const shuffleWeatherOutfit = () => {
+    if (allWeatherCombos.length <= 1) return;
+    const nextIdx = (currentComboIdx + 1) % allWeatherCombos.length;
+    setCurrentComboIdx(nextIdx);
+    const combo = allWeatherCombos[nextIdx];
+    const picked = combo.item_ids
+      .map((id) => stats.items.find((item: ClothingItem) => item.id === id))
+      .filter(Boolean) as ClothingItem[];
+    setWeatherOutfit(picked);
+    setWeatherTipAI(combo.tip);
+  };
+
   // First-time onboarding
   const [onboardStep, setOnboardStep] = useState(() => {
     if (localStorage.getItem("styleos_onboarded")) return -1;
@@ -295,18 +310,6 @@ const Home = () => {
   const finishOnboarding = () => {
     localStorage.setItem("styleos_onboarded", "1");
     setOnboardStep(-1);
-  };
-
-  const shuffleWeatherOutfit = () => {
-    if (allWeatherCombos.length <= 1) return;
-    const nextIdx = (currentComboIdx + 1) % allWeatherCombos.length;
-    setCurrentComboIdx(nextIdx);
-    const combo = allWeatherCombos[nextIdx];
-    const picked = combo.item_ids
-      .map((id) => stats.items.find((item: ClothingItem) => item.id === id))
-      .filter(Boolean) as ClothingItem[];
-    setWeatherOutfit(picked);
-    setWeatherTipAI(combo.tip);
   };
 
   return (
@@ -403,54 +406,48 @@ const Home = () => {
       </AnimatePresence>
 
       {/* Wardrobe stats */}
-      <div className="mb-5 grid grid-cols-3 gap-2">
+      <div className="mb-5 grid grid-cols-3 gap-3">
         <motion.button
+          whileTap={{ scale: 0.96 }}
+          onClick={() => navigate("/closet")}
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.05 }}
-          whileTap={{ scale: 0.96 }}
-          onClick={() => navigate("/closet")}
-          className="flex items-center gap-2.5 rounded-xl bg-card px-3 py-2.5 text-left active:bg-card/80 transition-colors"
+          className="flex flex-col items-center rounded-2xl bg-card p-4 active:bg-card/80 transition-colors"
         >
-          <Shirt className="h-4 w-4 shrink-0 text-ai" />
-          <div className="min-w-0">
-            <span className="block text-lg font-display font-bold leading-tight text-foreground">
-              {loadingStats ? "--" : stats.totalItems}
-            </span>
-            <span className="block text-[9px] font-body text-muted-foreground leading-tight">Items</span>
-          </div>
+          <Shirt className="h-5 w-5 text-ai" />
+          <span className="mt-1.5 text-xl font-display font-bold text-foreground">
+            {loadingStats ? "--" : stats.totalItems}
+          </span>
+          <span className="text-[10px] font-body text-muted-foreground">Total Items</span>
         </motion.button>
         <motion.button
+          whileTap={{ scale: 0.96 }}
+          onClick={() => navigate("/closet?filter=favorites")}
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          whileTap={{ scale: 0.96 }}
-          onClick={() => navigate("/closet")}
-          className="flex items-center gap-2.5 rounded-xl bg-card px-3 py-2.5 text-left active:bg-card/80 transition-colors"
+          className="flex flex-col items-center rounded-2xl bg-card p-4 active:bg-card/80 transition-colors"
         >
-          <Heart className="h-4 w-4 shrink-0 text-rose-500" />
-          <div className="min-w-0">
-            <span className="block text-lg font-display font-bold leading-tight text-foreground">
-              {loadingStats ? "--" : stats.favorites}
-            </span>
-            <span className="block text-[9px] font-body text-muted-foreground leading-tight">Favorites</span>
-          </div>
+          <Heart className="h-5 w-5 text-rose-500" />
+          <span className="mt-1.5 text-xl font-display font-bold text-foreground">
+            {loadingStats ? "--" : stats.favorites}
+          </span>
+          <span className="text-[10px] font-body text-muted-foreground">Favorites</span>
         </motion.button>
         <motion.button
+          whileTap={{ scale: 0.96 }}
+          onClick={() => navigate("/health")}
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.15 }}
-          whileTap={{ scale: 0.96 }}
-          onClick={() => navigate("/health")}
-          className="flex items-center gap-2.5 rounded-xl bg-card px-3 py-2.5 text-left active:bg-card/80 transition-colors"
+          className="flex flex-col items-center rounded-2xl bg-card p-4 active:bg-card/80 transition-colors"
         >
-          <Star className="h-4 w-4 shrink-0 text-amber-500" />
-          <div className="min-w-0">
-            <span className="block text-lg font-display font-bold leading-tight text-foreground">
-              {loadingStats ? "--" : stats.styleScore || "--"}
-            </span>
-            <span className="block text-[9px] font-body text-muted-foreground leading-tight">Score</span>
-          </div>
+          <Star className="h-5 w-5 text-amber-500" />
+          <span className="mt-1.5 text-xl font-display font-bold text-foreground">
+            {loadingStats ? "--" : stats.styleScore || "--"}
+          </span>
+          <span className="text-[10px] font-body text-muted-foreground">Style Score</span>
         </motion.button>
       </div>
 
@@ -580,13 +577,17 @@ const Home = () => {
         >
           <div className="flex items-center justify-between">
             <h2 className="flex items-center gap-2 text-base font-display font-semibold text-foreground">
-            <CloudSun className="h-4 w-4 text-ai" />
-            Today's Weather Outfit
-          </h2>
+              <CloudSun className="h-4 w-4 text-ai" />
+              Today's Weather Outfit
+            </h2>
             {allWeatherCombos.length > 1 && (
-              <motion.button whileTap={{ scale: 0.9 }} onClick={shuffleWeatherOutfit}
-                className="flex items-center gap-1 rounded-lg bg-card px-2.5 py-1 text-[11px] font-display font-medium text-muted-foreground hover:text-foreground transition-colors">
-                <Shuffle className="h-3 w-3" /> Shuffle
+              <motion.button
+                whileTap={{ scale: 0.9 }}
+                onClick={shuffleWeatherOutfit}
+                className="flex items-center gap-1 rounded-lg bg-card px-2.5 py-1 text-[11px] font-display font-medium text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Shuffle className="h-3 w-3" />
+                Shuffle
               </motion.button>
             )}
           </div>
@@ -633,7 +634,6 @@ const Home = () => {
                 </span>
               </div>
             ) : weatherOutfit.length > 0 ? (
-              <>
               <div className="flex gap-3 overflow-x-auto px-4 pb-4 scrollbar-none">
                 {weatherOutfit.map((item: ClothingItem, i: number) => (
                   <motion.div
@@ -662,18 +662,6 @@ const Home = () => {
                   </motion.div>
                 ))}
               </div>
-              {/* Try On button */}
-              <div className="px-4 pb-3 pt-1">
-                <motion.button
-                  whileTap={{ scale: 0.97 }}
-                  onClick={() => navigate(`/stylist?tryOn=${weatherOutfit.map(i => i.id).join(",")}`)}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-ai/10 py-2.5 text-sm font-display font-semibold text-ai hover:bg-ai/20 transition-colors"
-                >
-                  <Sparkles className="h-4 w-4" />
-                  Try On This Outfit
-                </motion.button>
-              </div>
-              </>
             ) : stats.items.length > 0 ? (
               <div className="flex gap-3 overflow-x-auto px-4 pb-4 scrollbar-none">
                 {stats.items.slice(0, 4).map((item: any, i: number) => (
