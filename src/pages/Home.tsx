@@ -99,7 +99,7 @@ const useWeather = (): WeatherData | null => {
         }
 
         const res = await fetch(
-          `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code,is_day&timezone=auto`
+          `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code,is_day&timezone=auto`
         );
         if (!res.ok) throw new Error(`Weather API returned ${res.status}`);
         const data = await res.json();
@@ -107,7 +107,9 @@ const useWeather = (): WeatherData | null => {
         if (!current || current.temperature_2m == null)
           throw new Error("Invalid weather response");
 
-        const temp = Math.round(current.temperature_2m);
+        // Use apparent (feels-like) temperature which matches what weather apps show
+        // It factors in humidity and wind, giving a more accurate perceived temperature
+        const temp = Math.round(current.apparent_temperature ?? current.temperature_2m);
         const cat = getWeatherCategory(temp);
         const isDay = current.is_day === 1;
 
@@ -201,7 +203,7 @@ const useWeather = (): WeatherData | null => {
       // Open-Meteo can infer location from the request IP server-side
       try {
         const res = await fetch(
-          "https://api.open-meteo.com/v1/forecast?latitude=52.52&longitude=13.41&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code,is_day&timezone=auto"
+          "https://api.open-meteo.com/v1/forecast?latitude=52.52&longitude=13.41&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code,is_day&timezone=auto"
         );
         // This is a true fallback — we don't know the real location
         // Use Berlin coords but mark as estimated
@@ -209,7 +211,7 @@ const useWeather = (): WeatherData | null => {
           const data = await res.json();
           const current = data.current;
           if (current && current.temperature_2m != null) {
-            const temp = Math.round(current.temperature_2m);
+            const temp = Math.round(current.apparent_temperature ?? current.temperature_2m);
             const cat = getWeatherCategory(temp);
             setWeather({
               temp,
