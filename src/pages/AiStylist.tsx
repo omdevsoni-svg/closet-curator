@@ -342,7 +342,7 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
                 const dataUrl = `data:${results[0].mimeType};base64,${results[0].base64}`;
                 setResultImage(dataUrl);
                 setStep("result");
-                onVtoResult?.(dataUrl, selectedItems.map(i => i.name));
+                onVtoResult?.(dataUrl, itemsWithImages.map(i => i.name));
               } else {
                 setError("Couldn't generate try-on with full outfit. Please try again.");
                 setStep("select");
@@ -428,7 +428,7 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
         const dataUrl = `data:${results[0].mimeType};base64,${results[0].base64}`;
         setResultImage(dataUrl);
         setStep("result");
-        onVtoResult?.(dataUrl, selectedItems.map(i => i.name));
+        onVtoResult?.(dataUrl, itemsToTry.map(i => i.name));
       } else {
         setError("Couldn't generate try-on with full outfit. Please try again.");
         setStep("select");
