@@ -423,7 +423,7 @@ export const saveLookbookEntry = async (
     // Upload VTO image to Supabase storage
     const blob = await fetch(base64Image).then(r => r.blob());
     const file = new File([blob], `vto_${Date.now()}.png`, { type: "image/png" });
-    const imageUrl = await uploadImage("closet-images", userId, file);
+    const imageUrl = await uploadImage("clothing-images", userId, file);
     if (!imageUrl) return null;
 
     const entry: LookbookEntry = {
