@@ -15,6 +15,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/profile": "Profile",
   "/settings": "Settings",
   "/calendar": "Outfit Calendar",
+  "/unworn": "Items Never Worn",
 };
 
 const TopBar = () => {
