@@ -200,7 +200,7 @@ const VerticalCarousel = ({ slot, items, selectedItem, onSelect }: VerticalCarou
         <AnimatePresence initial={false}>
           {visibleIndices.map((idx, pos) => {
             const item = items[idx];
-            const isActive = pos === 0; // top row is active
+            const isActive = selectedItem ? item.id === selectedItem.id : pos === 0;
             const isFaded = !isActive;
 
             return (
@@ -346,7 +346,7 @@ const MixAndMatch = ({ closetItems, onTryOn, onClose, inline = false }: MixAndMa
   const handleSelect = (slotKey: string, item: ClothingItem) => {
     setSelections((prev) => ({
       ...prev,
-      [slotKey]: prev[slotKey]?.id === item.id ? null : item,
+      [slotKey]: item,
     }));
   };
 
