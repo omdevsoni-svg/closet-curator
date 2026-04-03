@@ -65,13 +65,13 @@ const conditionFromCode = (code: number): string => {
 };
 
 const getWeatherIcon = (code: number, day: boolean): string => {
-  if (code <= 1) return day ? "âï¸" : "ð";
-  if (code <= 3) return day ? "â" : "âï¸";
-  if (code <= 48) return "ð«ï¸";
-  if (code <= 67) return "ð§ï¸";
-  if (code <= 77) return "ð¨ï¸";
-  if (code <= 82) return "ð§ï¸";
-  return "âï¸";
+  if (code <= 1) return day ? "Ã¢ÂÂÃ¯Â¸Â" : "Ã°ÂÂÂ";
+  if (code <= 3) return day ? "Ã¢ÂÂ" : "Ã¢ÂÂÃ¯Â¸Â";
+  if (code <= 48) return "Ã°ÂÂÂ«Ã¯Â¸Â";
+  if (code <= 67) return "Ã°ÂÂÂ§Ã¯Â¸Â";
+  if (code <= 77) return "Ã°ÂÂÂ¨Ã¯Â¸Â";
+  if (code <= 82) return "Ã°ÂÂÂ§Ã¯Â¸Â";
+  return "Ã¢ÂÂÃ¯Â¸Â";
 };
 
 const useWeather = (): WeatherData | null => {
@@ -199,13 +199,13 @@ const useWeather = (): WeatherData | null => {
       const ipOk = await fetchViaIpGeo();
       if (ipOk) return;
 
-      // Step 3: Last resort â use Open-Meteo's auto-detect feature
+      // Step 3: Last resort Ã¢ÂÂ use Open-Meteo's auto-detect feature
       // Open-Meteo can infer location from the request IP server-side
       try {
         const res = await fetch(
           "https://api.open-meteo.com/v1/forecast?latitude=52.52&longitude=13.41&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code,is_day&timezone=auto"
         );
-        // This is a true fallback â we don't know the real location
+        // This is a true fallback Ã¢ÂÂ we don't know the real location
         // Use Berlin coords but mark as estimated
         if (res.ok) {
           const data = await res.json();
@@ -230,14 +230,14 @@ const useWeather = (): WeatherData | null => {
         // Everything failed
       }
 
-      // Step 4: Absolute last resort â minimal static fallback
+      // Step 4: Absolute last resort Ã¢ÂÂ minimal static fallback
       setWeather({
         temp: 25,
         condition: "Unknown",
         humidity: 50,
         windSpeed: 10,
         city: "Location Unavailable",
-        icon: "ð¡ï¸",
+        icon: "Ã°ÂÂÂ¡Ã¯Â¸Â",
         tip: "Enable location access for accurate weather-based outfit suggestions.",
         isEstimated: true,
       });
@@ -323,7 +323,7 @@ const Home = () => {
     const fetchWeatherOutfit = async () => {
       setLoadingWeatherOutfit(true);
       try {
-        const occasion = `Everyday outfit for ${weather.temp}Â°C ${weather.condition} weather`;
+        const occasion = `Everyday outfit for ${weather.temp}ÃÂ°C ${weather.condition} weather`;
         const result = await getOutfitRecommendation({
           occasion,
           items: stats.items.map((item: ClothingItem) => ({
@@ -544,36 +544,35 @@ const Home = () => {
       </div>
 
       {/* Laundry reminder */}
-      {!loadingStats && (() => {
-        const laundryItems = stats.items.filter((i: any) => i.laundry_status === "in_laundry");
-        const oldItems = laundryItems.filter((i: any) => i.laundry_sent_at && (Date.now() - new Date(i.laundry_sent_at).getTime()) > 3 * 86400000);
-        if (laundryItems.length === 0) return null;
-        return (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            className={`mb-5 rounded-2xl px-4 py-3 flex items-center justify-between ${oldItems.length > 0 ? "bg-amber-500/10" : "bg-blue-500/10"}`}
-          >
-            <div className="flex items-center gap-2.5">
-              <div className={`flex h-8 w-8 items-center justify-center rounded-full ${oldItems.length > 0 ? "bg-amber-500/20" : "bg-blue-500/20"}`}>
-                <span className="text-base">ð§º</span>
-              </div>
-              <div>
-                <p className={`text-xs font-body font-medium ${oldItems.length > 0 ? "text-amber-700 dark:text-amber-400" : "text-blue-700 dark:text-blue-400"}`}>
-                  {laundryItems.length} item{laundryItems.length > 1 ? "s" : ""} in laundry
-                  {oldItems.length > 0 && " -- some over 3 days!"}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => navigate("/health")}
-              className={`text-[11px] font-body font-semibold ${oldItems.length > 0 ? "text-amber-600 dark:text-amber-400" : "text-blue-600 dark:text-blue-400"}`}
-            >
-              View
-            </button>
-          </motion.div>
-        );
-      })()}
+      {/* Unworn items nudge — compact CTA card */}
+            {!loadingStats && (() => {
+              const unworn = stats.items.filter(
+                (i: any) => !i.archived && (!i.worn_count || i.worn_count === 0)
+              );
+              if (unworn.length === 0) return null;
+              return (
+                <motion.button
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => navigate("/unworn")}
+                  className="mb-5 w-full flex items-center gap-3 rounded-2xl bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 dark:from-violet-500/20 dark:to-fuchsia-500/20 border border-violet-200/40 dark:border-violet-700/30 px-4 py-3.5 text-left transition-colors hover:from-violet-500/15 hover:to-fuchsia-500/15"
+                >
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-500/15 dark:bg-violet-500/25">
+                    <Shirt className="h-5 w-5 text-violet-600 dark:text-violet-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-body font-semibold text-violet-700 dark:text-violet-300">
+                      {unworn.length} item{unworn.length > 1 ? "s" : ""} never worn
+                    </p>
+                    <p className="text-[11px] font-body text-violet-600/70 dark:text-violet-400/70 mt-0.5">
+                      Rediscover forgotten pieces in your closet
+                    </p>
+                  </div>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-violet-400 dark:text-violet-500" />
+                </motion.button>
+              );
+            })()}
 
       {/* Unworn items nudge */}
       {!loadingStats && (() => {
@@ -690,10 +689,10 @@ const Home = () => {
                 <span className="text-3xl font-emoji">{weather.icon}</span>
                 <div>
                   <span className="text-2xl font-display font-bold text-foreground">
-                    {weather.temp}Â°C
+                    {weather.temp}ÃÂ°C
                   </span>
                   <p className="text-xs font-body text-muted-foreground">
-                    {weather.condition} Â· {weather.city}
+                    {weather.condition} ÃÂ· {weather.city}
                     {weather.isEstimated && (
                       <span className="ml-1 text-[10px] text-amber-500 dark:text-amber-400"> (approx)</span>
                     )}
