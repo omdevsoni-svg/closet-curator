@@ -65,13 +65,13 @@ const conditionFromCode = (code: number): string => {
 };
 
 const getWeatherIcon = (code: number, day: boolean): string => {
-  if (code <= 1) return day ? "☀️" : "🌙";
-  if (code <= 3) return day ? "⛅" : "☁️";
-  if (code <= 48) return "🌫️";
-  if (code <= 67) return "🌧️";
-  if (code <= 77) return "🌨️";
-  if (code <= 82) return "🌧️";
-  return "⛈️";
+  if (code <= 1) return day ? "âï¸" : "ð";
+  if (code <= 3) return day ? "â" : "âï¸";
+  if (code <= 48) return "ð«ï¸";
+  if (code <= 67) return "ð§ï¸";
+  if (code <= 77) return "ð¨ï¸";
+  if (code <= 82) return "ð§ï¸";
+  return "âï¸";
 };
 
 const useWeather = (): WeatherData | null => {
@@ -199,13 +199,13 @@ const useWeather = (): WeatherData | null => {
       const ipOk = await fetchViaIpGeo();
       if (ipOk) return;
 
-      // Step 3: Last resort — use Open-Meteo's auto-detect feature
+      // Step 3: Last resort â use Open-Meteo's auto-detect feature
       // Open-Meteo can infer location from the request IP server-side
       try {
         const res = await fetch(
           "https://api.open-meteo.com/v1/forecast?latitude=52.52&longitude=13.41&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code,is_day&timezone=auto"
         );
-        // This is a true fallback — we don't know the real location
+        // This is a true fallback â we don't know the real location
         // Use Berlin coords but mark as estimated
         if (res.ok) {
           const data = await res.json();
@@ -230,14 +230,14 @@ const useWeather = (): WeatherData | null => {
         // Everything failed
       }
 
-      // Step 4: Absolute last resort — minimal static fallback
+      // Step 4: Absolute last resort â minimal static fallback
       setWeather({
         temp: 25,
         condition: "Unknown",
         humidity: 50,
         windSpeed: 10,
         city: "Location Unavailable",
-        icon: "🌡️",
+        icon: "ð¡ï¸",
         tip: "Enable location access for accurate weather-based outfit suggestions.",
         isEstimated: true,
       });
@@ -323,7 +323,7 @@ const Home = () => {
     const fetchWeatherOutfit = async () => {
       setLoadingWeatherOutfit(true);
       try {
-        const occasion = `Everyday outfit for ${weather.temp}°C ${weather.condition} weather`;
+        const occasion = `Everyday outfit for ${weather.temp}Â°C ${weather.condition} weather`;
         const result = await getOutfitRecommendation({
           occasion,
           items: stats.items.map((item: ClothingItem) => ({
@@ -556,7 +556,7 @@ const Home = () => {
           >
             <div className="flex items-center gap-2.5">
               <div className={`flex h-8 w-8 items-center justify-center rounded-full ${oldItems.length > 0 ? "bg-amber-500/20" : "bg-blue-500/20"}`}>
-                <span className="text-base">🧺</span>
+                <span className="text-base">ð§º</span>
               </div>
               <div>
                 <p className={`text-xs font-body font-medium ${oldItems.length > 0 ? "text-amber-700 dark:text-amber-400" : "text-blue-700 dark:text-blue-400"}`}>
@@ -690,10 +690,10 @@ const Home = () => {
                 <span className="text-3xl font-emoji">{weather.icon}</span>
                 <div>
                   <span className="text-2xl font-display font-bold text-foreground">
-                    {weather.temp}°C
+                    {weather.temp}Â°C
                   </span>
                   <p className="text-xs font-body text-muted-foreground">
-                    {weather.condition} · {weather.city}
+                    {weather.condition} Â· {weather.city}
                     {weather.isEstimated && (
                       <span className="ml-1 text-[10px] text-amber-500 dark:text-amber-400"> (approx)</span>
                     )}
@@ -739,6 +739,7 @@ const Home = () => {
                 </span>
               </div>
             ) : weatherOutfit.length > 0 ? (
+              <>
               <div className="flex gap-3 overflow-x-auto px-4 pb-4 scrollbar-none">
                 {weatherOutfit.map((item: ClothingItem, i: number) => (
                   <motion.div
@@ -767,6 +768,36 @@ const Home = () => {
                   </motion.div>
                 ))}
               </div>
+              {/* Try On & Shuffle buttons */}
+              <div className="flex gap-2 px-4 pb-4">
+                <button
+                  onClick={() => {
+                    const ids = weatherOutfit.map(i => i.id).join(",");
+                    window.location.href = `/stylist?tryOn=${ids}`;
+                  }}
+                  className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-ai/10 py-2 text-xs font-body font-semibold text-ai hover:bg-ai/20 transition-colors"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Try On
+                </button>
+                <button
+                  onClick={() => {
+                    if (allWeatherCombos.length <= 1) return;
+                    const nextIdx = (currentComboIdx + 1) % allWeatherCombos.length;
+                    const combo = allWeatherCombos[nextIdx];
+                    const picked = combo.item_ids
+                      .map(id => stats.items.find((it) => it.id === id))
+                      .filter(Boolean);
+                    setWeatherOutfit(picked);
+                    setWeatherTipAI(combo.tip);
+                    setCurrentComboIdx(nextIdx);
+                  }}
+                  className="flex items-center justify-center gap-1.5 rounded-xl bg-muted py-2 px-4 text-xs font-body font-semibold text-muted-foreground hover:bg-muted/80 transition-colors"
+                >
+                  <Shuffle className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              </>
             ) : stats.items.length > 0 ? (
               <div className="flex gap-3 overflow-x-auto px-4 pb-4 scrollbar-none">
                 {stats.items.slice(0, 4).map((item: any, i: number) => (
