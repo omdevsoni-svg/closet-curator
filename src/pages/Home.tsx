@@ -65,13 +65,13 @@ const conditionFromCode = (code: number): string => {
 };
 
 const getWeatherIcon = (code: number, day: boolean): string => {
-  if (code <= 1) return day ? "Ã¢ÂÂÃ¯Â¸Â" : "Ã°ÂÂÂ";
-  if (code <= 3) return day ? "Ã¢ÂÂ" : "Ã¢ÂÂÃ¯Â¸Â";
-  if (code <= 48) return "Ã°ÂÂÂ«Ã¯Â¸Â";
-  if (code <= 67) return "Ã°ÂÂÂ§Ã¯Â¸Â";
-  if (code <= 77) return "Ã°ÂÂÂ¨Ã¯Â¸Â";
-  if (code <= 82) return "Ã°ÂÂÂ§Ã¯Â¸Â";
-  return "Ã¢ÂÂÃ¯Â¸Â";
+  if (code <= 1) return day ? "ÃÂ¢ÃÂÃÂÃÂ¯ÃÂ¸ÃÂ" : "ÃÂ°ÃÂÃÂÃÂ";
+  if (code <= 3) return day ? "ÃÂ¢ÃÂÃÂ" : "ÃÂ¢ÃÂÃÂÃÂ¯ÃÂ¸ÃÂ";
+  if (code <= 48) return "ÃÂ°ÃÂÃÂÃÂ«ÃÂ¯ÃÂ¸ÃÂ";
+  if (code <= 67) return "ÃÂ°ÃÂÃÂÃÂ§ÃÂ¯ÃÂ¸ÃÂ";
+  if (code <= 77) return "ÃÂ°ÃÂÃÂÃÂ¨ÃÂ¯ÃÂ¸ÃÂ";
+  if (code <= 82) return "ÃÂ°ÃÂÃÂÃÂ§ÃÂ¯ÃÂ¸ÃÂ";
+  return "ÃÂ¢ÃÂÃÂÃÂ¯ÃÂ¸ÃÂ";
 };
 
 const useWeather = (): WeatherData | null => {
@@ -199,13 +199,13 @@ const useWeather = (): WeatherData | null => {
       const ipOk = await fetchViaIpGeo();
       if (ipOk) return;
 
-      // Step 3: Last resort Ã¢ÂÂ use Open-Meteo's auto-detect feature
+      // Step 3: Last resort ÃÂ¢ÃÂÃÂ use Open-Meteo's auto-detect feature
       // Open-Meteo can infer location from the request IP server-side
       try {
         const res = await fetch(
           "https://api.open-meteo.com/v1/forecast?latitude=52.52&longitude=13.41&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code,is_day&timezone=auto"
         );
-        // This is a true fallback Ã¢ÂÂ we don't know the real location
+        // This is a true fallback ÃÂ¢ÃÂÃÂ we don't know the real location
         // Use Berlin coords but mark as estimated
         if (res.ok) {
           const data = await res.json();
@@ -230,14 +230,14 @@ const useWeather = (): WeatherData | null => {
         // Everything failed
       }
 
-      // Step 4: Absolute last resort Ã¢ÂÂ minimal static fallback
+      // Step 4: Absolute last resort ÃÂ¢ÃÂÃÂ minimal static fallback
       setWeather({
         temp: 25,
         condition: "Unknown",
         humidity: 50,
         windSpeed: 10,
         city: "Location Unavailable",
-        icon: "Ã°ÂÂÂ¡Ã¯Â¸Â",
+        icon: "ÃÂ°ÃÂÃÂÃÂ¡ÃÂ¯ÃÂ¸ÃÂ",
         tip: "Enable location access for accurate weather-based outfit suggestions.",
         isEstimated: true,
       });
@@ -323,7 +323,7 @@ const Home = () => {
     const fetchWeatherOutfit = async () => {
       setLoadingWeatherOutfit(true);
       try {
-        const occasion = `Everyday outfit for ${weather.temp}ÃÂ°C ${weather.condition} weather`;
+        const occasion = `Everyday outfit for ${weather.temp}ÃÂÃÂ°C ${weather.condition} weather`;
         const result = await getOutfitRecommendation({
           occasion,
           items: stats.items.map((item: ClothingItem) => ({
@@ -544,7 +544,7 @@ const Home = () => {
       </div>
 
       {/* Laundry reminder */}
-      {/* Unworn items nudge — compact CTA card */}
+      {/* Unworn items nudge â compact CTA card */}
             {!loadingStats && (() => {
               const unworn = stats.items.filter(
                 (i: any) => !i.archived && (!i.worn_count || i.worn_count === 0)
@@ -575,58 +575,7 @@ const Home = () => {
             })()}
 
       {/* Unworn items nudge */}
-      {!loadingStats && (() => {
-        const unworn = stats.items.filter(
-          (i: any) => !i.archived && (!i.worn_count || i.worn_count === 0)
-        );
-        if (unworn.length === 0) return null;
-        return (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-5"
-          >
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-violet-500/10">
-                  <Shirt className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400" />
-                </div>
-                <p className="text-xs font-body font-semibold text-violet-700 dark:text-violet-400">
-                  {unworn.length} item{unworn.length > 1 ? "s" : ""} never worn
-                </p>
-              </div>
-              <button
-                onClick={() => navigate("/closet")}
-                className="text-[11px] font-body font-semibold text-violet-600 dark:text-violet-400"
-              >
-                View All
-              </button>
-            </div>
-            <div className="flex gap-2.5 overflow-x-auto scrollbar-none pb-1">
-              {unworn.slice(0, 8).map((item: any) => (
-                <div key={item.id} className="shrink-0">
-                  <div className="h-20 w-16 overflow-hidden rounded-xl bg-card border border-violet-200/50 dark:border-violet-800/30 p-1.5">
-                    {item.image_url ? (
-                      <img
-                        src={item.image_url}
-                        alt={item.name}
-                        className="h-full w-full object-contain"
-                      />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center">
-                        <ImageIcon className="h-4 w-4 text-muted-foreground/30" />
-                      </div>
-                    )}
-                  </div>
-                  <p className="mt-0.5 text-center text-[9px] font-body text-muted-foreground truncate w-16">
-                    {item.name}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </motion.div>
-        );
-      })()}
+      
 
       {/* Explore Features */}
       <h2 className="text-base font-display font-semibold text-foreground">
@@ -689,10 +638,10 @@ const Home = () => {
                 <span className="text-3xl font-emoji">{weather.icon}</span>
                 <div>
                   <span className="text-2xl font-display font-bold text-foreground">
-                    {weather.temp}ÃÂ°C
+                    {weather.temp}ÃÂÃÂ°C
                   </span>
                   <p className="text-xs font-body text-muted-foreground">
-                    {weather.condition} ÃÂ· {weather.city}
+                    {weather.condition} ÃÂÃÂ· {weather.city}
                     {weather.isEstimated && (
                       <span className="ml-1 text-[10px] text-amber-500 dark:text-amber-400"> (approx)</span>
                     )}
