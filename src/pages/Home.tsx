@@ -252,32 +252,6 @@ const useWeather = (): WeatherData | null => {
 /* ------------------------------------------------------------------ */
 /*  Feature cards                                                      */
 /* ------------------------------------------------------------------ */
-const featureCards = [
-  {
-    label: "My Closet",
-    icon: Shirt,
-    path: "/closet",
-    color: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-  },
-  {
-    label: "AI Stylist",
-    icon: Sparkles,
-    path: "/stylist",
-    color: "bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400",
-  },
-  {
-    label: "Closet Health",
-    icon: HeartPulse,
-    path: "/health",
-    color: "bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400",
-  },
-  {
-    label: "Profile",
-    icon: User,
-    path: "/profile",
-    color: "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400",
-  },
-];
 
 /* ------------------------------------------------------------------ */
 /*  Home component                                                     */
@@ -464,35 +438,38 @@ const Home = () => {
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, height: 0, marginBottom: 0 }}
-            className="relative mb-5 overflow-hidden rounded-2xl bg-gradient-to-r from-[hsl(43,70%,50%)] to-[hsl(220,10%,65%)] p-5 text-white"
+            className="relative mb-5 overflow-hidden rounded-2xl bg-gradient-to-r from-[hsl(43,70%,50%)] to-[hsl(220,10%,65%)] px-4 py-3 text-white"
           >
-            <button
-              onClick={() => {
-                localStorage.setItem("styleos_welcome_dismissed", "1");
-                setShowWelcome(false);
-              }}
-              className="absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-full bg-white/20 text-white/80 hover:bg-white/30"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5" />
-              <h2 className="text-lg font-display font-bold">
-                {stats.totalItems === 0 ? `Welcome, ${userName}!` : `Hey, ${userName}!`}
-              </h2>
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <Sparkles className="h-4 w-4 shrink-0" />
+                <p className="text-sm font-display font-semibold truncate">
+                  {stats.totalItems === 0
+                    ? `Welcome, ${userName}!`
+                    : `Hey, ${userName}! ${stats.totalItems} items in your closet`}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={() =>
+                    navigate(stats.totalItems === 0 ? "/closet" : "/stylist")
+                  }
+                  className="flex items-center gap-1 rounded-lg bg-white/20 px-3 py-1.5 text-xs font-body font-medium text-white backdrop-blur-sm transition-colors hover:bg-white/30"
+                >
+                  {stats.totalItems === 0 ? "Add Items" : "Get Styled"}
+                  <ChevronRight className="h-3 w-3" />
+                </button>
+                <button
+                  onClick={() => {
+                    localStorage.setItem("styleos_welcome_dismissed", "1");
+                    setShowWelcome(false);
+                  }}
+                  className="flex h-6 w-6 items-center justify-center rounded-full bg-white/20 text-white/80 hover:bg-white/30"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
             </div>
-            <p className="mt-1 text-sm font-body text-white/80">
-              {stats.totalItems === 0
-                ? "Your AI stylist is ready. Add items to your closet and get personalized outfit suggestions."
-                : `You have ${stats.totalItems} items in your closet. Get styled by AI or check your closet health.`}
-            </p>
-            <button
-              onClick={() => navigate(stats.totalItems === 0 ? "/closet" : "/stylist")}
-              className="mt-3 flex items-center gap-1 rounded-xl bg-white/20 px-4 py-2 text-sm font-body font-medium text-white backdrop-blur-sm transition-colors hover:bg-white/30"
-            >
-              {stats.totalItems === 0 ? "Add Your First Item" : "Get Styled"}
-              <ChevronRight className="h-4 w-4" />
-            </button>
           </motion.div>
         )}
       </AnimatePresence>
@@ -605,35 +582,6 @@ const Home = () => {
         );
       })()}
 
-      {/* Explore Features */}
-      <h2 className="text-base font-display font-semibold text-foreground">
-        Explore Features
-      </h2>
-      <div className="mt-3 grid grid-cols-4 gap-2">
-        {featureCards.map((card, i) => {
-          const Icon = card.icon;
-          return (
-            <motion.button
-              key={card.label}
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.1 + i * 0.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => navigate(card.path)}
-              className="flex flex-col items-center gap-2 rounded-2xl bg-card p-3 transition-colors hover:bg-card/80"
-            >
-              <div
-                className={`flex h-10 w-10 items-center justify-center rounded-xl ${card.color}`}
-              >
-                <Icon className="h-5 w-5" />
-              </div>
-              <span className="text-[10px] font-body font-medium text-foreground">
-                {card.label}
-              </span>
-            </motion.button>
-          );
-        })}
-      </div>
 
       {/* Weather-Based Outfit Suggestion */}
       {weather && (
@@ -641,7 +589,7 @@ const Home = () => {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="mt-6"
+          className="mt-2"
         >
           <div className="flex items-center justify-between">
             <h2 className="flex items-center gap-2 text-base font-display font-semibold text-foreground">
