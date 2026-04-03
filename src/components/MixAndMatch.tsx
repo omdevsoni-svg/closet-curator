@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   ChevronUp,
   ChevronDown,
@@ -108,18 +108,14 @@ interface VerticalCarouselProps {
 }
 
 const ITEM_HEIGHT = 96; // px per row
-const VISIBLE_COUNT = 3;
+const VISIBLE_COUNT = 2;
 
 const VerticalCarousel = ({ slot, items, selectedItem, onSelect }: VerticalCarouselProps) => {
   // Find the index of the selected item, default to 0
   const selectedIdx = selectedItem ? items.findIndex(i => i.id === selectedItem.id) : -1;
   const [activeIndex, setActiveIndex] = useState(Math.max(0, selectedIdx));
 
-  // Touch / drag tracking
-  const touchStartY = useRef<number | null>(null);
-  const touchDelta = useRef(0);
-  const swiped = useRef(false); // lock: one scroll per gesture
-  const SWIPE_THRESHOLD = 40; // px to trigger item change
+  // Navigation via arrow buttons only (no touch/wheel hijacking for better page scroll)
 
   // Sync activeIndex when selectedItem changes externally (e.g. shuffle)
   useEffect(() => {
@@ -158,48 +154,7 @@ const VerticalCarousel = ({ slot, items, selectedItem, onSelect }: VerticalCarou
     });
   }, [items, onSelect, wrap]);
 
-  // Touch handlers for swipe
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    touchStartY.current = e.touches[0].clientY;
-    touchDelta.current = 0;
-  }, []);
 
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (touchStartY.current === null) return;
-    e.preventDefault(); // prevent page scroll while swiping carousel
-    touchDelta.current = touchStartY.current - e.touches[0].clientY;
-    // Trigger exactly one item change per swipe gesture
-    if (!swiped.current && Math.abs(touchDelta.current) >= SWIPE_THRESHOLD) {
-      swiped.current = true;
-      if (touchDelta.current > 0) {
-        scrollDown(); // Swiped up -> next item (wraps)
-      } else {
-        scrollUp(); // Swiped down -> previous item (wraps)
-      }
-    }
-  }, [scrollDown, scrollUp]);
-
-  const handleTouchEnd = useCallback(() => {
-    touchStartY.current = null;
-    touchDelta.current = 0;
-    swiped.current = false;
-  }, []);
-
-  // Mouse wheel handler
-  const wheelTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.stopPropagation();
-    // Debounce wheel events so one scroll tick = one item
-    if (wheelTimer.current) return;
-    if (Math.abs(e.deltaY) < 4) return; // ignore trackpad momentum micro-scrolls
-    e.preventDefault();
-    wheelTimer.current = setTimeout(() => { wheelTimer.current = null; }, 350);
-    if (e.deltaY > 0) {
-      scrollDown(); // wraps around
-    } else if (e.deltaY < 0) {
-      scrollUp(); // wraps around
-    }
-  }, [scrollDown, scrollUp]);
 
   if (items.length === 0) {
     return (
@@ -238,17 +193,14 @@ const VerticalCarousel = ({ slot, items, selectedItem, onSelect }: VerticalCarou
 
       {/* Casino reel -- scrollable via touch swipe & mouse wheel */}
       <div
-        className="relative overflow-hidden rounded-2xl w-full border border-border/20 bg-gradient-to-b from-card/40 via-card/60 to-card/40 touch-none cursor-grab backdrop-blur-sm"
+        className="relative overflow-hidden rounded-2xl w-full border border-border/20 bg-gradient-to-b from-card/40 via-card/60 to-card/40 backdrop-blur-sm"
         style={{ height: ITEM_HEIGHT * VISIBLE_COUNT }}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        onWheel={handleWheel}
+
       >
         <AnimatePresence initial={false}>
           {visibleIndices.map((idx, pos) => {
             const item = items[idx];
-            const isActive = pos === 1; // middle row
+            const isActive = pos === 0; // top row is active
             const isFaded = !isActive;
 
             return (
