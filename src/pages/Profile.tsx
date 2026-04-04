@@ -209,10 +209,10 @@ const Profile = () => {
   };
 
   const captureExistingMeasurements = async () => {
-    if (!profile?.body_photo_url) return;
+    if (!bodyPhoto) return;
     setCapturingMeasurements(true);
     try {
-      const response = await fetch(profile.body_photo_url);
+      const response = await fetch(bodyPhoto);
       const blob = await response.blob();
       const reader = new FileReader();
       const imgBase64 = await new Promise((resolve) => {
@@ -460,7 +460,7 @@ const Profile = () => {
           </div>
         ) : (
           <div className="text-center py-6 text-gray-400">
-            {profile?.body_photo_url && !measurements ? (
+            {bodyPhoto && !measurements ? (
                 <>
                   <button
                     onClick={captureExistingMeasurements}
@@ -563,7 +563,7 @@ const Profile = () => {
 
 
       {/* Full-size Image Modal */}
-      {showImageModal && profile?.body_photo_url && (
+      {showImageModal && bodyPhoto && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -584,7 +584,7 @@ const Profile = () => {
               <span className="text-2xl font-bold">&times;</span>
             </button>
             <img
-              src={profile.body_photo_url}
+              src={bodyPhoto}
               alt="Full body photo"
               className="w-full h-auto max-h-[85vh] object-contain rounded-xl"
             />
