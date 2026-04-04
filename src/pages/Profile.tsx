@@ -220,6 +220,23 @@ const Profile = () => {
         console.error("AI detection failed:", aiErr);
         toast({ title: "Photo uploaded", description: "Body photo saved but AI analysis failed. You can set body type manually.", variant: "destructive" });
       } finally {
+      // Capture body measurements from VTO API
+      try {
+        const token = (await supabase.auth.getSession()).data.session?.access_token;
+        const capRes = await fetch("/api/capture-measurements", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...(token ? { Authorization: "Bearer " + token } : {}) },
+          body: JSON.stringify({ userId: user.id, imageBase64: await new Promise((resolve) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result).split(",").pop()); reader.readAsDataURL(file); }) }),
+        });
+        const capData = await capRes.json();
+        if (capData.success && capData.measurements) {
+          setMeasurements(capData.measurements);
+          await updateProfile(user.id, { body_measurements: capData.measurements });
+        }
+      } catch (capErr) {
+        console.error("Measurement capture failed:", capErr);
+      }
+
         setIsAnalyzing(false);
       }
     } catch (err) {
