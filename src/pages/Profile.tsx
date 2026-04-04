@@ -100,6 +100,8 @@ const Profile = () => {
   const [sizeLoading, setSizeLoading] = useState(false);
   const [sizeCategory, setSizeCategory] = useState("general");
   const [sizeBrand, setSizeBrand] = useState("");
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [capturingMeasurements, setCapturingMeasurements] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -203,6 +205,34 @@ const Profile = () => {
       console.error("Size rec error:", err);
     } finally {
       setSizeLoading(false);
+    }
+  };
+
+  const captureExistingMeasurements = async () => {
+    if (!profile?.body_photo_url) return;
+    setCapturingMeasurements(true);
+    try {
+      const response = await fetch(profile.body_photo_url);
+      const blob = await response.blob();
+      const reader = new FileReader();
+      const imgBase64 = await new Promise((resolve) => {
+        reader.onload = () => resolve(String(reader.result).split(",").pop() || "");
+        reader.readAsDataURL(blob);
+      });
+      const capToken = (await supabase.auth.getSession()).data.session?.access_token;
+      const capRes = await fetch("/api/capture-measurements", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + (capToken || "") },
+        body: JSON.stringify({ userId: profile.id, imageBase64: imgBase64 }),
+      });
+      const capData = await capRes.json();
+      if (capData.success && capData.measurements) {
+        setMeasurements(capData.measurements);
+      }
+    } catch (e) {
+      console.error("Measurement capture error:", e);
+    } finally {
+      setCapturingMeasurements(false);
     }
   };
 
@@ -430,8 +460,27 @@ const Profile = () => {
           </div>
         ) : (
           <div className="text-center py-6 text-gray-400">
-            <Ruler className="w-8 h-8 mx-auto mb-2 opacity-50" />
-            <p className="text-sm">Upload a body photo to capture measurements</p>
+            {profile?.body_photo_url && !measurements ? (
+                <>
+                  <button
+                    onClick={captureExistingMeasurements}
+                    disabled={capturingMeasurements}
+                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all disabled:opacity-50 mx-auto"
+                  >
+                    {capturingMeasurements ? (
+                      <><Loader2 className="w-4 h-4 animate-spin" /> Capturing...</>
+                    ) : (
+                      <><Ruler className="w-4 h-4" /> Capture My Measurements</>
+                    )}
+                  </button>
+                  <p className="text-gray-500 text-xs text-center mt-2">Uses your existing body photo</p>
+                </>
+              ) : !profile?.body_photo_url ? (
+                <>
+                  <Ruler className="w-12 h-12 text-gray-600 mx-auto mb-2" />
+                  <p className="text-gray-500 text-sm text-center">Upload a body photo to capture measurements</p>
+                </>
+              ) : null}
           </div>
         )}
       </motion.div>
@@ -510,6 +559,38 @@ const Profile = () => {
           </div>
         </div>
       </motion.div>
+
+
+
+      {/* Full-size Image Modal */}
+      {showImageModal && profile?.body_photo_url && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+          onClick={() => setShowImageModal(false)}
+        >
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="relative max-w-lg w-full max-h-[90vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowImageModal(false)}
+              className="absolute -top-10 right-0 text-white hover:text-gray-300 transition-colors"
+            >
+              <span className="text-2xl font-bold">&times;</span>
+            </button>
+            <img
+              src={profile.body_photo_url}
+              alt="Full body photo"
+              className="w-full h-auto max-h-[85vh] object-contain rounded-xl"
+            />
+          </motion.div>
+        </motion.div>
+      )}
 
     </div>
   );
