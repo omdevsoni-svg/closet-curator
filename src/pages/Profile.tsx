@@ -18,6 +18,7 @@ import {
   uploadImage,
   type Profile as ProfileType,
 } from "@/lib/database";
+import { detectBodyAttributes } from "@/lib/ai-service";
 
 /* ------------------------------------------------------------------ */
 /*  Body type data                                                     */
@@ -91,6 +92,7 @@ const Profile = () => {
   const [modelGender, setModelGender] = useState<"women" | "men" | "neutral">("neutral");
   const [bodyPhoto, setBodyPhoto] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -122,10 +124,30 @@ const Profile = () => {
   const handleBodyPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
-    const url = await uploadImage("profile-images", user.id, file);
-    if (url) {
-      setBodyPhoto(url);
-      await savePreferences({ body_image_url: url });
+
+    try {
+      // Upload image first
+      const url = await uploadImage(file, user.id, "body-photos");
+      setBodyPhotoUrl(url);
+      await updateProfile(user.id, { body_photo_url: url });
+
+      // Run AI detection
+      setIsAnalyzing(true);
+      try {
+        const attrs = await detectBodyAttributes(file);
+        setBodyType(attrs.body_type);
+        setSkinTone(attrs.skin_tone);
+        await savePreferences({ body_type: attrs.body_type, skin_tone: attrs.skin_tone });
+        toast({ title: "Body analysis complete", description: "Body type: " + attrs.body_type.replace("_", " ") + " | Skin tone: " + attrs.skin_tone + " (Confidence: " + attrs.confidence + ")" });
+      } catch (aiErr) {
+        console.error("AI detection failed:", aiErr);
+        toast({ title: "Photo uploaded", description: "Body photo saved but AI analysis failed. You can set body type manually.", variant: "destructive" });
+      } finally {
+        setIsAnalyzing(false);
+      }
+    } catch (err) {
+      console.error("Upload error:", err);
+      toast({ title: "Upload failed", description: "Could not upload body photo.", variant: "destructive" });
     }
   };
 
