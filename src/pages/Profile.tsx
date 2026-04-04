@@ -208,33 +208,34 @@ const Profile = () => {
     }
   };
 
-  const captureExistingMeasurements = async () => {
-    if (!bodyPhoto) return;
-    setCapturingMeasurements(true);
-    try {
-      const response = await fetch(bodyPhoto);
-      const blob = await response.blob();
-      const reader = new FileReader();
-      const imgBase64 = await new Promise((resolve) => {
-        reader.onload = () => resolve(String(reader.result).split(",").pop() || "");
-        reader.readAsDataURL(blob);
-      });
-      const capToken = (await supabase.auth.getSession()).data.session?.access_token;
-      const capRes = await fetch("/api/capture-measurements", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer " + (capToken || "") },
-        body: JSON.stringify({ userId: profile.id, imageBase64: imgBase64 }),
-      });
-      const capData = await capRes.json();
-      if (capData.success && capData.measurements) {
-        setMeasurements(capData.measurements);
+
+    const captureExistingMeasurements = async () => {
+      if (!bodyPhoto) return;
+      setCapturingMeasurements(true);
+      try {
+        const response = await fetch(bodyPhoto);
+        const blob = await response.blob();
+        const reader = new FileReader();
+        const imgBase64 = await new Promise((resolve) => {
+          reader.onload = () => resolve(String(reader.result).split(",").pop() || "");
+          reader.readAsDataURL(blob);
+        });
+        const capToken = (await supabase.auth.getSession()).data.session?.access_token;
+        const capRes = await fetch("/api/capture-measurements", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + (capToken || "") },
+          body: JSON.stringify({ userId: profile.id, imageBase64: imgBase64 }),
+        });
+        const capData = await capRes.json();
+        if (capData.success && capData.measurements) {
+          setMeasurements(capData.measurements);
+        }
+      } catch (e) {
+        console.error("Measurement capture error:", e);
+      } finally {
+        setCapturingMeasurements(false);
       }
-    } catch (e) {
-      console.error("Measurement capture error:", e);
-    } finally {
-      setCapturingMeasurements(false);
-    }
-  };
+    };
 
   return (
       <div className="flex min-h-[50vh] items-center justify-center">
