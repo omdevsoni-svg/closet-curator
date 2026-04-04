@@ -1,4 +1,72 @@
 import { useState, useEffect } from "react";
+            <div className="border-t pt-4 mt-4">
+              <h4 className="text-sm font-semibold text-gray-700 mb-3">AI Size Translator</h4>
+              <div className="flex gap-2 mb-3">
+                <select value={sizeCategory} onChange={(e) => setSizeCategory(e.target.value)}
+                  className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm">
+                  <option value="general">General</option>
+                  <option value="tops">Tops</option>
+                  <option value="bottoms">Bottoms</option>
+                  <option value="dresses">Dresses</option>
+                  <option value="outerwear">Outerwear</option>
+                </select>
+                <input type="text" placeholder="Brand (optional)" value={sizeBrand}
+                  onChange={(e) => setSizeBrand(e.target.value)}
+                  className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm" />
+                <button onClick={getSizeRecommendation} disabled={sizeLoading}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+                  {sizeLoading ? "..." : "Get Sizes"}
+                </button>
+              </div>
+
+              {sizeRec && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {[
+                      { label: "Top", val: sizeRec.top_size },
+                      { label: "Bottom", val: sizeRec.bottom_size },
+                      { label: "Dress", val: sizeRec.dress_size },
+                      { label: "Shirt", val: sizeRec.shirt_size },
+                    ].map((s) => s.val ? (
+                      <div key={s.label} className="bg-emerald-50 border border-emerald-200 rounded-lg p-2 text-center">
+                        <span className="text-xs text-emerald-600">{s.label}</span>
+                        <p className="font-bold text-emerald-700">{s.val}</p>
+                      </div>
+                    ) : null)}
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { label: "EU", val: sizeRec.eu_size },
+                      { label: "US", val: sizeRec.us_size },
+                      { label: "UK", val: sizeRec.uk_size },
+                    ].map((s) => s.val ? (
+                      <div key={s.label} className="bg-gray-50 rounded-lg p-2 text-center">
+                        <span className="text-xs text-gray-500">{s.label}</span>
+                        <p className="font-semibold text-gray-800">{s.val}</p>
+                      </div>
+                    ) : null)}
+                  </div>
+                  {sizeRec.fit_notes && (
+                    <p className="text-xs text-gray-500 italic mt-1">{sizeRec.fit_notes}</p>
+                  )}
+                  <div className="flex items-center gap-1 mt-1">
+                    <div className={"w-2 h-2 rounded-full " + (sizeRec.confidence === "high" ? "bg-green-500" : sizeRec.confidence === "medium" ? "bg-yellow-500" : "bg-red-500")} />
+                    <span className="text-xs text-gray-400">Confidence: {sizeRec.confidence}</span>
+                  </div>
+                </motion.div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-6 text-gray-400">
+            <Ruler className="w-8 h-8 mx-auto mb-2 opacity-50" />
+            <p className="text-sm">Upload a body photo to capture measurements</p>
+          </div>
+        )}
+      </motion.div>
+
+
+import { supabase } from "../lib/supabase";
 import { useNavigate } from "react-router-dom";
 import {
   User,
@@ -8,6 +76,7 @@ import {
   Sparkles,
   Check,
   Loader2,
+  Ruler,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
@@ -93,6 +162,11 @@ const Profile = () => {
   const [bodyPhoto, setBodyPhoto] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [measurements, setMeasurements] = useState<Record<string, any> | null>(null);
+  const [sizeRec, setSizeRec] = useState<Record<string, any> | null>(null);
+  const [sizeLoading, setSizeLoading] = useState(false);
+  const [sizeCategory, setSizeCategory] = useState("general");
+  const [sizeBrand, setSizeBrand] = useState("");
 
   useEffect(() => {
     if (!user) return;
@@ -109,6 +183,9 @@ const Profile = () => {
         setBodyPhoto(p.body_image_url || null);
       }
       setClosetCount(items.length);
+        if (p.body_measurements) {
+          setMeasurements(p.body_measurements);
+        }
       setLoading(false);
     };
     load();
@@ -155,7 +232,26 @@ const Profile = () => {
   const userName = profile?.name || user?.user_metadata?.name || "Style Enthusiast";
 
   if (loading) {
-    return (
+    const getSizeRecommendation = async () => {
+    if (!measurements) return;
+    setSizeLoading(true);
+    try {
+      const token = (await supabase.auth.getSession()).data.session?.access_token;
+      const res = await fetch("/api/size-recommendation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: "Bearer " + token } : {}) },
+        body: JSON.stringify({ measurements, category: sizeCategory, brand: sizeBrand || undefined }),
+      });
+      const data = await res.json();
+      if (data.success) setSizeRec(data.sizes);
+    } catch (err) {
+      console.error("Size rec error:", err);
+    } finally {
+      setSizeLoading(false);
+    }
+  };
+
+  return (
       <div className="flex min-h-[50vh] items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
@@ -317,6 +413,60 @@ const Profile = () => {
           </div>
         </div>
       </motion.div>
+
+      {/* My Sizes & Size Translator */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}
+        className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center">
+            <Ruler className="w-5 h-5 text-indigo-600" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-gray-900">My Sizes</h3>
+            <p className="text-sm text-gray-500">Body measurements & AI size recommendations</p>
+          </div>
+        </div>
+
+        {measurements ? (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[
+                { label: "Chest", key: "chest_cm", unit: "cm" },
+                { label: "Waist", key: "waist_cm", unit: "cm" },
+                { label: "Hip", key: "hip_cm", unit: "cm" },
+                { label: "Shoulder", key: "shoulder_width_cm", unit: "cm" },
+                { label: "Arm Length", key: "arm_length_cm", unit: "cm" },
+                { label: "Height", key: "height_cm", unit: "cm" },
+                { label: "Inseam", key: "inseam_cm", unit: "cm" },
+                { label: "Build", key: "build", unit: "" },
+              ].map((m) => measurements[m.key] != null ? (
+                <div key={m.key} className="bg-gray-50 rounded-xl p-3 text-center">
+                  <p className="text-xs text-gray-500 mb-1">{m.label}</p>
+                  <p className="text-lg font-semibold text-gray-900">
+                    {measurements[m.key]}{m.unit && <span className="text-xs text-gray-400 ml-0.5">{m.unit}</span>}
+                  </p>
+                </div>
+              ) : null)}
+            </div>
+
+
+            {(measurements.recommended_size || measurements.recommended_trouser) && (
+              <div className="flex gap-3 flex-wrap">
+                {measurements.recommended_size && (
+                  <div className="bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-2">
+                    <span className="text-xs text-indigo-600">Top Size</span>
+                    <p className="text-lg font-bold text-indigo-700">{measurements.recommended_size}</p>
+                  </div>
+                )}
+                {measurements.recommended_trouser && (
+                  <div className="bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-2">
+                    <span className="text-xs text-indigo-600">Bottom Size</span>
+                    <p className="text-lg font-bold text-indigo-700">{measurements.recommended_trouser}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
 
       {/* Style Preferences */}
       <motion.div
