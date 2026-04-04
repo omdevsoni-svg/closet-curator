@@ -677,3 +677,50 @@ export const suggestEthnicPairing = async (
     return { success: false, suggestions: [], error: err.message || "Failed to generate suggestions" };
   }
 };
+
+
+/* ------------------------------------------------------------------ */
+/* Body type & skin tone detection from full-body photo               */
+/* ------------------------------------------------------------------ */
+export interface BodyAttributes {
+  body_type: "rectangle" | "hourglass" | "inverted_triangle" | "pear";
+  skin_tone: "Light" | "Fair" | "Medium" | "Olive" | "Tan" | "Dark" | "Deep";
+  confidence: "high" | "medium" | "low";
+}
+
+export async function detectBodyAttributes(
+  file: File
+): Promise<BodyAttributes> {
+  try {
+    const base64 = await fileToBase64(file);
+    const compressed = await compressBase64Image(base64, 800, 0.8);
+
+    const response = await fetch("/api/detect-body-type", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        imageBase64: compressed.replace(/^data:[^;]+;base64,/, ""),
+        mimeType: file.type || "image/jpeg",
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error("Body detection API returned " + response.status);
+    }
+
+    const data = await response.json();
+
+    if (!data.success) {
+      throw new Error(data.error || "Body detection failed");
+    }
+
+    return {
+      body_type: data.body_type,
+      skin_tone: data.skin_tone,
+      confidence: data.confidence,
+    };
+  } catch (error) {
+    console.error("detectBodyAttributes error:", error);
+    throw error;
+  }
+}
