@@ -637,6 +637,7 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
                         <p className="mt-1 text-[10px] font-body font-medium text-foreground truncate">
                           {item.name}
                         </p>
+                      {(() => { const sz = getRecommendedSize(item.category, bodyMeasurements); return sz ? <span className="ml-1 inline-block px-1.5 py-0.5 bg-indigo-100 text-indigo-700 text-xs rounded-full font-medium">Size {sz}</span> : null; })()}
                         {selectedItem?.id === item.id && (
                           <div className="mt-1 flex items-center justify-center">
                             <Check className="h-3 w-3 text-ai" />
@@ -1087,12 +1088,25 @@ const CombinationCard = ({ combo, index, isActive, onTryOn, occasion }: Combinat
 /* ------------------------------------------------------------------ */
 /*  AI Stylist component                                               */
 /* ------------------------------------------------------------------ */
+// Map clothing category to recommended size from measurements
+function getRecommendedSize(category: string, m: Record<string, any> | null): string | null {
+  if (!m) return null;
+  const c = (category || "").toLowerCase();
+  if (c.includes("top") || c.includes("shirt") || c.includes("tee") || c.includes("blouse") || c.includes("jacket") || c.includes("sweater"))
+    return m.recommended_size || null;
+  if (c.includes("bottom") || c.includes("pant") || c.includes("jean") || c.includes("trouser") || c.includes("short"))
+    return m.recommended_trouser || null;
+  if (c.includes("dress")) return m.recommended_size || null;
+  return null;
+}
+
 const AiStylist = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [closetItems, setClosetItems] = useState<ClothingItem[]>([]);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [bodyMeasurements, setBodyMeasurements] = useState<Record<string, any> | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedOccasion, setSelectedOccasion] = useState<string | null>(null);
   const [prompt, setPrompt] = useState("");
@@ -1126,6 +1140,7 @@ const AiStylist = () => {
       ]);
       setClosetItems(items);
       setProfile(prof);
+          if (prof.body_measurements) setBodyMeasurements(prof.body_measurements);
       setLoading(false);
     };
     load();
