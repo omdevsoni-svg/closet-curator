@@ -214,11 +214,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // 2. Get Supabase config
     const { url: sbUrl, key: sbKey } = getSupabaseConfig();
 
-    // 3. Fetch all profiles that have a body_photo_url
+    // 3. Fetch all profiles that have a body_image_url
     const profiles = await supabaseQuery(
       sbUrl,
       sbKey,
-      "/profiles?body_photo_url=not.is.null&select=id,body_photo_url,body_type,skin_tone"
+      "/profiles?body_image_url=not.is.null&select=id,body_image_url,body_type,skin_tone"
     );
 
     if (!profiles || profiles.length === 0) {
@@ -231,7 +231,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     for (const profile of profiles) {
       try {
         console.log(`Processing profile ${profile.id}...`);
-        const analysis = await analyzeBodyImage(profile.body_photo_url, accessToken);
+        const analysis = await analyzeBodyImage(profile.body_image_url, accessToken);
 
         if (analysis) {
           // Update profile in Supabase
