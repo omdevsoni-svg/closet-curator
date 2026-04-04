@@ -49,6 +49,7 @@ export interface Profile {
   notif_unworn: boolean;
   notif_laundry: boolean;
   personalization: boolean;
+  body_measurements?: Record<string, any>;
   created_at: string;
   updated_at: string;
 }
