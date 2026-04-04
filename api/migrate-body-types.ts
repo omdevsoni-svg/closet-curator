@@ -21,13 +21,14 @@ async function supabaseQuery(
   url: string,
   key: string,
   path: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  userToken?: string
 ) {
   const res = await fetch(`${url}/rest/v1${path}`, {
     ...options,
     headers: {
       apikey: key,
-      Authorization: `Bearer ${key}`,
+      Authorization: userToken ? `Bearer ${userToken}` : `Bearer ${key}`,
       "Content-Type": "application/json",
       Prefer: options.method === "PATCH" ? "return=minimal" : "return=representation",
       ...(options.headers || {}),
@@ -195,7 +196,7 @@ async function analyzeBodyImage(
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "POST") {
@@ -214,11 +215,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // 2. Get Supabase config
     const { url: sbUrl, key: sbKey } = getSupabaseConfig();
 
-    // 3. Fetch all profiles that have a body_image_url
+    // 3. Extract user token from Authorization header (to bypass RLS with user session)
+    const authHeader = req.headers.authorization || "";
+    const userToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : undefined;
+
+    // 4. Fetch all profiles that have a body_image_url
     const profiles = await supabaseQuery(
       sbUrl,
       sbKey,
-      "/profiles?body_image_url=not.is.null&select=id,body_image_url,body_type,skin_tone"
+      "/profiles?body_image_url=not.is.null&select=id,body_image_url,body_type,skin_tone",
+      {},
+      userToken
     );
 
     if (!profiles || profiles.length === 0) {
@@ -241,7 +248,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               body_type: analysis.body_type,
               skin_tone: analysis.skin_tone,
             }),
-          });
+          }, userToken);
 
           results.push({
             id: profile.id,
