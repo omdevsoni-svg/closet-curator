@@ -97,9 +97,6 @@ const Profile = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [measurements, setMeasurements] = useState<Record<string, any> | null>(null);
   const [sizeRec, setSizeRec] = useState<Record<string, any> | null>(null);
-  const [sizeLoading, setSizeLoading] = useState(false);
-  const [sizeCategory, setSizeCategory] = useState("general");
-  const [sizeBrand, setSizeBrand] = useState("");
   const [showImageModal, setShowImageModal] = useState(false);
   const [capturingMeasurements, setCapturingMeasurements] = useState(false);
 
@@ -125,6 +122,40 @@ const Profile = () => {
     };
     load();
   }, [user]);
+
+  // Auto-capture measurements when body photo exists but no measurements
+  useEffect(() => {
+    if (!bodyPhoto || measurements || capturingMeasurements) return;
+    if (!profile?.id) return;
+    const run = async () => {
+      setCapturingMeasurements(true);
+      try {
+        const response = await fetch(bodyPhoto);
+        const blob = await response.blob();
+        const reader = new FileReader();
+        const imgBase64: string = await new Promise((resolve) => {
+          reader.onload = () => resolve(String(reader.result).split(",").pop() || "");
+          reader.readAsDataURL(blob);
+        });
+        const capToken = (await supabase.auth.getSession()).data.session?.access_token;
+        const capRes = await fetch("/api/capture-measurements", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + (capToken || "") },
+          body: JSON.stringify({ userId: profile.id, imageBase64: imgBase64 }),
+        });
+        const capData = await capRes.json();
+        if (capData.success && capData.measurements) {
+          setMeasurements(capData.measurements);
+          await updateProfile(profile.id, { body_measurements: capData.measurements });
+        }
+      } catch (e) {
+        console.error("Auto measurement capture error:", e);
+      } finally {
+        setCapturingMeasurements(false);
+      }
+    };
+    run();
+  }, [bodyPhoto, measurements, profile]);
 
   const savePreferences = async (updates: Record<string, any>) => {
     if (!user) return;
@@ -188,53 +219,9 @@ const Profile = () => {
   const currentBody = bodyTypeData[bodyType];
   const userName = profile?.name || user?.user_metadata?.name || "Style Enthusiast";
 
-  const getSizeRecommendation = async () => {
-  if (!measurements) return;
-  setSizeLoading(true);
-  try {
-    const token = (await supabase.auth.getSession()).data.session?.access_token;
-    const res = await fetch("/api/size-recommendation", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...(token ? { Authorization: "Bearer " + token } : {}) },
-      body: JSON.stringify({ measurements, category: sizeCategory, brand: sizeBrand || undefined }),
-    });
-    const data = await res.json();
-    if (data.success) setSizeRec(data.sizes);
-  } catch (err) {
-    console.error("Size rec error:", err);
-  } finally {
-    setSizeLoading(false);
-  }
-  };
 
 
-  const captureExistingMeasurements = async () => {
-    if (!bodyPhoto) return;
-    setCapturingMeasurements(true);
-    try {
-      const response = await fetch(bodyPhoto);
-      const blob = await response.blob();
-      const reader = new FileReader();
-      const imgBase64 = await new Promise((resolve) => {
-        reader.onload = () => resolve(String(reader.result).split(",").pop() || "");
-        reader.readAsDataURL(blob);
-      });
-      const capToken = (await supabase.auth.getSession()).data.session?.access_token;
-      const capRes = await fetch("/api/capture-measurements", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer " + (capToken || "") },
-        body: JSON.stringify({ userId: profile.id, imageBase64: imgBase64 }),
-      });
-      const capData = await capRes.json();
-      if (capData.success && capData.measurements) {
-        setMeasurements(capData.measurements);
-      }
-    } catch (e) {
-      console.error("Measurement capture error:", e);
-    } finally {
-      setCapturingMeasurements(false);
-    }
-  };
+
 
   if (loading) {
   return (
@@ -340,6 +327,40 @@ const Profile = () => {
               </label>
             </div>
           </div>
+
+          {/* Compact Size Display */}
+          {capturingMeasurements && (
+            <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              <span>Detecting sizes from your photo...</span>
+            </div>
+          )}
+          {measurements && !capturingMeasurements && (
+            <div className="mt-3">
+              <div className="flex flex-wrap items-center gap-1.5">
+                {measurements.recommended_size && (
+                  <span className="rounded-full bg-ai/10 px-2.5 py-0.5 text-[11px] font-medium text-ai">
+                    Top: {measurements.recommended_size}
+                  </span>
+                )}
+                {measurements.recommended_trouser && (
+                  <span className="rounded-full bg-ai/10 px-2.5 py-0.5 text-[11px] font-medium text-ai">
+                    Bottom: {measurements.recommended_trouser}
+                  </span>
+                )}
+                {[
+                  { key: "chest", label: "Chest" },
+                  { key: "waist", label: "Waist" },
+                  { key: "hips", label: "Hips" },
+                  { key: "shoulder_width", label: "Shoulders" },
+                ].map((m) => measurements[m.key] != null ? (
+                  <span key={m.key} className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
+                    {m.label}: {measurements[m.key]}cm
+                  </span>
+                ) : null)}
+              </div>
+            </div>
+          )}
         </div>
       </motion.div>
 
@@ -400,91 +421,6 @@ const Profile = () => {
         </div>
       </motion.div>
 
-      {/* My Sizes & Size Translator */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center">
-            <Ruler className="w-5 h-5 text-indigo-600" />
-          </div>
-          <div>
-            <h3 className="font-semibold text-gray-900">My Sizes</h3>
-            <p className="text-sm text-gray-500">Body measurements & AI size recommendations</p>
-          </div>
-        </div>
-        {measurements ? (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {[
-                { label: "Chest", key: "chest_cm", unit: "cm" },
-                { label: "Waist", key: "waist_cm", unit: "cm" },
-                { label: "Hip", key: "hip_cm", unit: "cm" },
-                { label: "Shoulder", key: "shoulder_width_cm", unit: "cm" },
-                { label: "Height", key: "height_cm", unit: "cm" },
-                { label: "Inseam", key: "inseam_cm", unit: "cm" },
-              ].map((m) => measurements[m.key] != null ? (
-                <div key={m.key} className="bg-gray-50 rounded-xl p-3 text-center">
-                  <p className="text-xs text-gray-500 mb-1">{m.label}</p>
-                  <p className="text-lg font-semibold text-gray-900">{measurements[m.key]}<span className="text-xs text-gray-400 ml-0.5">{m.unit}</span></p>
-                </div>
-              ) : null)}
-            </div>
-            {(measurements.recommended_size || measurements.recommended_trouser) && (
-              <div className="flex gap-3 flex-wrap">
-                {measurements.recommended_size && (<div className="bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-2"><span className="text-xs text-indigo-600 block">Top Size</span><p className="text-lg font-bold text-indigo-700">{measurements.recommended_size}</p></div>)}
-                {measurements.recommended_trouser && (<div className="bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-2"><span className="text-xs text-indigo-600 block">Bottom Size</span><p className="text-lg font-bold text-indigo-700">{measurements.recommended_trouser}</p></div>)}
-              </div>
-            )}
-            <div className="border-t pt-4 mt-4">
-              <h4 className="text-sm font-semibold text-gray-700 mb-3">AI Size Translator</h4>
-              <div className="flex gap-2 mb-3">
-                <select value={sizeCategory} onChange={(e) => setSizeCategory(e.target.value)} className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm">
-                  <option value="general">General</option>
-                  <option value="tops">Tops</option>
-                  <option value="bottoms">Bottoms</option>
-                  <option value="dresses">Dresses</option>
-                </select>
-                <input type="text" placeholder="Brand (optional)" value={sizeBrand} onChange={(e) => setSizeBrand(e.target.value)} className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm" />
-                <button onClick={getSizeRecommendation} disabled={sizeLoading} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 disabled:opacity-50">{sizeLoading ? "..." : "Get Sizes"}</button>
-              </div>
-              {sizeRec && (
-                <div className="space-y-2">
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {[{ label: "Top", val: sizeRec.top_size }, { label: "Bottom", val: sizeRec.bottom_size }, { label: "Dress", val: sizeRec.dress_size }, { label: "Shirt", val: sizeRec.shirt_size }].map((s) => s.val ? (<div key={s.label} className="bg-emerald-50 border border-emerald-200 rounded-lg p-2 text-center"><span className="text-xs text-emerald-600">{s.label}</span><p className="font-bold text-emerald-700">{s.val}</p></div>) : null)}
-                  </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[{ label: "EU", val: sizeRec.eu_size }, { label: "US", val: sizeRec.us_size }, { label: "UK", val: sizeRec.uk_size }].map((s) => s.val ? (<div key={s.label} className="bg-gray-50 rounded-lg p-2 text-center"><span className="text-xs text-gray-500">{s.label}</span><p className="font-semibold text-gray-800">{s.val}</p></div>) : null)}
-                  </div>
-                  {sizeRec.fit_notes && <p className="text-xs text-gray-500 italic mt-1">{sizeRec.fit_notes}</p>}
-                </div>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="text-center py-6 text-gray-400">
-            {bodyPhoto && !measurements ? (
-                <>
-                  <button
-                    onClick={captureExistingMeasurements}
-                    disabled={capturingMeasurements}
-                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all disabled:opacity-50 mx-auto"
-                  >
-                    {capturingMeasurements ? (
-                      <><Loader2 className="w-4 h-4 animate-spin" /> Capturing...</>
-                    ) : (
-                      <><Ruler className="w-4 h-4" /> Capture My Measurements</>
-                    )}
-                  </button>
-                  <p className="text-gray-500 text-xs text-center mt-2">Uses your existing body photo</p>
-                </>
-              ) : !profile?.body_photo_url ? (
-                <>
-                  <Ruler className="w-12 h-12 text-gray-600 mx-auto mb-2" />
-                  <p className="text-gray-500 text-sm text-center">Upload a body photo to capture measurements</p>
-                </>
-              ) : null}
-          </div>
-        )}
-      </motion.div>
 
       {/* Style Preferences */}
       <motion.div
