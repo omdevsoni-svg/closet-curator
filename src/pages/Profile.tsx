@@ -310,7 +310,7 @@ const Profile = () => {
 
         <div className="mt-4 flex items-start gap-4">
           {bodyPhoto ? (
-            <div className="relative h-28 w-20 shrink-0 overflow-hidden rounded-xl bg-background ring-2 ring-[hsl(43,70%,50%)]/20">
+            <div onClick={() => setShowImageModal(true)} className="cursor-pointer relative h-28 w-20 shrink-0 overflow-hidden rounded-xl bg-background ring-2 ring-[hsl(43,70%,50%)]/20" title="Click to view full size">
               <img
                 src={bodyPhoto}
                 alt="Full body"
