@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { supabase } from "../lib/supabase";
 import { useNavigate } from "react-router-dom";
 import {
   User,
@@ -98,27 +97,21 @@ const Profile = () => {
   const [saving, setSaving] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [measurements, setMeasurements] = useState<Record<string, any> | null>(null);
-  const [sizeRec, setSizeRec] = useState<Record<string, any> | null>(null);
   const [showImageModal, setShowImageModal] = useState(false);
-  const [capturingMeasurements, setCapturingMeasurements] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<"idle" | "success" | "error">("idle");
 
-  const [editingSize, setEditingSize] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState("");
-
-  const sizeOptions: Record<string, string[]> = {
-    recommended_size: ["XS", "S", "M", "L", "XL", "XXL"],
-    recommended_trouser: ["26", "28", "30", "32", "34", "36", "38", "40"],
-  };
+  const topSizeOptions = ["XS", "S", "M", "L", "XL", "XXL"];
+  const bottomSizeOptions = ["26", "28", "30", "32", "34", "36", "38", "40"];
+  const shoeSizeOptions = ["6", "7", "8", "9", "10", "11", "12", "13"];
 
   const handleSizeUpdate = async (key: string, value: string) => {
-    if (!measurements || !profile?.id) return;
-    const updated = { ...measurements, [key]: key.includes("recommended") ? value : parseFloat(value) || measurements[key] };
+    if (!user) return;
+    const current = measurements || {};
+    const updated = { ...current, [key]: value };
     setMeasurements(updated);
-    setEditingSize(null);
     try {
-      await updateProfile(profile.id, { body_measurements: updated });
+      await updateProfile(user.id, { body_measurements: updated });
     } catch (e) {
       console.error("Failed to save size update:", e);
     }
@@ -146,43 +139,6 @@ const Profile = () => {
     };
     load();
   }, [user]);
-
-  // Auto-capture measurements when body photo exists but no measurements
-  useEffect(() => {
-    if (!bodyPhoto || measurements || capturingMeasurements) return;
-    if (!profile?.id) return;
-    const run = async () => {
-      setCapturingMeasurements(true);
-      try {
-        const response = await fetch(bodyPhoto);
-        const blob = await response.blob();
-        const reader = new FileReader();
-        const imgBase64: string = await new Promise((resolve) => {
-          reader.onload = () => resolve(String(reader.result).split(",").pop() || "");
-          reader.readAsDataURL(blob);
-        });
-        const capToken = (await supabase.auth.getSession()).data.session?.access_token;
-        const capRes = await fetch("/api/capture-measurements", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: "Bearer " + (capToken || ""),
-          },
-          body: JSON.stringify({ userId: profile.id, imageBase64: imgBase64 }),
-        });
-        const capData = await capRes.json();
-        if (capData.success && capData.measurements) {
-          setMeasurements(capData.measurements);
-          await updateProfile(profile.id, { body_measurements: capData.measurements });
-        }
-      } catch (e) {
-        console.error("Auto measurement capture error:", e);
-      } finally {
-        setCapturingMeasurements(false);
-      }
-    };
-    run();
-  }, [bodyPhoto, measurements, profile]);
 
   const savePreferences = async (updates: Record<string, any>) => {
     if (!user) return;
@@ -218,30 +174,6 @@ const Profile = () => {
       } catch (aiErr) {
         console.error("AI detection failed:", aiErr);
       } finally {
-        // Capture body measurements
-        try {
-          const capToken = (await supabase.auth.getSession()).data.session?.access_token;
-          const reader = new FileReader();
-          const imgBase64 = await new Promise<string>((resolve) => {
-            reader.onload = () => resolve(String(reader.result).split(",").pop() || "");
-            reader.readAsDataURL(file);
-          });
-          const capRes = await fetch("/api/capture-measurements", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              ...(capToken ? { Authorization: "Bearer " + capToken } : {}),
-            },
-            body: JSON.stringify({ userId: user.id, imageBase64: imgBase64 }),
-          });
-          const capData = await capRes.json();
-          if (capData.success && capData.measurements) {
-            setMeasurements(capData.measurements);
-            await updateProfile(user.id, { body_measurements: capData.measurements });
-          }
-        } catch (capErr) {
-          console.error("Measurement capture failed:", capErr);
-        }
         setIsAnalyzing(false);
       }
     } catch (err) {
@@ -257,9 +189,8 @@ const Profile = () => {
   const handleRemovePhoto = async () => {
     if (!user) return;
     setBodyPhoto(null);
-    setMeasurements(null);
     try {
-      await updateProfile(user.id, { body_photo_url: null, body_image_url: null, body_measurements: null });
+      await updateProfile(user.id, { body_photo_url: null, body_image_url: null });
     } catch (err) {
       console.error("Failed to remove photo:", err);
     }
@@ -444,86 +375,75 @@ const Profile = () => {
             {isAnalyzing && !uploadingPhoto && (
               <div className="mt-2 flex items-center gap-1.5 text-[11px] text-ai font-body">
                 <Loader2 className="h-3 w-3 animate-spin" />
-                Analyzing body type & measurements...
+                Analyzing body type...
               </div>
             )}
           </div>
         </div>
 
-        {/* Sizes Section - below image row, inside same card */}
-        {capturingMeasurements && (
-          <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-            <Loader2 className="h-3 w-3 animate-spin" />
-            <span>Detecting sizes from your photo...</span>
+      </motion.div>
+
+      {/* Your Sizes */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.18 }}
+        className="mt-4 rounded-2xl bg-card p-5"
+      >
+        <div className="flex items-center gap-2">
+          <Ruler className="h-4 w-4 text-ai" />
+          <h3 className="text-sm font-display font-semibold text-foreground">
+            Your Sizes
+          </h3>
+        </div>
+
+        {/* Top Size */}
+        <div className="mt-4">
+          <label className="text-xs font-body text-muted-foreground">Top / Shirt Size</label>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {topSizeOptions.map((s) => (
+              <button
+                key={s}
+                onClick={() => handleSizeUpdate("recommended_size", s)}
+                className={"rounded-full px-3 py-1 text-[11px] font-body font-medium transition-colors " + (measurements?.recommended_size === s ? "bg-ai text-white" : "bg-background text-muted-foreground hover:text-foreground")}
+              >
+                {s}
+              </button>
+            ))}
           </div>
-        )}
-        {measurements && !capturingMeasurements && (
-          <div className="mt-3 flex items-center gap-2">
-            <Ruler className="h-3.5 w-3.5 shrink-0 text-ai" />
-            <div className="flex flex-wrap items-center gap-1.5">
-              {measurements.recommended_size && (
-                <button
-                  onClick={() => { setEditingSize("recommended_size"); setEditValue(measurements.recommended_size); }}
-                  className="rounded-full bg-ai/10 px-2.5 py-0.5 text-[11px] font-medium text-ai hover:bg-ai/20 transition-colors"
-                  title="Tap to change"
-                >
-                  Top: {measurements.recommended_size}
-                </button>
-              )}
-              {measurements.recommended_trouser && (
-                <button
-                  onClick={() => { setEditingSize("recommended_trouser"); setEditValue(measurements.recommended_trouser); }}
-                  className="rounded-full bg-ai/10 px-2.5 py-0.5 text-[11px] font-medium text-ai hover:bg-ai/20 transition-colors"
-                  title="Tap to change"
-                >
-                  Bottom: {measurements.recommended_trouser}
-                </button>
-              )}
-              {[
-                { key: "chest", label: "Chest" },
-                { key: "waist", label: "Waist" },
-                { key: "hips", label: "Hips" },
-                { key: "shoulder_width", label: "Shoulders" },
-              ].map((m) =>
-                measurements[m.key] != null ? (
-                  <button
-                    key={m.key}
-                    onClick={() => { setEditingSize(m.key); setEditValue(String(measurements[m.key])); }}
-                    className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground hover:bg-muted/80 transition-colors"
-                    title="Tap to change"
-                  >
-                    {m.label}: {measurements[m.key]}cm
-                  </button>
-                ) : null
-              )}
-            </div>
+        </div>
+
+        {/* Bottom Size */}
+        <div className="mt-4">
+          <label className="text-xs font-body text-muted-foreground">Bottom / Trouser Size</label>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {bottomSizeOptions.map((s) => (
+              <button
+                key={s}
+                onClick={() => handleSizeUpdate("recommended_trouser", s)}
+                className={"rounded-full px-3 py-1 text-[11px] font-body font-medium transition-colors " + (measurements?.recommended_trouser === s ? "bg-ai text-white" : "bg-background text-muted-foreground hover:text-foreground")}
+              >
+                {s}
+              </button>
+            ))}
           </div>
-        )}
-        {editingSize && (
-          <div className="mt-2 flex items-center gap-1.5 pl-5">
-            {sizeOptions[editingSize] ? (
-              <div className="flex flex-wrap gap-1">
-                {sizeOptions[editingSize].map((opt) => (
-                  <button
-                    key={opt}
-                    onClick={() => handleSizeUpdate(editingSize, opt)}
-                    className={"rounded-full px-2 py-0.5 text-[10px] transition-colors " + (editValue === opt ? "bg-ai text-white" : "bg-muted text-muted-foreground hover:bg-muted/80")}
-                  >
-                    {opt}
-                  </button>
-                ))}
-                <button onClick={() => setEditingSize(null)} className="rounded-full px-2 py-0.5 text-[10px] text-muted-foreground hover:text-foreground">x</button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-1">
-                <input type="number" value={editValue} onChange={(e) => setEditValue(e.target.value)} className="w-16 rounded-md border border-border bg-background px-1.5 py-0.5 text-[10px]" autoFocus />
-                <span className="text-[10px] text-muted-foreground">cm</span>
-                <button onClick={() => handleSizeUpdate(editingSize, editValue)} className="rounded-full bg-ai px-2 py-0.5 text-[10px] text-white">Save</button>
-                <button onClick={() => setEditingSize(null)} className="rounded-full px-2 py-0.5 text-[10px] text-muted-foreground hover:text-foreground">x</button>
-              </div>
-            )}
+        </div>
+
+        {/* Shoe Size */}
+        <div className="mt-4">
+          <label className="text-xs font-body text-muted-foreground">Shoe Size (US)</label>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {shoeSizeOptions.map((s) => (
+              <button
+                key={s}
+                onClick={() => handleSizeUpdate("shoe_size", s)}
+                className={"rounded-full px-3 py-1 text-[11px] font-body font-medium transition-colors " + (measurements?.shoe_size === s ? "bg-ai text-white" : "bg-background text-muted-foreground hover:text-foreground")}
+              >
+                {s}
+              </button>
+            ))}
           </div>
-        )}
+        </div>
       </motion.div>
 
       {/* Styling Tips */}
