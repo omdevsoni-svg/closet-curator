@@ -1,8 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import * as crypto from "crypto";
 
 /* ------------------------------------------------------------------ */
-/* Body measurements via Vertex AI (Gemini) + GCP Service Account      */
+/* Captures body measurements using Gemini Vision + stores in profiles */
 /* ------------------------------------------------------------------ */
 
 function getSupabaseConfig() {
@@ -18,67 +17,24 @@ function getSupabaseConfig() {
   return { url, key };
 }
 
-/* ---------- GCP Service Account -> OAuth2 Access Token ------------ */
+function getGeminiKey() {
+  // Try dedicated key first, then parse from GCP service account
+  const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY;
+  if (key) return key;
 
-interface ServiceAccount {
-  client_email: string;
-  private_key: string;
-  project_id: string;
-}
-
-function getServiceAccount(): ServiceAccount {
-  const raw = process.env.GCP_SERVICE_ACCOUNT_KEY;
-  if (!raw) throw new Error("GCP_SERVICE_ACCOUNT_KEY env var is missing");
-  const sa = JSON.parse(raw);
-  if (!sa.client_email || !sa.private_key || !sa.project_id) {
-    throw new Error("GCP_SERVICE_ACCOUNT_KEY is missing required fields");
-  }
-  return sa;
-}
-
-function base64url(input: Buffer | string): string {
-  const buf = typeof input === "string" ? Buffer.from(input) : input;
-  return buf.toString("base64").replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
-}
-
-async function getAccessToken(sa: ServiceAccount): Promise<string> {
-  const now = Math.floor(Date.now() / 1000);
-  const header = base64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
-  const payload = base64url(
-    JSON.stringify({
-      iss: sa.client_email,
-      scope: "https://www.googleapis.com/auth/cloud-platform",
-      aud: "https://oauth2.googleapis.com/token",
-      iat: now,
-      exp: now + 3600,
-    })
-  );
-
-  const signInput = header + "." + payload;
-  const sign = crypto.createSign("RSA-SHA256");
-  sign.update(signInput);
-  const signature = base64url(sign.sign(sa.private_key));
-
-  const jwt = signInput + "." + signature;
-
-  const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`,
-  });
-
-  if (!tokenRes.ok) {
-    const errText = await tokenRes.text();
-    throw new Error("OAuth2 token exchange failed: " + errText);
+  // Fall back to GCP service account JSON â extract API key if present
+  const gcpJson = process.env.GCP_SERVICE_ACCOUNT_KEY;
+  if (gcpJson) {
+    try {
+      const parsed = JSON.parse(gcpJson);
+      if (parsed.api_key) return parsed.api_key;
+    } catch { /* not JSON or no api_key field */ }
   }
 
-  const tokenData = await tokenRes.json();
-  return tokenData.access_token;
+  throw new Error("Missing Gemini/Google AI API key. Set GEMINI_API_KEY env var.");
 }
 
-/* ---------- Measurement Prompt ------------------------------------ */
-
-const MEASURE_PROMPT = `You are a body measurement estimation AI. Analyze this full-body photo and estimate the person's body measurements.
+const GEMINI_PROMPT = `You are a body measurement estimation AI. Analyze this full-body photo and estimate the person's body measurements.
 
 Return ONLY a valid JSON object with these fields (all numeric values in cm, sizes as strings):
 {
@@ -96,8 +52,6 @@ Use visual cues like body proportions, build, and clothing fit to make reasonabl
 
 Return ONLY the JSON object, no explanation or markdown.`;
 
-/* ---------- Handler ----------------------------------------------- */
-
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -110,55 +64,55 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const { userId, imageBase64 } = req.body || {};
-    if (!userId) return res.status(400).json({ success: false, error: "userId is required" });
-    if (!imageBase64) return res.status(400).json({ success: false, error: "imageBase64 is required" });
 
-    const sa = getServiceAccount();
+    if (!userId) {
+      return res.status(400).json({ success: false, error: "userId is required" });
+    }
+    if (!imageBase64) {
+      return res.status(400).json({ success: false, error: "imageBase64 is required" });
+    }
+
+    const geminiKey = getGeminiKey();
     const sb = getSupabaseConfig();
-    const accessToken = await getAccessToken(sa);
 
+    // Extract user token from Authorization header for RLS
     const authHeader = req.headers.authorization || "";
     const userToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : undefined;
 
-    // 1. Call Vertex AI Gemini to analyze body photo
-    const project = sa.project_id;
-    const region = "us-central1";
-    const model = "gemini-2.5-flash";
-    const vertexUrl = `https://${region}-aiplatform.googleapis.com/v1/projects/${project}/locations/${region}/publishers/google/models/${model}:generateContent`;
-
-    const geminiRes = await fetch(vertexUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              { text: MEASURE_PROMPT },
-              {
-                inline_data: {
-                  mime_type: "image/jpeg",
-                  data: imageBase64,
+    // 1. Call Gemini Vision API to analyze body photo
+    const geminiRes = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                { text: GEMINI_PROMPT },
+                {
+                  inline_data: {
+                    mime_type: "image/jpeg",
+                    data: imageBase64,
+                  },
                 },
-              },
-            ],
+              ],
+            },
+          ],
+          generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 512,
           },
-        ],
-        generationConfig: {
-          temperature: 0.1,
-          maxOutputTokens: 512,
-        },
-      }),
-    });
+        }),
+      }
+    );
 
     if (!geminiRes.ok) {
       const errText = await geminiRes.text();
-      console.error("Vertex AI error:", geminiRes.status, errText);
+      console.error("Gemini API error:", geminiRes.status, errText);
       return res.status(502).json({
         success: false,
-        error: `Vertex AI returned ${geminiRes.status}`,
+        error: `Gemini API returned ${geminiRes.status}`,
         detail: errText,
       });
     }
@@ -167,12 +121,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const textContent =
       geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
-    // Parse JSON from response
-    let measurements = null;
+    // Parse JSON from Gemini response (strip markdown fences if present)
+    let measurements: Record<string, any> | null = null;
     try {
       const jsonStr = textContent
-        .replace(/\`\`\`json\s*/g, "")
-        .replace(/\`\`\`\s*/g, "")
+        .replace(/```json\s*/g, "")
+        .replace(/```\s*/g, "")
         .trim();
       measurements = JSON.parse(jsonStr);
     } catch (parseErr) {
@@ -192,7 +146,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // 2. Store measurements in profiles table
+    // 2. Store measurements in the profiles table
     const patchRes = await fetch(
       `${sb.url}/rest/v1/profiles?id=eq.${userId}`,
       {
@@ -203,7 +157,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           "Content-Type": "application/json",
           Prefer: "return=minimal",
         },
-        body: JSON.stringify({ body_measurements: measurements }),
+        body: JSON.stringify({
+          body_measurements: measurements,
+        }),
       }
     );
 
@@ -217,7 +173,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    return res.status(200).json({ success: true, measurements, stored: true });
+    return res.status(200).json({
+      success: true,
+      measurements,
+      stored: true,
+    });
   } catch (err: any) {
     console.error("capture-measurements error:", err);
     return res.status(500).json({
