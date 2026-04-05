@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import crypto from "crypto";
+import * as crypto from "crypto";
 
 /* ------------------------------------------------------------------ */
 /* Body measurements via Vertex AI (Gemini) + GCP Service Account      */
