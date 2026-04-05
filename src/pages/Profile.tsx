@@ -10,6 +10,7 @@ import {
   Check,
   Loader2,
   Ruler,
+  Trash2,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
@@ -23,8 +24,9 @@ import {
 import { detectBodyAttributes } from "@/lib/ai-service";
 
 /* ------------------------------------------------------------------ */
-/*  Body type data                                                     */
+/* Body type data                                                      */
 /* ------------------------------------------------------------------ */
+
 interface BodyTypeInfo {
   type: string;
   tips: string[];
@@ -79,8 +81,9 @@ const skinToneOptions = ["Light", "Fair", "Medium", "Olive", "Tan", "Dark", "Dee
 const bodyTypeOptions = ["rectangle", "hourglass", "inverted_triangle", "pear"];
 
 /* ------------------------------------------------------------------ */
-/*  Main Profile component                                             */
+/* Main Profile component                                              */
 /* ------------------------------------------------------------------ */
+
 const Profile = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -88,7 +91,6 @@ const Profile = () => {
   const [profile, setProfile] = useState<ProfileType | null>(null);
   const [loading, setLoading] = useState(true);
   const [closetCount, setClosetCount] = useState(0);
-
   const [bodyType, setBodyType] = useState("rectangle");
   const [skinTone, setSkinTone] = useState("Medium");
   const [modelGender, setModelGender] = useState<"women" | "men" | "neutral">("neutral");
@@ -98,6 +100,10 @@ const Profile = () => {
   const [measurements, setMeasurements] = useState<Record<string, any> | null>(null);
   const [sizeRec, setSizeRec] = useState<Record<string, any> | null>(null);
   const [showImageModal, setShowImageModal] = useState(false);
+  const [capturingMeasurements, setCapturingMeasurements] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<"idle" | "success" | "error">("idle");
+
   const [editingSize, setEditingSize] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
 
@@ -117,7 +123,6 @@ const Profile = () => {
       console.error("Failed to save size update:", e);
     }
   };
-  const [capturingMeasurements, setCapturingMeasurements] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -134,9 +139,9 @@ const Profile = () => {
         setBodyPhoto(p.body_image_url || null);
       }
       setClosetCount(items.length);
-        if (p.body_measurements) {
-          setMeasurements(p.body_measurements);
-        }
+      if (p.body_measurements) {
+        setMeasurements(p.body_measurements);
+      }
       setLoading(false);
     };
     load();
@@ -159,7 +164,10 @@ const Profile = () => {
         const capToken = (await supabase.auth.getSession()).data.session?.access_token;
         const capRes = await fetch("/api/capture-measurements", {
           method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: "Bearer " + (capToken || "") },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + (capToken || ""),
+          },
           body: JSON.stringify({ userId: profile.id, imageBase64: imgBase64 }),
         });
         const capData = await capRes.json();
@@ -186,12 +194,16 @@ const Profile = () => {
   const handleBodyPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
-
+    setUploadingPhoto(true);
+    setUploadStatus("idle");
     try {
       // Upload image first
       const url = await uploadImage(file, user.id, "body-photos");
-      setBodyPhotoUrl(url);
+      setBodyPhoto(url);
       await updateProfile(user.id, { body_photo_url: url });
+      setUploadingPhoto(false);
+      setUploadStatus("success");
+      setTimeout(() => setUploadStatus("idle"), 2000);
 
       // Run AI detection
       setIsAnalyzing(true);
@@ -199,51 +211,65 @@ const Profile = () => {
         const attrs = await detectBodyAttributes(file);
         setBodyType(attrs.body_type);
         setSkinTone(attrs.skin_tone);
-        await savePreferences({ body_type: attrs.body_type, skin_tone: attrs.skin_tone });
-        toast({ title: "Body analysis complete", description: "Body type: " + attrs.body_type.replace("_", " ") + " | Skin tone: " + attrs.skin_tone + " (Confidence: " + attrs.confidence + ")" });
+        await savePreferences({
+          body_type: attrs.body_type,
+          skin_tone: attrs.skin_tone,
+        });
       } catch (aiErr) {
         console.error("AI detection failed:", aiErr);
-        toast({ title: "Photo uploaded", description: "Body photo saved but AI analysis failed. You can set body type manually.", variant: "destructive" });
       } finally {
-      // Capture body measurements from VTO API
-      try {
-        const capToken = (await supabase.auth.getSession()).data.session?.access_token;
-        const reader = new FileReader();
-        const imgBase64 = await new Promise<string>((resolve) => {
-          reader.onload = () => resolve(String(reader.result).split(",").pop() || "");
-          reader.readAsDataURL(file);
-        });
-        const capRes = await fetch("/api/capture-measurements", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...(capToken ? { Authorization: "Bearer " + capToken } : {}) },
-          body: JSON.stringify({ userId: user.id, imageBase64: imgBase64 }),
-        });
-        const capData = await capRes.json();
-        if (capData.success && capData.measurements) {
-          setMeasurements(capData.measurements);
-          await updateProfile(user.id, { body_measurements: capData.measurements });
+        // Capture body measurements
+        try {
+          const capToken = (await supabase.auth.getSession()).data.session?.access_token;
+          const reader = new FileReader();
+          const imgBase64 = await new Promise<string>((resolve) => {
+            reader.onload = () => resolve(String(reader.result).split(",").pop() || "");
+            reader.readAsDataURL(file);
+          });
+          const capRes = await fetch("/api/capture-measurements", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(capToken ? { Authorization: "Bearer " + capToken } : {}),
+            },
+            body: JSON.stringify({ userId: user.id, imageBase64: imgBase64 }),
+          });
+          const capData = await capRes.json();
+          if (capData.success && capData.measurements) {
+            setMeasurements(capData.measurements);
+            await updateProfile(user.id, { body_measurements: capData.measurements });
+          }
+        } catch (capErr) {
+          console.error("Measurement capture failed:", capErr);
         }
-      } catch (capErr) {
-        console.error("Measurement capture failed:", capErr);
-      }
-
         setIsAnalyzing(false);
       }
     } catch (err) {
       console.error("Upload error:", err);
-      toast({ title: "Upload failed", description: "Could not upload body photo.", variant: "destructive" });
+      setUploadingPhoto(false);
+      setUploadStatus("error");
+      setTimeout(() => setUploadStatus("idle"), 3000);
+    }
+    // Reset file input so re-selecting the same file triggers onChange
+    e.target.value = "";
+  };
+
+  const handleRemovePhoto = async () => {
+    if (!user) return;
+    setBodyPhoto(null);
+    setMeasurements(null);
+    try {
+      await updateProfile(user.id, { body_photo_url: null, body_image_url: null, body_measurements: null });
+    } catch (err) {
+      console.error("Failed to remove photo:", err);
     }
   };
 
   const currentBody = bodyTypeData[bodyType];
   const userName = profile?.name || user?.user_metadata?.name || "Style Enthusiast";
 
-
-
-
-
   if (loading) {
-  return (
+    return (
       <div className="flex min-h-[50vh] items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
@@ -287,7 +313,6 @@ const Profile = () => {
             </p>
           </div>
         </div>
-
       </motion.div>
 
       {/* Full-Body Image */}
@@ -316,35 +341,95 @@ const Profile = () => {
 
         <div className="mt-4 flex items-start gap-4">
           {bodyPhoto ? (
-            <div onClick={() => setShowImageModal(true)} className="cursor-pointer relative h-28 w-20 shrink-0 overflow-hidden rounded-xl bg-background ring-2 ring-[hsl(43,70%,50%)]/20" title="Click to view full size">
+            <div
+              onClick={() => !uploadingPhoto && setShowImageModal(true)}
+              className={"cursor-pointer relative h-28 w-20 shrink-0 overflow-hidden rounded-xl bg-background ring-2 " + (uploadingPhoto ? "ring-ai/40 animate-pulse" : uploadStatus === "success" ? "ring-green-500/60" : "ring-[hsl(43,70%,50%)]/20")}
+              title={uploadingPhoto ? "Uploading..." : "Click to view full size"}
+            >
               <img
                 src={bodyPhoto}
                 alt="Full body"
-                className="h-full w-full object-cover"
-                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                className={"h-full w-full object-cover transition-opacity duration-300 " + (uploadingPhoto ? "opacity-40" : "opacity-100")}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = "none";
+                }}
               />
+              {uploadingPhoto && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 rounded-xl">
+                  <Loader2 className="h-5 w-5 animate-spin text-white" />
+                  <span className="mt-1 text-[9px] font-medium text-white">Uploading</span>
+                </div>
+              )}
+              {uploadStatus === "success" && !uploadingPhoto && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-green-500/20 rounded-xl animate-pulse">
+                  <Check className="h-5 w-5 text-green-400" />
+                  <span className="mt-1 text-[9px] font-medium text-green-400">Updated!</span>
+                </div>
+              )}
+              {uploadStatus === "error" && !uploadingPhoto && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-red-500/20 rounded-xl">
+                  <span className="text-[9px] font-medium text-red-400">Failed</span>
+                </div>
+              )}
+            </div>
+          ) : uploadingPhoto ? (
+            <div className="flex h-28 w-20 shrink-0 items-center justify-center rounded-xl bg-background ring-2 ring-ai/40 animate-pulse">
+              <div className="flex flex-col items-center">
+                <Loader2 className="h-5 w-5 animate-spin text-ai" />
+                <span className="mt-1 text-[9px] font-medium text-muted-foreground">Uploading</span>
+              </div>
             </div>
           ) : (
             <div className="flex h-28 w-20 shrink-0 items-center justify-center rounded-xl bg-background ring-2 ring-border">
               <User className="h-8 w-8 text-muted-foreground/30" />
             </div>
           )}
+
           <div className="flex-1">
             <p className="text-xs text-muted-foreground font-body">
-              Upload a full-body photo in fitted clothing for accurate body type detection. Use a well-lit environment.
+              Upload a full-body photo in fitted clothing for accurate body type
+              detection. Use a well-lit environment.
             </p>
-            <div className="mt-2 flex gap-2">
-              <label className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-background px-3 py-1.5 text-xs font-body font-medium text-muted-foreground transition-colors hover:text-foreground">
-                <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleBodyPhotoUpload} />
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <label className={"flex cursor-pointer items-center gap-1.5 rounded-lg bg-background px-3 py-1.5 text-xs font-body font-medium text-muted-foreground transition-colors hover:text-foreground" + (uploadingPhoto ? " opacity-50 pointer-events-none" : "")}>
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={handleBodyPhotoUpload}
+                  disabled={uploadingPhoto}
+                />
                 <Camera className="h-3.5 w-3.5" />
                 Camera
               </label>
-              <label className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-background px-3 py-1.5 text-xs font-body font-medium text-muted-foreground transition-colors hover:text-foreground">
-                <input type="file" accept="image/*" className="hidden" onChange={handleBodyPhotoUpload} />
+              <label className={"flex cursor-pointer items-center gap-1.5 rounded-lg bg-background px-3 py-1.5 text-xs font-body font-medium text-muted-foreground transition-colors hover:text-foreground" + (uploadingPhoto ? " opacity-50 pointer-events-none" : "")}>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleBodyPhotoUpload}
+                  disabled={uploadingPhoto}
+                />
                 <ImageIcon className="h-3.5 w-3.5" />
                 Gallery
               </label>
+              {bodyPhoto && !uploadingPhoto && (
+                <button
+                  onClick={handleRemovePhoto}
+                  className="flex items-center gap-1 text-[11px] font-body text-destructive/70 hover:text-destructive transition-colors"
+                >
+                  <Trash2 className="h-3 w-3" />
+                  Remove Photo
+                </button>
+              )}
             </div>
+            {isAnalyzing && (
+              <div className="mt-2 flex items-center gap-1.5 text-[11px] text-ai font-body">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Analyzing body type & measurements...
+              </div>
+            )}
           </div>
 
           {/* Compact Size Display */}
@@ -480,7 +565,6 @@ const Profile = () => {
         </div>
       </motion.div>
 
-
       {/* Style Preferences */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
@@ -552,8 +636,6 @@ const Profile = () => {
         </div>
       </motion.div>
 
-
-
       {/* Full-size Image Modal */}
       {showImageModal && bodyPhoto && (
         <motion.div
@@ -583,7 +665,6 @@ const Profile = () => {
           </motion.div>
         </motion.div>
       )}
-
     </div>
   );
 };
