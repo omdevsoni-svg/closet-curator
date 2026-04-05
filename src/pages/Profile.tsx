@@ -355,15 +355,15 @@ const Profile = () => {
                 }}
               />
               {uploadingPhoto && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 rounded-xl">
-                  <Loader2 className="h-5 w-5 animate-spin text-white" />
-                  <span className="mt-1 text-[9px] font-medium text-white">Uploading</span>
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 rounded-xl">
+                  <Loader2 className="h-6 w-6 animate-spin text-yellow-400" />
+                  <span className="mt-1 text-[10px] font-semibold text-yellow-400">Uploading</span>
                 </div>
               )}
               {uploadStatus === "success" && !uploadingPhoto && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-green-500/20 rounded-xl animate-pulse">
-                  <Check className="h-5 w-5 text-green-400" />
-                  <span className="mt-1 text-[9px] font-medium text-green-400">Updated!</span>
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-green-500/30 rounded-xl animate-pulse">
+                  <Check className="h-6 w-6 text-green-400" />
+                  <span className="mt-1 text-[10px] font-semibold text-green-400">Updated!</span>
                 </div>
               )}
               {uploadStatus === "error" && !uploadingPhoto && (
@@ -424,7 +424,24 @@ const Profile = () => {
                 </button>
               )}
             </div>
-            {isAnalyzing && (
+            {uploadingPhoto && (
+              <div className="mt-2 flex items-center gap-1.5 text-[11px] text-yellow-400 font-body animate-pulse">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Uploading your photo...
+              </div>
+            )}
+            {uploadStatus === "success" && !uploadingPhoto && !isAnalyzing && (
+              <div className="mt-2 flex items-center gap-1.5 text-[11px] text-green-400 font-body">
+                <Check className="h-3.5 w-3.5" />
+                Photo uploaded successfully!
+              </div>
+            )}
+            {uploadStatus === "error" && !uploadingPhoto && (
+              <div className="mt-2 flex items-center gap-1.5 text-[11px] text-red-400 font-body">
+                Upload failed. Please try again.
+              </div>
+            )}
+            {isAnalyzing && !uploadingPhoto && (
               <div className="mt-2 flex items-center gap-1.5 text-[11px] text-ai font-body">
                 <Loader2 className="h-3 w-3 animate-spin" />
                 Analyzing body type & measurements...
