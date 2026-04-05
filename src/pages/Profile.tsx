@@ -394,12 +394,12 @@ const Profile = () => {
                 {/* Inline size editor */}
                 {editingSize && (
                   <div className="mt-2 flex items-center gap-1.5 animate-in fade-in">
-                    {sizeOptions[editingSize] ? (
+                    {sizeOptions[editingSize!] ? (
                       <div className="flex flex-wrap gap-1">
-                        {sizeOptions[editingSize].map((opt) => (
+                        {sizeOptions[editingSize!].map((opt) => (
                           <button
                             key={opt}
-                            onClick={() => handleSizeUpdate(editingSize, opt)}
+                            onClick={() => handleSizeUpdate(editingSize!, opt)}
                             className={`rounded-full px-2 py-0.5 text-[10px] transition-colors ${editValue === opt ? "bg-ai text-white" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
                           >
                             {opt}
@@ -417,7 +417,7 @@ const Profile = () => {
                           autoFocus
                         />
                         <span className="text-[10px] text-muted-foreground">cm</span>
-                        <button onClick={() => handleSizeUpdate(editingSize, editValue)} className="rounded-full bg-ai px-2 py-0.5 text-[10px] text-white">Save</button>
+                        <button onClick={() => handleSizeUpdate(editingSize!, editValue)} className="rounded-full bg-ai px-2 py-0.5 text-[10px] text-white">Save</button>
                         <button onClick={() => setEditingSize(null)} className="rounded-full px-2 py-0.5 text-[10px] text-muted-foreground hover:text-foreground">x</button>
                       </div>
                     )}
