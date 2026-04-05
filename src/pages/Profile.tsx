@@ -380,25 +380,27 @@ const Profile = () => {
                   { key: "waist", label: "Waist" },
                   { key: "hips", label: "Hips" },
                   { key: "shoulder_width", label: "Shoulders" },
-                ].map((m) => measurements[m.key] != null ? (
-                  <button
-                    key={m.key}
-                    onClick={() => { setEditingSize(m.key); setEditValue(String(measurements[m.key])); }}
-                    className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground hover:bg-muted/80 transition-colors"
-                    title="Tap to change"
-                  >
-                    {m.label}: {measurements[m.key]}cm
-                  </button>
-                ) : null)}
+                ].map((m) =>
+                  measurements[m.key] != null ? (
+                    <button
+                      key={m.key}
+                      onClick={() => { setEditingSize(m.key); setEditValue(String(measurements[m.key])); }}
+                      className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground hover:bg-muted/80 transition-colors"
+                      title="Tap to change"
+                    >
+                      {m.label}: {measurements[m.key]}cm
+                    </button>
+                  ) : null
+                )}
               </div>
               {editingSize && (
                 <div className="mt-2 flex items-center gap-1.5">
-                  {sizeOptions[editingSize!] ? (
+                  {sizeOptions[editingSize] ? (
                     <div className="flex flex-wrap gap-1">
-                      {sizeOptions[editingSize!].map((opt) => (
+                      {sizeOptions[editingSize].map((opt) => (
                         <button
                           key={opt}
-                          onClick={() => handleSizeUpdate(editingSize!, opt)}
+                          onClick={() => handleSizeUpdate(editingSize, opt)}
                           className={"rounded-full px-2 py-0.5 text-[10px] transition-colors " + (editValue === opt ? "bg-ai text-white" : "bg-muted text-muted-foreground hover:bg-muted/80")}
                         >
                           {opt}
@@ -410,14 +412,14 @@ const Profile = () => {
                     <div className="flex items-center gap-1">
                       <input type="number" value={editValue} onChange={(e) => setEditValue(e.target.value)} className="w-16 rounded-md border border-border bg-background px-1.5 py-0.5 text-[10px]" autoFocus />
                       <span className="text-[10px] text-muted-foreground">cm</span>
-                      <button onClick={() => handleSizeUpdate(editingSize!, editValue)} className="rounded-full bg-ai px-2 py-0.5 text-[10px] text-white">Save</button>
+                      <button onClick={() => handleSizeUpdate(editingSize, editValue)} className="rounded-full bg-ai px-2 py-0.5 text-[10px] text-white">Save</button>
                       <button onClick={() => setEditingSize(null)} className="rounded-full px-2 py-0.5 text-[10px] text-muted-foreground hover:text-foreground">x</button>
                     </div>
                   )}
                 </div>
               )}
             </div>
-          ))}
+          )}
         </div>
       </motion.div>
 
@@ -540,11 +542,7 @@ const Profile = () => {
                   setModelGender(g);
                   savePreferences({ model_gender: g });
                 }}
-                className={`flex items-center justify-center gap-1 rounded-xl py-2 text-xs font-body font-medium capitalize transition-all ${
-                  modelGender === g
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-background text-muted-foreground"
-                }`}
+                className={"flex items-center justify-center gap-1 rounded-xl py-2 text-xs font-body font-medium capitalize transition-all " + (modelGender === g ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground")}
               >
                 {modelGender === g && <Check className="h-3 w-3" />}
                 {g}
