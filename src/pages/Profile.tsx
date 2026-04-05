@@ -348,84 +348,79 @@ const Profile = () => {
           </div>
 
           {/* Compact Size Display */}
-            {capturingMeasurements && (
-              <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                <span>Detecting sizes from your photo...</span>
-              </div>
-            )}
-            {measurements && !capturingMeasurements && (
-              <div className="mt-3">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {measurements.recommended_size && (
-                    <button
-                      onClick={() => { setEditingSize("recommended_size"); setEditValue(measurements.recommended_size); }}
-                      className="rounded-full bg-ai/10 px-2.5 py-0.5 text-[11px] font-medium text-ai hover:bg-ai/20 transition-colors"
-                      title="Tap to change"
-                    >
-                      Top: {measurements.recommended_size}
-                    </button>
-                  )}
-                  {measurements.recommended_trouser && (
-                    <button
-                      onClick={() => { setEditingSize("recommended_trouser"); setEditValue(measurements.recommended_trouser); }}
-                      className="rounded-full bg-ai/10 px-2.5 py-0.5 text-[11px] font-medium text-ai hover:bg-ai/20 transition-colors"
-                      title="Tap to change"
-                    >
-                      Bottom: {measurements.recommended_trouser}
-                    </button>
-                  )}
-                  {[
-                    { key: "chest", label: "Chest" },
-                    { key: "waist", label: "Waist" },
-                    { key: "hips", label: "Hips" },
-                    { key: "shoulder_width", label: "Shoulders" },
-                  ].map((m) => measurements[m.key] != null ? (
-                    <button
-                      key={m.key}
-                      onClick={() => { setEditingSize(m.key); setEditValue(String(measurements[m.key])); }}
-                      className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground hover:bg-muted/80 transition-colors"
-                      title="Tap to change"
-                    >
-                      {m.label}: {measurements[m.key]}cm
-                    </button>
-                  ) : null)}
-                </div>
-                {/* Inline size editor */}
-                {editingSize && (
-                  <div className="mt-2 flex items-center gap-1.5 animate-in fade-in">
-                    {sizeOptions[editingSize!] ? (
-                      <div className="flex flex-wrap gap-1">
-                        {sizeOptions[editingSize!].map((opt) => (
-                          <button
-                            key={opt}
-                            onClick={() => handleSizeUpdate(editingSize!, opt)}
-                            className={`rounded-full px-2 py-0.5 text-[10px] transition-colors ${editValue === opt ? "bg-ai text-white" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
-                          >
-                            {opt}
-                          </button>
-                        ))}
-                        <button onClick={() => setEditingSize(null)} className="rounded-full px-2 py-0.5 text-[10px] text-muted-foreground hover:text-foreground">x</button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1">
-                        <input
-                          type="number"
-                          value={editValue}
-                          onChange={(e) => setEditValue(e.target.value)}
-                          className="w-16 rounded-md border border-border bg-background px-1.5 py-0.5 text-[10px]"
-                          autoFocus
-                        />
-                        <span className="text-[10px] text-muted-foreground">cm</span>
-                        <button onClick={() => handleSizeUpdate(editingSize!, editValue)} className="rounded-full bg-ai px-2 py-0.5 text-[10px] text-white">Save</button>
-                        <button onClick={() => setEditingSize(null)} className="rounded-full px-2 py-0.5 text-[10px] text-muted-foreground hover:text-foreground">x</button>
-                      </div>
-                    )}
-                  </div>
+          {capturingMeasurements && (
+            <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              <span>Detecting sizes from your photo...</span>
+            </div>
+          )}
+          {measurements && !capturingMeasurements && (
+            <div className="mt-3">
+              <div className="flex flex-wrap items-center gap-1.5">
+                {measurements.recommended_size && (
+                  <button
+                    onClick={() => { setEditingSize("recommended_size"); setEditValue(measurements.recommended_size); }}
+                    className="rounded-full bg-ai/10 px-2.5 py-0.5 text-[11px] font-medium text-ai hover:bg-ai/20 transition-colors"
+                    title="Tap to change"
+                  >
+                    Top: {measurements.recommended_size}
+                  </button>
                 )}
+                {measurements.recommended_trouser && (
+                  <button
+                    onClick={() => { setEditingSize("recommended_trouser"); setEditValue(measurements.recommended_trouser); }}
+                    className="rounded-full bg-ai/10 px-2.5 py-0.5 text-[11px] font-medium text-ai hover:bg-ai/20 transition-colors"
+                    title="Tap to change"
+                  >
+                    Bottom: {measurements.recommended_trouser}
+                  </button>
+                )}
+                {[
+                  { key: "chest", label: "Chest" },
+                  { key: "waist", label: "Waist" },
+                  { key: "hips", label: "Hips" },
+                  { key: "shoulder_width", label: "Shoulders" },
+                ].map((m) => measurements[m.key] != null ? (
+                  <button
+                    key={m.key}
+                    onClick={() => { setEditingSize(m.key); setEditValue(String(measurements[m.key])); }}
+                    className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground hover:bg-muted/80 transition-colors"
+                    title="Tap to change"
+                  >
+                    {m.label}: {measurements[m.key]}cm
+                  </button>
+                ) : null)}
               </div>
-            )}
-            </motion.div>
+              {editingSize && (
+                <div className="mt-2 flex items-center gap-1.5">
+                  {sizeOptions[editingSize!] ? (
+                    <div className="flex flex-wrap gap-1">
+                      {sizeOptions[editingSize!].map((opt) => (
+                        <button
+                          key={opt}
+                          onClick={() => handleSizeUpdate(editingSize!, opt)}
+                          className={`rounded-full px-2 py-0.5 text-[10px] transition-colors ${editValue === opt ? "bg-ai text-white" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
+                        >
+                          {opt}
+                        </button>
+                      ))}
+                      <button onClick={() => setEditingSize(null)} className="rounded-full px-2 py-0.5 text-[10px] text-muted-foreground hover:text-foreground">x</button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1">
+                      <input type="number" value={editValue} onChange={(e) => setEditValue(e.target.value)} className="w-16 rounded-md border border-border bg-background px-1.5 py-0.5 text-[10px]" autoFocus />
+                      <span className="text-[10px] text-muted-foreground">cm</span>
+                      <button onClick={() => handleSizeUpdate(editingSize!, editValue)} className="rounded-full bg-ai px-2 py-0.5 text-[10px] text-white">Save</button>
+                      <button onClick={() => setEditingSize(null)} className="rounded-full px-2 py-0.5 text-[10px] text-muted-foreground hover:text-foreground">x</button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+          )}
+        </div>
+      </motion.div>
 
       {/* Styling Tips */}
       <motion.div
