@@ -188,55 +188,55 @@ const Profile = () => {
   const currentBody = bodyTypeData[bodyType];
   const userName = profile?.name || user?.user_metadata?.name || "Style Enthusiast";
 
-  if (loading) {
-    const getSizeRecommendation = async () => {
-    if (!measurements) return;
-    setSizeLoading(true);
-    try {
-      const token = (await supabase.auth.getSession()).data.session?.access_token;
-      const res = await fetch("/api/size-recommendation", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...(token ? { Authorization: "Bearer " + token } : {}) },
-        body: JSON.stringify({ measurements, category: sizeCategory, brand: sizeBrand || undefined }),
-      });
-      const data = await res.json();
-      if (data.success) setSizeRec(data.sizes);
-    } catch (err) {
-      console.error("Size rec error:", err);
-    } finally {
-      setSizeLoading(false);
-    }
+  const getSizeRecommendation = async () => {
+  if (!measurements) return;
+  setSizeLoading(true);
+  try {
+    const token = (await supabase.auth.getSession()).data.session?.access_token;
+    const res = await fetch("/api/size-recommendation", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(token ? { Authorization: "Bearer " + token } : {}) },
+      body: JSON.stringify({ measurements, category: sizeCategory, brand: sizeBrand || undefined }),
+    });
+    const data = await res.json();
+    if (data.success) setSizeRec(data.sizes);
+  } catch (err) {
+    console.error("Size rec error:", err);
+  } finally {
+    setSizeLoading(false);
+  }
   };
 
 
-    const captureExistingMeasurements = async () => {
-      if (!bodyPhoto) return;
-      setCapturingMeasurements(true);
-      try {
-        const response = await fetch(bodyPhoto);
-        const blob = await response.blob();
-        const reader = new FileReader();
-        const imgBase64 = await new Promise((resolve) => {
-          reader.onload = () => resolve(String(reader.result).split(",").pop() || "");
-          reader.readAsDataURL(blob);
-        });
-        const capToken = (await supabase.auth.getSession()).data.session?.access_token;
-        const capRes = await fetch("/api/capture-measurements", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: "Bearer " + (capToken || "") },
-          body: JSON.stringify({ userId: profile.id, imageBase64: imgBase64 }),
-        });
-        const capData = await capRes.json();
-        if (capData.success && capData.measurements) {
-          setMeasurements(capData.measurements);
-        }
-      } catch (e) {
-        console.error("Measurement capture error:", e);
-      } finally {
-        setCapturingMeasurements(false);
+  const captureExistingMeasurements = async () => {
+    if (!bodyPhoto) return;
+    setCapturingMeasurements(true);
+    try {
+      const response = await fetch(bodyPhoto);
+      const blob = await response.blob();
+      const reader = new FileReader();
+      const imgBase64 = await new Promise((resolve) => {
+        reader.onload = () => resolve(String(reader.result).split(",").pop() || "");
+        reader.readAsDataURL(blob);
+      });
+      const capToken = (await supabase.auth.getSession()).data.session?.access_token;
+      const capRes = await fetch("/api/capture-measurements", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + (capToken || "") },
+        body: JSON.stringify({ userId: profile.id, imageBase64: imgBase64 }),
+      });
+      const capData = await capRes.json();
+      if (capData.success && capData.measurements) {
+        setMeasurements(capData.measurements);
       }
-    };
+    } catch (e) {
+      console.error("Measurement capture error:", e);
+    } finally {
+      setCapturingMeasurements(false);
+    }
+  };
 
+  if (loading) {
   return (
       <div className="flex min-h-[50vh] items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
