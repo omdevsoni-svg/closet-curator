@@ -399,7 +399,7 @@ const Profile = () => {
                         <button
                           key={opt}
                           onClick={() => handleSizeUpdate(editingSize!, opt)}
-                          className={`rounded-full px-2 py-0.5 text-[10px] transition-colors ${editValue === opt ? "bg-ai text-white" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
+                          className={"rounded-full px-2 py-0.5 text-[10px] transition-colors " + (editValue === opt ? "bg-ai text-white" : "bg-muted text-muted-foreground hover:bg-muted/80")}
                         >
                           {opt}
                         </button>
@@ -417,8 +417,7 @@ const Profile = () => {
                 </div>
               )}
             </div>
-          )}
-          )}
+          ))}
         </div>
       </motion.div>
 
