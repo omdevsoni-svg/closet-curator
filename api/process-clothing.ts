@@ -61,7 +61,7 @@ If the image DOES contain a valid clothing/garment item, analyze it and return a
 - is_garment: true
 - name: a short descriptive name for the clothing item (e.g. "Blue Denim Jacket")
 - category: EXACTLY one of these values: "Tops", "Bottoms", "Dresses", "Outerwear", "Activewear", "Footwear", "Accessories"
-- color: EXACTLY one of these values: "Black", "White", "Navy", "Blue", "Red", "Green", "Beige", "Grey", "Pink", "Brown"
+- color: EXACTLY one of these values: "Black", "White", "Navy", "Blue", "Red", "Green", "Beige", "Grey", "Pink", "Brown", "Cream", "Olive", "Burgundy", "Teal", "Coral", "Lavender", "Purple", "Orange", "Yellow", "Tan", "Charcoal", "Khaki", "Gold", "Maroon", "Mustard", "Rust", "Turquoise", "Ivory", "Multicolor"
 - material: fabric type if identifiable, or best guess (e.g. "Cotton", "Polyester", "Denim", "Silk", "Wool", "Leather")
 - tags: array of 2-4 descriptive tags (e.g. ["casual", "summer", "lightweight"])
 - gender: one of: men, women, unisex
@@ -238,13 +238,34 @@ Output: One clean product photo of the COMPLETE item (including BOTH shoes for f
     }
 
     // Validate and normalize color
-    const validColors = ["Black", "White", "Navy", "Blue", "Red", "Green", "Beige", "Grey", "Pink", "Brown"];
+    const validColors = ["Black", "White", "Navy", "Blue", "Red", "Green", "Beige", "Grey", "Pink", "Brown", "Cream", "Olive", "Burgundy", "Teal", "Coral", "Lavender", "Purple", "Orange", "Yellow", "Tan", "Charcoal", "Khaki", "Gold", "Maroon", "Mustard", "Rust", "Turquoise", "Ivory", "Multicolor"];
     const colorMap: Record<string, string> = {
-      black: "Black", white: "White", navy: "Navy", blue: "Blue", red: "Red",
-      green: "Green", beige: "Beige", grey: "Grey", gray: "Grey", pink: "Pink", brown: "Brown",
-    };
+    black: "Black", white: "White", navy: "Navy", blue: "Blue", red: "Red",
+    green: "Green", beige: "Beige", grey: "Grey", gray: "Grey", pink: "Pink",
+    brown: "Brown", cream: "Cream", olive: "Olive", burgundy: "Burgundy",
+    teal: "Teal", coral: "Coral", lavender: "Lavender", purple: "Purple",
+    orange: "Orange", yellow: "Yellow", tan: "Tan", charcoal: "Charcoal",
+    khaki: "Khaki", gold: "Gold", maroon: "Maroon", mustard: "Mustard",
+    rust: "Rust", turquoise: "Turquoise", ivory: "Ivory", multicolor: "Multicolor",
+    // Common AI response aliases
+    "dark blue": "Navy", "light blue": "Blue", "sky blue": "Blue",
+    "dark green": "Green", "forest green": "Green", "light green": "Green",
+    "dark grey": "Charcoal", "dark gray": "Charcoal", "light grey": "Grey",
+    "light gray": "Grey", "off-white": "Cream", "off white": "Cream",
+    "wine": "Burgundy", "wine red": "Burgundy", "dark red": "Burgundy",
+    "magenta": "Pink", "hot pink": "Pink", "light pink": "Pink", "rose": "Pink",
+    "violet": "Purple", "plum": "Purple", "indigo": "Navy",
+    "camel": "Tan", "sand": "Tan", "taupe": "Tan", "nude": "Beige",
+    "copper": "Rust", "terracotta": "Rust", "brick": "Rust",
+    "silver": "Grey", "golden": "Gold", "bronze": "Brown",
+    "mint": "Green", "sage": "Olive", "emerald": "Green", "aqua": "Teal",
+    "peach": "Coral", "salmon": "Coral", "fuchsia": "Pink",
+    "chocolate": "Brown", "coffee": "Brown", "espresso": "Brown",
+    "multi": "Multicolor", "multicolored": "Multicolor", "multi-color": "Multicolor",
+    "pattern": "Multicolor", "printed": "Multicolor", "floral": "Multicolor",
+  };
     if (!validColors.includes(attrs.color)) {
-      attrs.color = colorMap[attrs.color?.toLowerCase()] || "";
+      attrs.color = colorMap[attrs.color?.toLowerCase()] || (attrs.color ? attrs.color.charAt(0).toUpperCase() + attrs.color.slice(1).toLowerCase() : "");
     }
 
     // Normalize gender
