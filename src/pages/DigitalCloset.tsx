@@ -59,7 +59,7 @@ const isHeicFile = (file: File): boolean => {
 };
 
 const categories = ["All", "Tops", "Bottoms", "Outerwear", "Footwear", "Dresses", "Accessories", "Activewear", "Ethnic Wear", "In Laundry"];
-const colorOptions = ["Black", "White", "Navy", "Blue", "Red", "Green", "Beige", "Grey", "Pink", "Brown"];
+const colorOptions = ["Black", "White", "Navy", "Blue", "Red", "Green", "Beige", "Grey", "Pink", "Brown", "Cream", "Olive", "Burgundy", "Teal", "Coral", "Lavender", "Purple", "Orange", "Yellow", "Tan", "Charcoal", "Khaki", "Gold", "Maroon", "Mustard", "Rust", "Turquoise", "Ivory", "Multicolor"];
 const categoryOptions = ["Tops", "Bottoms", "Outerwear", "Footwear", "Dresses", "Accessories", "Activewear"];
 
 /* ------------------------------------------------------------------ */
@@ -443,7 +443,10 @@ const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => 
                 className="mt-1.5 h-11 w-full rounded-xl border border-border bg-card px-4 text-sm font-body text-foreground outline-none focus:border-ai focus:ring-2 focus:ring-ai/20 appearance-none"
               >
                 <option value="">Select color</option>
-                {colorOptions.map((c) => (
+              {color && !colorOptions.includes(color) && (
+                <option key={color} value={color}>{color} (detected)</option>
+              )}
+              {colorOptions.map((c) => (
                   <option key={c} value={c}>{c}</option>
                 ))}
               </select>
