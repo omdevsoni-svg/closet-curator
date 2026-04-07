@@ -1645,7 +1645,7 @@ const DigitalCloset = () => {
   const [items, setItems] = useState<ClothingItem[]>([]);
   const [loadingItems, setLoadingItems] = useState(true);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(searchParams.get("filter") === "favorites");
-  const [activeCategory, setActiveCategory] = useState("All");
+  const [activeCategories, setActiveCategories] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isListening, setIsListening] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -1728,8 +1728,8 @@ const DigitalCloset = () => {
   // Filter items -- favorites first, then category, then fuzzy search
   const categoryFiltered = items.filter((item) => {
     if (showFavoritesOnly && !item.favorite) return false;
-    if (activeCategory === "In Laundry") return item.laundry_status === "in_laundry";
-    return activeCategory === "All" || item.category === activeCategory;
+    if (activeCategories.includes("In Laundry")) return item.laundry_status === "in_laundry";
+    return activeCategories.length === 0 || activeCategories.includes(item.category);
   });
 
   const filtered = searchQuery.trim()
@@ -1821,13 +1821,13 @@ const DigitalCloset = () => {
           whileTap={{ scale: 0.9 }}
           onClick={() => setShowFilterSheet(true)}
           className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-colors ${
-            activeCategory !== "All"
+            activeCategories.length > 0
               ? "border-ai bg-ai/10 text-ai"
               : "border-border bg-card text-muted-foreground hover:text-foreground"
           }`}
         >
           <SlidersHorizontal className="h-4.5 w-4.5" />
-          {activeCategory !== "All" && (
+          {activeCategories.length > 0 && (
             <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-ai text-[8px] font-bold text-white">
               1
             </span>
@@ -1836,7 +1836,7 @@ const DigitalCloset = () => {
       </div>
 
       {/* Active filter tags */}
-      {(activeCategory !== "All" || showFavoritesOnly) && (
+      {(activeCategories.length > 0 || showFavoritesOnly) && (
         <div className="mt-2.5 flex items-center gap-2">
           {showFavoritesOnly && (
             <button
@@ -1847,12 +1847,12 @@ const DigitalCloset = () => {
               <X className="h-3 w-3" />
             </button>
           )}
-          {activeCategory !== "All" && (
+          {activeCategories.length > 0 && (
             <button
-              onClick={() => setActiveCategory("All")}
+              onClick={() => setActiveCategories([])}
               className="flex items-center gap-1.5 rounded-full bg-ai/10 px-3 py-1.5 text-xs font-body font-medium text-ai transition-colors hover:bg-ai/20"
             >
-              {activeCategory}
+              {activeCategories.join(", ")}
               <X className="h-3 w-3" />
             </button>
           )}
@@ -1894,14 +1894,13 @@ const DigitalCloset = () => {
                 </button>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                {categories.map((cat) => {
-                  const isActive = activeCategory === cat;
+                {categories.filter(cat => items.some(item => item.category === cat)).map((cat) => {
+                  const isActive = activeCategories.includes(cat);
                   return (
                     <button
                       key={cat}
                       onClick={() => {
-                        setActiveCategory(cat);
-                        setShowFilterSheet(false);
+                        setActiveCategories(prev => prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat]);
                       }}
                       className={`flex items-center justify-between rounded-xl px-4 py-3 text-sm font-body font-medium transition-all ${
                         isActive
@@ -1915,11 +1914,10 @@ const DigitalCloset = () => {
                   );
                 })}
               </div>
-              {activeCategory !== "All" && (
+              {activeCategories.length > 0 && (
                 <button
                   onClick={() => {
-                    setActiveCategory("All");
-                    setShowFilterSheet(false);
+                    setActiveCategories([]);
                   }}
                   className="mt-3 w-full rounded-xl border border-border py-2.5 text-sm font-body font-medium text-muted-foreground hover:text-foreground transition-colors"
                 >
