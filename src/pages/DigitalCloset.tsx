@@ -1882,6 +1882,7 @@ const DigitalCloset = () => {
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
               transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
+              onClick={(e) => e.stopPropagation()}
               className="relative z-10 w-full max-w-lg max-h-[70vh] overflow-y-auto overscroll-contain rounded-t-3xl bg-background p-5 pb-10 sm:rounded-3xl sm:pb-5"
             >
               <div className="flex items-center justify-between mb-4">
