@@ -1867,7 +1867,7 @@ const DigitalCloset = () => {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onTouchMove={(e) => e.stopPropagation()}
-            className="fixed inset-0 z-50 flex items-end justify-center sm:items-center"
+            className="fixed inset-0 z-50 flex items-end justify-center pb-20 sm:items-center sm:pb-0"
           >
             <motion.div
               initial={{ opacity: 0 }}
