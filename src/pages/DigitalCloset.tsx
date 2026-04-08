@@ -6,7 +6,7 @@ import {
   Mic,
   MicOff,
   X,
-  Camera,
+  Camera
   ImageIcon,
   Upload,
   Heart,
@@ -256,7 +256,7 @@ const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-end justify-center pb-20 sm:items-center sm:pb-0"
+          className="fixed inset-0 z-[60] flex items-end justify-center pb-24 sm:items-center sm:pb-0"
         >
           <motion.div
             initial={{ opacity: 0 }}
@@ -1866,8 +1866,8 @@ const DigitalCloset = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onTouchMove={(e) => e.stopPropagation()}
-            className="fixed inset-0 z-50 flex items-end justify-center pb-20 sm:items-center sm:pb-0"
+            
+            className="fixed inset-0 z-[60] flex items-end justify-center pb-24 sm:items-center sm:pb-0"
           >
             <motion.div
               initial={{ opacity: 0 }}
@@ -1875,7 +1875,7 @@ const DigitalCloset = () => {
               exit={{ opacity: 0 }}
               onClick={() => setShowFilterSheet(false)}
               className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-              style={{ touchAction: "none" }}
+              
             />
             <motion.div
               initial={{ y: "100%" }}
@@ -1883,7 +1883,7 @@ const DigitalCloset = () => {
               exit={{ y: "100%" }}
               transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
               onClick={(e) => e.stopPropagation()}
-              className="relative z-10 w-full max-w-lg max-h-[80vh] overflow-y-auto overscroll-contain rounded-t-3xl bg-background p-5 pb-6 sm:rounded-3xl sm:pb-5"
+              className="relative z-10 w-full max-w-lg max-h-[70vh] sm:max-h-[80vh] overflow-y-auto overscroll-contain rounded-t-3xl bg-background p-5 pb-8 sm:rounded-3xl sm:pb-5"
             >
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-display font-bold text-foreground">Filter by Category</h3>
