@@ -6,7 +6,7 @@ import {
   Mic,
   MicOff,
   X,
-  Camera
+  Camera,
   ImageIcon,
   Upload,
   Heart,
