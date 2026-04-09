@@ -20,7 +20,7 @@
 
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="/icons/icon-512.png" />
-  <!-- v3.8 -->
+  <!-- v3.9 -->
   </head>
 
   <body>
@@ -28,8 +28,29 @@
     <script type="module" src="/src/main.tsx"></script>
     <script>
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch(() => {});
+        var reloading = false;
+        navigator.serviceWorker.addEventListener('controllerchange', function () {
+          if (reloading) return;
+          reloading = true;
+          window.location.reload();
+        });
+        window.addEventListener('load', function () {
+          navigator.serviceWorker.register('/sw.js').then(function (reg) {
+            try { reg.update(); } catch (e) {}
+            if (reg.waiting) {
+              reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+            }
+            reg.addEventListener('updatefound', function () {
+              var nw = reg.installing;
+              if (!nw) return;
+              nw.addEventListener('statechange', function () {
+                if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+                  nw.postMessage({ type: 'SKIP_WAITING' });
+                }
+              });
+            });
+            setInterval(function () { try { reg.update(); } catch (e) {} }, 60 * 1000);
+          }).catch(function () {});
         });
       }
     </script>
