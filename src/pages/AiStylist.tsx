@@ -1150,10 +1150,16 @@ const AiStylist = () => {
   useEffect(() => {
     if (activeTab !== "lookbook" || !user) return;
     (async () => {
-    setLookbookLoading(true);
-      const data = await getLookbook(user.id);
-      setLookbook(data || []);
-    setLookbook(data);
+      setLookbookLoading(true);
+      try {
+        const data = await getLookbook(user.id);
+        setLookbook(data || []);
+      } catch (err) {
+        console.error("Failed to load lookbook:", err);
+        setLookbook([]);
+      } finally {
+        setLookbookLoading(false);
+      }
     })();
   }, [activeTab, user]);
 
