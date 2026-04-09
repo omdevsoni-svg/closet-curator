@@ -637,7 +637,7 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
                         <p className="mt-1 text-[10px] font-body font-medium text-foreground truncate">
                           {item.name}
                         </p>
-                      {(() => { const sz = getRecommendedSize(item.category, bodyMeasurements); return sz ? <span className="ml-1 inline-block px-1.5 py-0.5 bg-indigo-100 text-indigo-700 text-xs rounded-full font-medium">Size {sz}</span> : null; })()}
+                      {(() => { const sz = getRecommendedSize(item.category, null); return sz ? <span className="ml-1 inline-block px-1.5 py-0.5 bg-indigo-100 text-indigo-700 text-xs rounded-full font-medium">Size {sz}</span> : null; })()}
                         {selectedItem?.id === item.id && (
                           <div className="mt-1 flex items-center justify-center">
                             <Check className="h-3 w-3 text-ai" />
