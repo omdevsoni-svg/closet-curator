@@ -1703,9 +1703,9 @@ const AiStylist = () => {
                             deleteLookbookEntry(user!.id, entry.id);
                             setLookbook(prev => prev.filter(e => e.id !== entry.id));
                           }}
-                          className="text-muted-foreground/40 hover:text-rose-500 transition-colors"
+                          className="text-rose-500 hover:text-rose-700 hover:text-rose-500 transition-colors"
                         >
-                          <Trash2 className="h-3 w-3" />
+                          <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
                     </div>
