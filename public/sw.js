@@ -1,7 +1,7 @@
-const CACHE_NAME = 'stylevault-v1';
+const CACHE_NAME = 'stylevault-v2';
 const OFFLINE_URL = '/';
 
-// Install: cache the shell
+// Install: cache the shell, then activate immediately
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll([OFFLINE_URL]))
@@ -9,7 +9,7 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// Activate: clean old caches
+// Activate: clean old caches and claim clients
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
@@ -19,7 +19,14 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Fetch: network-first, fallback to cache
+// Allow page to trigger immediate activation
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
+
+// Fetch: network-first for navigations, fallback to cache
 self.addEventListener('fetch', (event) => {
   if (event.request.mode === 'navigate') {
     event.respondWith(
