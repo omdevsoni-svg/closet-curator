@@ -22,6 +22,7 @@ import ResetPassword from "./pages/ResetPassword";
 import EmailVerification from "./pages/EmailVerification";
 import UnwornItems from "./pages/UnwornItems";
 import NotFound from "./pages/NotFound";
+import Privacy from "./pages/Privacy";
 
 const queryClient = new QueryClient();
 
@@ -69,6 +70,7 @@ const App = () => {
                   <Route path="/calendar" element={<OutfitCalendar />} />
                   <Route path="/unworn" element={<UnwornItems />} />
                 </Route>
+                <Route path="/privacy" element={<Privacy />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </BrowserRouter>
