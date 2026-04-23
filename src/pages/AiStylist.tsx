@@ -236,9 +236,19 @@ interface TryOnModalProps {
   onVtoResult?: (imageDataUrl: string, itemNames: string[]) => void;
 }
 
+// Helper: detect gender mismatch between user profile and clothing items
+function getGenderMismatchItems(
+  items: ClothingItem[],
+  userGender: "women" | "men" | "neutral" | undefined
+): ClothingItem[] {
+  if (!userGender || userGender === "neutral") return [];
+  const mapped = userGender === "men" ? "women" : "men"; // opposite gender
+  return items.filter((item) => item.gender === mapped);
+}
+
 const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comboLabel, onVtoResult }: TryOnModalProps) => {
   const navigate = useNavigate();
-  const [step, setStep] = useState<"loading" | "no-photo" | "select" | "generating" | "result">("loading");
+  const [step, setStep] = useState<"loading" | "no-photo" | "select" | "gender-warning" | "generating" | "result">("loading");
   const [personPhoto, setPersonPhoto] = useState<string | null>(null);
   const [bodyPhotoBase64, setBodyPhotoBase64] = useState<string | null>(null);
   const [facePhotoBase64, setFacePhotoBase64] = useState<string | null>(null);
@@ -254,6 +264,71 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
   // Finalise My Outfit -- wear tracking
   const [finalising, setFinalising] = useState(false);
   const [finalised, setFinalised] = useState(false);
+  // Gender mismatch soft gate
+  const [mismatchedItems, setMismatchedItems] = useState<ClothingItem[]>([]);
+  const [pendingTryOnAction, setPendingTryOnAction] = useState<(() => void) | null>(null);
+  const [profileGender, setProfileGender] = useState<"women" | "men" | "neutral" | undefined>(undefined);
+
+  // Extracted auto-generate logic so it can be called from useEffect or gender-warning confirm
+  const autoGenerate = async (
+    itemsWithImages: ClothingItem[],
+    bodyB64: string,
+    desc: string | undefined,
+    faceB64: string | null
+  ) => {
+    setSeqProgress(null);
+    try {
+      let results: { mimeType: string; base64: string }[] = [];
+
+      if (itemsWithImages.length === 1) {
+        const productBase64 = await urlToBase64(itemsWithImages[0].image_url, { removeBackground: true });
+        results = await virtualTryOn(bodyB64, productBase64, 1, desc, faceB64 || undefined);
+      } else {
+        const categoryOrder: Record<string, number> = {
+          shoes: 0, footwear: 0, sneakers: 0, boots: 0, sandals: 0,
+          bottomwear: 1, bottom: 1, pants: 1, jeans: 1, trousers: 1, shorts: 1, skirt: 1,
+          topwear: 2, top: 2, shirt: 2, tshirt: 2, jacket: 2, hoodie: 2, sweater: 2, blazer: 2,
+          accessories: 3, accessory: 3, watch: 3, bag: 3, hat: 3,
+        };
+        const sorted = [...itemsWithImages].sort((a, b) => {
+          const aOrder = categoryOrder[a.category?.toLowerCase()] ?? 3;
+          const bOrder = categoryOrder[b.category?.toLowerCase()] ?? 3;
+          return aOrder - bOrder;
+        });
+
+        const seqGarments = await Promise.all(
+          sorted.map(async (item) => ({
+            base64: await urlToBase64(item.image_url, { removeBackground: true }),
+            mimeType: "image/png",
+            label: `${item.category}: ${item.name}`,
+            category: item.category?.toLowerCase() || "other",
+          }))
+        );
+
+        results = await virtualTryOnSequential(
+          bodyB64,
+          seqGarments,
+          desc,
+          (progress) => setSeqProgress(progress),
+          faceB64 || undefined,
+        );
+      }
+
+      if (results.length > 0) {
+        const dataUrl = `data:${results[0].mimeType};base64,${results[0].base64}`;
+        setResultImage(dataUrl);
+        setStep("result");
+        onVtoResult?.(dataUrl, itemsWithImages.map(i => i.name));
+      } else {
+        setError("Couldn't generate try-on with full outfit. Please try again.");
+        setStep("select");
+      }
+    } catch (err) {
+      console.error("Auto try-on error:", err);
+      setError("Something went wrong. Please try again.");
+      setStep("select");
+    }
+  };
 
   useEffect(() => {
     if (!isOpen || !userId) return;
@@ -285,6 +360,7 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
           const descParts: string[] = [];
           if (profile?.model_gender) descParts.push(profile.model_gender === "neutral" ? "person" : profile.model_gender === "men" ? "male" : "female");
           if (descParts.length > 0) setPersonDescription(descParts.join(", "));
+          setProfileGender(profile?.model_gender);
 
           // Auto-select the first outfit item
           const firstItem = outfitItems.find((i) => i.image_url);
@@ -293,65 +369,25 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
           // If we have outfit items with images, skip selection and go straight to generating
           const itemsWithImages = outfitItems.filter((i) => i.image_url);
           const desc = descParts.length > 0 ? descParts.join(", ") : undefined;
+
+          // Gender mismatch soft gate -- check before auto-generating
+          const mismatched = getGenderMismatchItems(itemsWithImages, profile?.model_gender);
+          if (mismatched.length > 0) {
+            setMismatchedItems(mismatched);
+            // Store the generate action so user can confirm
+            setPendingTryOnAction(() => () => {
+              setStep("generating");
+              setMismatchedItems([]);
+              setPendingTryOnAction(null);
+              autoGenerate(itemsWithImages, bodyB64, desc, faceB64);
+            });
+            setStep("gender-warning");
+            return;
+          }
+
           if (itemsWithImages.length > 0) {
             setStep("generating");
-            setSeqProgress(null);
-            try {
-              let results: { mimeType: string; base64: string }[] = [];
-
-              if (itemsWithImages.length === 1) {
-                // Single garment -- use direct one-shot
-                const productBase64 = await urlToBase64(itemsWithImages[0].image_url, { removeBackground: true });
-                results = await virtualTryOn(bodyB64, productBase64, 1, desc, faceB64 || undefined);
-              } else {
-                // v22: SEQUENTIAL generation -- one garment at a time
-                // Sort garments: shoes -> bottomwear -> topwear (topwear LAST for max quality & print fidelity)
-                const categoryOrder: Record<string, number> = {
-                  shoes: 0, footwear: 0, sneakers: 0, boots: 0, sandals: 0,
-                  bottomwear: 1, bottom: 1, pants: 1, jeans: 1, trousers: 1, shorts: 1, skirt: 1,
-                  topwear: 2, top: 2, shirt: 2, tshirt: 2, jacket: 2, hoodie: 2, sweater: 2, blazer: 2,
-                  accessories: 3, accessory: 3, watch: 3, bag: 3, hat: 3,
-                };
-                const sorted = [...itemsWithImages].sort((a, b) => {
-                  const aOrder = categoryOrder[a.category?.toLowerCase()] ?? 3;
-                  const bOrder = categoryOrder[b.category?.toLowerCase()] ?? 3;
-                  return aOrder - bOrder;
-                });
-
-                // v23: Remove background from garment images for clean VTO input
-                const seqGarments = await Promise.all(
-                  sorted.map(async (item) => ({
-                    base64: await urlToBase64(item.image_url, { removeBackground: true }),
-                    mimeType: "image/png",
-                    label: `${item.category}: ${item.name}`,
-                    category: item.category?.toLowerCase() || "other",
-                  }))
-                );
-
-                // v15: Imagen 3 VTO (face param kept for backward compat)
-                results = await virtualTryOnSequential(
-                  bodyB64,
-                  seqGarments,
-                  desc,
-                  (progress) => setSeqProgress(progress),
-                  faceB64 || undefined,
-                );
-              }
-
-              if (results.length > 0) {
-                const dataUrl = `data:${results[0].mimeType};base64,${results[0].base64}`;
-                setResultImage(dataUrl);
-                setStep("result");
-                onVtoResult?.(dataUrl, itemsWithImages.map(i => i.name));
-              } else {
-                setError("Couldn't generate try-on with full outfit. Please try again.");
-                setStep("select");
-              }
-            } catch (err) {
-              console.error("Auto try-on error:", err);
-              setError("Something went wrong. Please try again.");
-              setStep("select");
-            }
+            autoGenerate(itemsWithImages, bodyB64, desc, faceB64);
           } else {
             setStep("select");
           }
@@ -370,20 +406,39 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
   // or fall back to the single selectedItem when browsing the closet.
   const handleTryOn = async () => {
     if (!bodyPhotoBase64) return;
-    setStep("generating");
     setError(null);
+
+    const itemsToTry = mode === "outfit" && outfitItems.filter((i) => i.image_url).length > 0
+      ? outfitItems.filter((i) => i.image_url)
+      : selectedItem?.image_url ? [selectedItem] : [];
+
+    if (itemsToTry.length === 0) {
+      setError("No items with images to try on.");
+      setStep("select");
+      return;
+    }
+
+    // Gender mismatch soft gate
+    const mismatched = getGenderMismatchItems(itemsToTry, profileGender);
+    if (mismatched.length > 0) {
+      setMismatchedItems(mismatched);
+      setPendingTryOnAction(() => () => {
+        setMismatchedItems([]);
+        setPendingTryOnAction(null);
+        proceedWithTryOn(itemsToTry);
+      });
+      setStep("gender-warning");
+      return;
+    }
+
+    proceedWithTryOn(itemsToTry);
+  };
+
+  const proceedWithTryOn = async (itemsToTry: ClothingItem[]) => {
+    setStep("generating");
     setSeqProgress(null);
 
     try {
-      const itemsToTry = mode === "outfit" && outfitItems.filter((i) => i.image_url).length > 0
-        ? outfitItems.filter((i) => i.image_url)
-        : selectedItem?.image_url ? [selectedItem] : [];
-
-      if (itemsToTry.length === 0) {
-        setError("No items with images to try on.");
-        setStep("select");
-        return;
-      }
 
       let results: { mimeType: string; base64: string }[] = [];
 
@@ -446,6 +501,8 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
     setError(null);
     setFinalised(false);
     setFinalising(false);
+    setMismatchedItems([]);
+    setPendingTryOnAction(null);
     if (bodyPhotoBase64) setStep("select");
     else setStep("no-photo");
   };
@@ -564,6 +621,63 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
                   Go to Profile
                   <ArrowRight className="h-4 w-4" />
                 </button>
+              </div>
+            )}
+
+            {/* Gender mismatch warning */}
+            {step === "gender-warning" && (
+              <div className="mt-6 flex flex-col items-center text-center">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30">
+                  <AlertTriangle className="h-7 w-7 text-amber-600 dark:text-amber-400" />
+                </div>
+                <h3 className="mt-4 text-base font-display font-semibold text-foreground">
+                  Gender mismatch detected
+                </h3>
+                <p className="mt-2 text-sm font-body text-muted-foreground leading-relaxed max-w-xs">
+                  {mismatchedItems.length === 1
+                    ? `"${mismatchedItems[0].name}" is tagged as ${mismatchedItems[0].gender}'s wear, which doesn't match your profile.`
+                    : `${mismatchedItems.length} items are tagged as ${mismatchedItems[0]?.gender}'s wear, which doesn't match your profile.`}
+                </p>
+                {/* Show mismatched item thumbnails */}
+                <div className="mt-4 flex items-center justify-center gap-2">
+                  {mismatchedItems.slice(0, 4).map((item) => (
+                    <div key={item.id} className="flex flex-col items-center">
+                      <div className="h-16 w-14 overflow-hidden rounded-xl bg-card border border-amber-200 dark:border-amber-800 p-1">
+                        {item.image_url ? (
+                          <img src={item.image_url} alt={item.name} className="h-full w-full object-contain" />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center">
+                            <ImageIcon className="h-5 w-5 text-muted-foreground/30" />
+                          </div>
+                        )}
+                      </div>
+                      <span className="mt-1 text-[9px] font-body text-amber-600 dark:text-amber-400 font-medium">
+                        {item.gender}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-5 flex w-full gap-2">
+                  <button
+                    onClick={() => {
+                      setMismatchedItems([]);
+                      setPendingTryOnAction(null);
+                      setStep("select");
+                    }}
+                    className="flex-1 rounded-xl bg-card py-3 text-sm font-body font-medium text-foreground"
+                  >
+                    Go Back
+                  </button>
+                  <motion.button
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => {
+                      if (pendingTryOnAction) pendingTryOnAction();
+                    }}
+                    className="flex-1 rounded-xl bg-ai py-3 text-sm font-display font-semibold text-ai-foreground"
+                  >
+                    Try Anyway
+                  </motion.button>
+                </div>
               </div>
             )}
 
