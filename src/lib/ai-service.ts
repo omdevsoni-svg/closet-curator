@@ -160,8 +160,14 @@ export interface DetectedAttributes {
   rotation_needed?: number; // 0, 90, 180, or 270 degrees clockwise
 }
 
+export interface DetectedItem {
+  attributes: DetectedAttributes;
+  enhancedImage?: { mimeType: string; base64: string };
+}
+
 export type DetectionResult =
-  | { success: true; attributes: DetectedAttributes; enhancedImage?: { mimeType: string; base64: string } }
+  | { success: true; item_count: 1; attributes: DetectedAttributes; enhancedImage?: { mimeType: string; base64: string } }
+  | { success: true; item_count: number; items: DetectedItem[] }
   | { success: false; is_garment: false; rejection_reason: string }
   | { success: false; error: string };
 
@@ -188,9 +194,23 @@ export const detectClothingAttributes = async (
       return { success: false, is_garment: false, rejection_reason: data.rejection_reason };
     }
 
+    // Multi-item response
+    if (data.success && data.item_count > 1 && Array.isArray(data.items)) {
+      return {
+        success: true,
+        item_count: data.item_count,
+        items: data.items.map((item: any) => ({
+          attributes: item.attributes as DetectedAttributes,
+          ...(item.enhancedImage ? { enhancedImage: item.enhancedImage } : {}),
+        })),
+      };
+    }
+
+    // Single-item response (backward compatible)
     if (data.success && data.attributes) {
       return {
         success: true,
+        item_count: 1,
         attributes: data.attributes as DetectedAttributes,
         ...(data.enhancedImage ? { enhancedImage: data.enhancedImage } : {}),
       };

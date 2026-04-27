@@ -40,7 +40,7 @@ import {
   returnFromLaundry,
   type ClothingItem,
 } from "@/lib/database";
-import { detectClothingAttributes, fileToBase64, suggestEthnicPairing, type DetectionResult, type SuggestedEthnicItem } from "@/lib/ai-service";
+import { detectClothingAttributes, fileToBase64, suggestEthnicPairing, type DetectionResult, type DetectedItem, type SuggestedEthnicItem } from "@/lib/ai-service";
 import { fuzzySearch } from "@/lib/fuzzySearch";
 import heic2any from "heic2any";
 
@@ -72,6 +72,15 @@ interface AddItemModalProps {
   userId: string;
 }
 
+// Multi-item detected state for when AI finds multiple garments in one image
+interface MultiItemEntry {
+  attributes: import("@/lib/ai-service").DetectedAttributes;
+  enhancedImage?: { mimeType: string; base64: string };
+  selected: boolean;
+  saving: boolean;
+  saved: boolean;
+}
+
 const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => {
   const [itemName, setItemName] = useState("");
   const [category, setCategory] = useState("");
@@ -91,6 +100,11 @@ const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => 
   const [aiDetected, setAiDetected] = useState(false);
   const [aiError, setAiError] = useState(false);
   const [aiRejection, setAiRejection] = useState<string | null>(null);
+  // Multi-item detection
+  const [multiItems, setMultiItems] = useState<MultiItemEntry[]>([]);
+  const [multiMode, setMultiMode] = useState(false);
+  const [multiSavingAll, setMultiSavingAll] = useState(false);
+  const [originalFile, setOriginalFile] = useState<File | null>(null);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -130,6 +144,9 @@ const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => 
     setAiDetected(false);
     setAiError(false);
     setAiRejection(null);
+    setMultiMode(false);
+    setMultiItems([]);
+    setOriginalFile(processedFile);
     try {
       const base64 = await fileToBase64(processedFile);
       const result = await detectClothingAttributes(
@@ -137,31 +154,41 @@ const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => 
         processedFile.type || "image/jpeg"
       );
 
-      if (result.success && "attributes" in result) {
+      // Multi-item detected
+      if (result.success && "items" in result && result.item_count > 1) {
+        setMultiMode(true);
+        setMultiItems(
+          result.items.map((item) => ({
+            attributes: item.attributes,
+            enhancedImage: item.enhancedImage,
+            selected: true,
+            saving: false,
+            saved: false,
+          }))
+        );
+        setAiDetected(true);
+      } else if (result.success && "attributes" in result) {
+        // Single item (backward compatible)
         const attrs = result.attributes;
         if (attrs.name) setItemName(attrs.name);
         if (attrs.category) setCategory(attrs.category);
         if (attrs.color) setColor(attrs.color);
         if (attrs.gender) setGender(attrs.gender as "women" | "men" | "unisex");
-        // Brand is intentionally NOT set by AI -- user must enter it manually
         if (attrs.material) setMaterial(attrs.material);
         if (attrs.tags?.length) setTags(attrs.tags.join(", "));
 
         // Use AI-enhanced catalog image if available
         if (result.enhancedImage) {
           const enhancedDataUrl = `data:${result.enhancedImage.mimeType};base64,${result.enhancedImage.base64}`;
-          // Convert data URL to File for upload
           const resp = await fetch(enhancedDataUrl);
           const blob = await resp.blob();
           let enhancedFile = new File([blob], "enhanced.png", { type: result.enhancedImage.mimeType });
-          // Also apply AI-detected rotation to enhanced image if needed
           if (attrs.rotation_needed && attrs.rotation_needed > 0) {
             enhancedFile = await rotateImage(enhancedFile, attrs.rotation_needed);
           }
           setImageFile(enhancedFile);
           setImagePreview(URL.createObjectURL(enhancedFile));
         } else if (attrs.rotation_needed && attrs.rotation_needed > 0) {
-          // No enhanced image -- apply AI-detected rotation to fix orientation
           const rotated = await rotateImage(processedFile, attrs.rotation_needed);
           setImageFile(rotated);
           setImagePreview(URL.createObjectURL(rotated));
@@ -169,7 +196,6 @@ const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => 
 
         setAiDetected(true);
       } else if ("is_garment" in result && result.is_garment === false) {
-        // Non-garment image -- reject and clear preview
         setAiRejection(result.rejection_reason);
         setImageFile(null);
         setImagePreview(null);
@@ -202,6 +228,70 @@ const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => 
     setAiDetected(false);
     setAiError(false);
     setAiRejection(null);
+    setMultiMode(false);
+    setMultiItems([]);
+    setMultiSavingAll(false);
+    setOriginalFile(null);
+  };
+
+  // Multi-item: save all selected items to closet
+  const handleSaveMultiItems = async () => {
+    setMultiSavingAll(true);
+    const selectedItems = multiItems.filter((item) => item.selected && !item.saved);
+
+    for (let i = 0; i < selectedItems.length; i++) {
+      const entry = selectedItems[i];
+      const idx = multiItems.indexOf(entry);
+      setMultiItems((prev) => prev.map((m, j) => j === idx ? { ...m, saving: true } : m));
+
+      try {
+        let imageUrl = "";
+        if (entry.enhancedImage) {
+          const enhancedDataUrl = `data:${entry.enhancedImage.mimeType};base64,${entry.enhancedImage.base64}`;
+          const resp = await fetch(enhancedDataUrl);
+          const blob = await resp.blob();
+          let enhancedFile = new File([blob], `enhanced-${i}.png`, { type: entry.enhancedImage.mimeType });
+          if (entry.attributes.rotation_needed && entry.attributes.rotation_needed > 0) {
+            enhancedFile = await rotateImage(enhancedFile, entry.attributes.rotation_needed);
+          }
+          const url = await uploadImage("clothing-images", userId, enhancedFile);
+          if (url) imageUrl = url;
+        } else if (originalFile) {
+          const url = await uploadImage("clothing-images", userId, originalFile);
+          if (url) imageUrl = url;
+        }
+
+        const newItem = await addClosetItem({
+          user_id: userId,
+          name: entry.attributes.name,
+          category: entry.attributes.category,
+          color: entry.attributes.color || "Unspecified",
+          tags: entry.attributes.tags || [],
+          purchase_type: "new",
+          image_url: imageUrl,
+          gender: entry.attributes.gender,
+          material: entry.attributes.material || undefined,
+          favorite: false,
+        });
+
+        if (newItem) {
+          onAdd(newItem);
+          setMultiItems((prev) => prev.map((m, j) => j === idx ? { ...m, saving: false, saved: true } : m));
+        } else {
+          setMultiItems((prev) => prev.map((m, j) => j === idx ? { ...m, saving: false } : m));
+        }
+      } catch (err) {
+        console.error("Error saving multi-item:", err);
+        setMultiItems((prev) => prev.map((m, j) => j === idx ? { ...m, saving: false } : m));
+      }
+    }
+
+    setMultiSavingAll(false);
+    // If all saved, close modal after a brief delay
+    const allSaved = multiItems.filter((m) => m.selected).every((m) => m.saved);
+    if (allSaved || selectedItems.length === 0) {
+      setTimeout(() => { resetForm(); onClose(); }, 600);
+    }
   };
 
   // Close and reset -- prevents stale preview on reopen
@@ -285,6 +375,143 @@ const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => 
               </button>
             </div>
 
+            {/* Multi-item review mode */}
+            {multiMode && multiItems.length > 0 && !aiDetecting && (
+              <div className="mt-5">
+                <motion.div
+                  initial={{ opacity: 0, y: -5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-center gap-2 rounded-xl bg-purple-500/10 px-4 py-2.5"
+                >
+                  <Sparkles className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                  <span className="text-xs font-body text-purple-700 dark:text-purple-300 font-medium">
+                    AI detected {multiItems.length} items in this image — select which ones to add
+                  </span>
+                </motion.div>
+
+                {/* Original image preview */}
+                {imagePreview && (
+                  <div className="mt-4 relative aspect-video w-full max-w-[280px] mx-auto overflow-hidden rounded-xl bg-card">
+                    <img src={imagePreview} alt="Uploaded" className="h-full w-full object-contain" />
+                  </div>
+                )}
+
+                {/* Item cards */}
+                <div className="mt-4 space-y-3">
+                  {multiItems.map((entry, idx) => {
+                    const preview = entry.enhancedImage
+                      ? `data:${entry.enhancedImage.mimeType};base64,${entry.enhancedImage.base64}`
+                      : imagePreview;
+                    return (
+                      <motion.div
+                        key={idx}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: idx * 0.1 }}
+                        className={`relative flex items-center gap-3 rounded-2xl border p-3 transition-all ${
+                          entry.saved
+                            ? "border-green-300 bg-green-50 dark:border-green-800 dark:bg-green-900/20"
+                            : entry.selected
+                            ? "border-ai/40 bg-ai/5"
+                            : "border-border/50 bg-card opacity-60"
+                        }`}
+                      >
+                        {/* Select toggle */}
+                        <button
+                          onClick={() => {
+                            if (entry.saved) return;
+                            setMultiItems((prev) =>
+                              prev.map((m, i) => i === idx ? { ...m, selected: !m.selected } : m)
+                            );
+                          }}
+                          disabled={entry.saved}
+                          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-all ${
+                            entry.saved
+                              ? "border-green-500 bg-green-500"
+                              : entry.selected
+                              ? "border-ai bg-ai"
+                              : "border-border bg-card"
+                          }`}
+                        >
+                          {(entry.selected || entry.saved) && <Check className="h-3 w-3 text-white" />}
+                        </button>
+
+                        {/* Thumbnail */}
+                        <div className="h-16 w-14 shrink-0 overflow-hidden rounded-xl bg-background">
+                          {preview ? (
+                            <img src={preview} alt={entry.attributes.name} className="h-full w-full object-contain" />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center">
+                              <ImageIcon className="h-5 w-5 text-muted-foreground/30" />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Details */}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-body font-semibold text-foreground truncate">
+                            {entry.attributes.name}
+                          </p>
+                          <div className="mt-0.5 flex items-center gap-2 text-[11px] font-body text-muted-foreground">
+                            <span className="rounded-md bg-card px-1.5 py-0.5">{entry.attributes.category}</span>
+                            <span>{entry.attributes.color}</span>
+                            <span className="capitalize">{entry.attributes.gender}</span>
+                          </div>
+                          {entry.attributes.material && (
+                            <p className="mt-0.5 text-[10px] font-body text-muted-foreground/70">{entry.attributes.material}</p>
+                          )}
+                        </div>
+
+                        {/* Status */}
+                        {entry.saving && <Loader2 className="h-4 w-4 shrink-0 animate-spin text-ai" />}
+                        {entry.saved && <CheckCircle2 className="h-5 w-5 shrink-0 text-green-500" />}
+                      </motion.div>
+                    );
+                  })}
+                </div>
+
+                {/* Action buttons */}
+                <div className="mt-5 flex gap-2">
+                  <button
+                    onClick={() => {
+                      setMultiMode(false);
+                      setMultiItems([]);
+                      // Load the first item into the single-item form for manual editing
+                      const first = multiItems[0];
+                      if (first) {
+                        setItemName(first.attributes.name);
+                        setCategory(first.attributes.category);
+                        setColor(first.attributes.color);
+                        setGender(first.attributes.gender as "women" | "men" | "unisex");
+                        setMaterial(first.attributes.material);
+                        setTags(first.attributes.tags?.join(", ") || "");
+                      }
+                    }}
+                    className="flex-1 rounded-xl bg-card py-3 text-sm font-body font-medium text-foreground"
+                  >
+                    Edit Individually
+                  </button>
+                  <motion.button
+                    whileTap={{ scale: 0.98 }}
+                    onClick={handleSaveMultiItems}
+                    disabled={multiSavingAll || multiItems.filter((m) => m.selected && !m.saved).length === 0}
+                    className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-display font-semibold text-primary-foreground disabled:opacity-40"
+                  >
+                    {multiSavingAll ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <>
+                        <Upload className="h-4 w-4" />
+                        Add {multiItems.filter((m) => m.selected && !m.saved).length} Items
+                      </>
+                    )}
+                  </motion.button>
+                </div>
+              </div>
+            )}
+
+            {/* Single-item form (hidden during multi-item mode) */}
+            {!multiMode && <>
             {/* Photo upload */}
             <div className="mt-5">
               <label className="text-xs font-medium font-body uppercase tracking-wider text-muted-foreground">
@@ -587,6 +814,7 @@ const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => 
                 </>
               )}
             </motion.button>
+            </>}
           </motion.div>
         </motion.div>
       )}
@@ -668,7 +896,46 @@ const BatchAddModal = ({ isOpen, onClose, onAdd, userId }: BatchAddModalProps) =
       try {
         const base64 = await fileToBase64(item.file);
         const result = await detectClothingAttributes(base64, item.file.type || "image/jpeg");
-        if (result.success && "attributes" in result) {
+
+        // Multi-item: split into separate batch entries
+        if (result.success && "items" in result && result.item_count > 1) {
+          const extraEntries: BatchItem[] = [];
+          result.items.forEach((detected, dIdx) => {
+            let enhancedFile: File | undefined;
+            let enhancedPreview: string | undefined;
+            if (detected.enhancedImage) {
+              const dataUrl = `data:${detected.enhancedImage.mimeType};base64,${detected.enhancedImage.base64}`;
+              // We'll create the File synchronously in the save step; store the dataUrl for now
+              enhancedPreview = dataUrl;
+            }
+            const entry: BatchItem = {
+              file: item.file,
+              preview: enhancedPreview || item.preview,
+              status: "detected",
+              name: detected.attributes.name || "",
+              category: detected.attributes.category || "",
+              color: detected.attributes.color || "",
+              gender: (detected.attributes.gender as "women" | "men" | "unisex") || "unisex",
+              material: detected.attributes.material || "",
+              tags: detected.attributes.tags?.join(", ") || "",
+              enhancedPreview,
+            };
+            if (dIdx === 0) {
+              // Replace the original entry
+              setBatchItems((prev) => prev.map((b, i) => i === idx ? entry : b));
+            } else {
+              extraEntries.push(entry);
+            }
+          });
+          // Insert extra entries right after the current one
+          if (extraEntries.length > 0) {
+            setBatchItems((prev) => {
+              const copy = [...prev];
+              copy.splice(idx + 1, 0, ...extraEntries);
+              return copy;
+            });
+          }
+        } else if (result.success && "attributes" in result) {
           const attrs = result.attributes;
           let enhancedFile: File | undefined;
           let enhancedPreview: string | undefined;
