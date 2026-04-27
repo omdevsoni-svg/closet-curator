@@ -287,11 +287,8 @@ const AddItemModal = ({ isOpen, onClose, onAdd, userId }: AddItemModalProps) => 
     }
 
     setMultiSavingAll(false);
-    // If all saved, close modal after a brief delay
-    const allSaved = multiItems.filter((m) => m.selected).every((m) => m.saved);
-    if (allSaved || selectedItems.length === 0) {
-      setTimeout(() => { resetForm(); onClose(); }, 600);
-    }
+    // Close modal and return to closet screen after saving
+    setTimeout(() => { resetForm(); onClose(); }, 400);
   };
 
   // Close and reset -- prevents stale preview on reopen
