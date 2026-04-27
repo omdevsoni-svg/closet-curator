@@ -40,7 +40,7 @@ import {
   returnFromLaundry,
   type ClothingItem,
 } from "@/lib/database";
-import { detectClothingAttributes, fileToBase64, suggestEthnicPairing, type DetectionResult, type DetectedItem, type SuggestedEthnicItem } from "@/lib/ai-service";
+import { detectClothingAttributes, fileToBase64, suggestEthnicPairing, type DetectionResult, type DetectedItem, type DetectedAttributes, type SuggestedEthnicItem } from "@/lib/ai-service";
 import { fuzzySearch } from "@/lib/fuzzySearch";
 import heic2any from "heic2any";
 
@@ -74,7 +74,7 @@ interface AddItemModalProps {
 
 // Multi-item detected state for when AI finds multiple garments in one image
 interface MultiItemEntry {
-  attributes: import("@/lib/ai-service").DetectedAttributes;
+  attributes: DetectedAttributes;
   enhancedImage?: { mimeType: string; base64: string };
   selected: boolean;
   saving: boolean;
