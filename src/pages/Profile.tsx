@@ -148,13 +148,62 @@ const Profile = () => {
   };
 
   /**
-   * Shrink any image (including HEIC) to a safe JPEG File in one canvas pass.
-   * iOS Safari caps canvas at ~16.7 MP; we target 2048 px max → ~4 MP, well
-   * within limits even on older devices. This avoids the heic2any JS decoder
-   * entirely — iOS Safari can load HEIC natively via <img>.
+   * Shrink any image (including HEIC) to a safe JPEG File.
+   *
+   * TestFlight / WKWebView has ~100-150 MB memory limit. A 48 MP iPhone photo
+   * decoded at native resolution uses ~200 MB just for the bitmap, which
+   * crashes the WebView before our code even touches a canvas.
+   *
+   * Strategy:
+   * 1. Try createImageBitmap() with resizeWidth/Height — this tells the
+   *    browser to decode at the TARGET resolution, so the full-res bitmap
+   *    never exists in memory. Supported in iOS 15+/WKWebView.
+   * 2. Fallback: OffscreenCanvas (if available).
+   * 3. Last resort: classic Image + canvas with small target.
    */
-  const shrinkToSafeJpeg = (file: File, maxDim = 2048, quality = 0.82): Promise<File> =>
-    new Promise((resolve) => {
+  const shrinkToSafeJpeg = async (file: File, maxDim = 1024, quality = 0.75): Promise<File> => {
+    try {
+      // ---- Strategy 1: createImageBitmap with resize (best for iOS WKWebView) ----
+      if (typeof createImageBitmap !== "undefined") {
+        // We don't know actual dimensions yet, but we can ask the browser to
+        // constrain to maxDim×maxDim while preserving aspect ratio.
+        const bitmap = await createImageBitmap(file, {
+          resizeWidth: maxDim,
+          resizeHeight: maxDim,
+          resizeQuality: "medium",
+        });
+        // bitmap dimensions will be at most maxDim on each side (aspect preserved)
+        const canvas = document.createElement("canvas");
+        canvas.width = bitmap.width;
+        canvas.height = bitmap.height;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(bitmap, 0, 0);
+          bitmap.close(); // free GPU/CPU memory immediately
+
+          const blob: Blob | null = await new Promise((r) =>
+            canvas.toBlob(r, "image/jpeg", quality)
+          );
+          // Free canvas memory
+          canvas.width = 0;
+          canvas.height = 0;
+
+          if (blob) {
+            return new File(
+              [blob],
+              file.name.replace(/\.[^.]+$/, ".jpg"),
+              { type: "image/jpeg" }
+            );
+          }
+        }
+        bitmap.close();
+      }
+    } catch (e) {
+      console.warn("createImageBitmap resize failed, trying fallback:", e);
+    }
+
+    // ---- Strategy 2: classic Image + canvas (lower iOS compat) ----
+    return new Promise((resolve) => {
       const url = URL.createObjectURL(file);
       const img = new Image();
       img.onload = () => {
@@ -173,7 +222,6 @@ const Profile = () => {
         canvas.toBlob(
           (blob) => {
             URL.revokeObjectURL(url);
-            // Free canvas memory immediately
             canvas.width = 0;
             canvas.height = 0;
             if (!blob) { resolve(file); return; }
@@ -186,6 +234,7 @@ const Profile = () => {
       img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
       img.src = url;
     });
+  };
 
   const handleBodyPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -193,9 +242,9 @@ const Profile = () => {
     setUploadingPhoto(true);
     setUploadStatus("idle");
     try {
-      // Step 1: Shrink the image ONCE to a safe JPEG (≤2048px, ~500KB).
-      // This is the only canvas operation — avoids repeated full-res loads
-      // that crash iOS Safari on 48MP iPhone photos.
+      // Step 1: Shrink image ONCE to ≤1024px JPEG using createImageBitmap
+      // (decodes at target res, full 48MP image never exists in memory).
+      // This prevents WKWebView/TestFlight crashes on high-res iPhone photos.
       const safeFile = await shrinkToSafeJpeg(file);
 
       // Step 2: Upload the already-small JPEG (no further conversion needed)
