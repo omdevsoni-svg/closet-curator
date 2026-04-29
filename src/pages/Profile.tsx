@@ -147,17 +147,60 @@ const Profile = () => {
     setSaving(false);
   };
 
+  /**
+   * Shrink any image (including HEIC) to a safe JPEG File in one canvas pass.
+   * iOS Safari caps canvas at ~16.7 MP; we target 2048 px max → ~4 MP, well
+   * within limits even on older devices. This avoids the heic2any JS decoder
+   * entirely — iOS Safari can load HEIC natively via <img>.
+   */
+  const shrinkToSafeJpeg = (file: File, maxDim = 2048, quality = 0.82): Promise<File> =>
+    new Promise((resolve) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        let w = img.naturalWidth;
+        let h = img.naturalHeight;
+        if (w > maxDim || h > maxDim) {
+          if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
+          else { w = Math.round(w * maxDim / h); h = maxDim; }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { URL.revokeObjectURL(url); resolve(file); return; }
+        ctx.drawImage(img, 0, 0, w, h);
+        canvas.toBlob(
+          (blob) => {
+            URL.revokeObjectURL(url);
+            // Free canvas memory immediately
+            canvas.width = 0;
+            canvas.height = 0;
+            if (!blob) { resolve(file); return; }
+            resolve(new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" }));
+          },
+          "image/jpeg",
+          quality
+        );
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+      img.src = url;
+    });
+
   const handleBodyPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
     setUploadingPhoto(true);
     setUploadStatus("idle");
     try {
-      // Upload image first
-      const url = await uploadImage("body-photos", user.id, file);
+      // Step 1: Shrink the image ONCE to a safe JPEG (≤2048px, ~500KB).
+      // This is the only canvas operation — avoids repeated full-res loads
+      // that crash iOS Safari on 48MP iPhone photos.
+      const safeFile = await shrinkToSafeJpeg(file);
 
-      // Guard: if upload returned null, treat as failure — don't proceed to
-      // heavy AI detection which can crash iOS due to memory pressure
+      // Step 2: Upload the already-small JPEG (no further conversion needed)
+      const url = await uploadImage("body-photos", user.id, safeFile);
+
       if (!url) {
         setUploadingPhoto(false);
         setUploadStatus("error");
@@ -172,10 +215,10 @@ const Profile = () => {
       setUploadStatus("success");
       setTimeout(() => setUploadStatus("idle"), 2000);
 
-      // Run AI detection
+      // Step 3: Run AI detection on the same small JPEG (not the raw 48MP file)
       setIsAnalyzing(true);
       try {
-        const attrs = await detectBodyAttributes(file);
+        const attrs = await detectBodyAttributes(safeFile);
         setBodyType(attrs.body_type);
         setSkinTone(attrs.skin_tone);
         await savePreferences({
