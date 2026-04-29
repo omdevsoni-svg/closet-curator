@@ -217,6 +217,13 @@ export const fixImageOrientation = (file: File): Promise<File> =>
       img.onload = () => {
         let { naturalWidth: w, naturalHeight: h } = img;
 
+        // Cap dimensions to avoid exceeding iOS Safari canvas pixel limit (~16.7MP)
+        const MAX_DIM = 4096;
+        if (w > MAX_DIM || h > MAX_DIM) {
+          if (w > h) { h = Math.round(h * MAX_DIM / w); w = MAX_DIM; }
+          else { w = Math.round(w * MAX_DIM / h); h = MAX_DIM; }
+        }
+
         // Determine if EXIF requires a dimension swap (orientations 5-8)
         const needsSwap = orientation >= 5 && orientation <= 8;
         const canvasW = needsSwap ? h : w;
@@ -240,7 +247,7 @@ export const fixImageOrientation = (file: File): Promise<File> =>
           default: break; // orientation 1 = no transform needed
         }
 
-        ctx.drawImage(img, 0, 0);
+        ctx.drawImage(img, 0, 0, w, h);
         URL.revokeObjectURL(url);
 
         canvas.toBlob(
@@ -273,7 +280,14 @@ export const rotateImage = (file: File, degrees: number): Promise<File> =>
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
-      const { naturalWidth: w, naturalHeight: h } = img;
+      let w = img.naturalWidth;
+      let h = img.naturalHeight;
+      // Cap dimensions to avoid exceeding iOS Safari canvas pixel limit (~16.7MP)
+      const MAX_DIM = 4096;
+      if (w > MAX_DIM || h > MAX_DIM) {
+        if (w > h) { h = Math.round(h * MAX_DIM / w); w = MAX_DIM; }
+        else { w = Math.round(w * MAX_DIM / h); h = MAX_DIM; }
+      }
       const swap = degrees === 90 || degrees === 270;
       const canvas = document.createElement("canvas");
       canvas.width = swap ? h : w;
@@ -282,7 +296,7 @@ export const rotateImage = (file: File, degrees: number): Promise<File> =>
       if (!ctx) { URL.revokeObjectURL(url); resolve(file); return; }
       ctx.translate(canvas.width / 2, canvas.height / 2);
       ctx.rotate((degrees * Math.PI) / 180);
-      ctx.drawImage(img, -w / 2, -h / 2);
+      ctx.drawImage(img, -w / 2, -h / 2, w, h);
       URL.revokeObjectURL(url);
       canvas.toBlob(
         (blob) => {
@@ -300,24 +314,32 @@ export const rotateImage = (file: File, degrees: number): Promise<File> =>
 /* ------------------------------------------------------------------ */
 /*  Helper: convert any image file to a web-friendly JPEG via canvas   */
 /* ------------------------------------------------------------------ */
-const toJpegBlob = (file: File): Promise<Blob> =>
+const toJpegBlob = (file: File, maxDim = 4096): Promise<Blob> =>
   new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
+      // Cap dimensions to avoid exceeding iOS Safari canvas pixel limit (~16.7MP)
+      // iPhone cameras can produce 48MP (8064×6048) which crashes WebKit
+      let w = img.naturalWidth;
+      let h = img.naturalHeight;
+      if (w > maxDim || h > maxDim) {
+        if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
+        else { w = Math.round(w * maxDim / h); h = maxDim; }
+      }
       const canvas = document.createElement("canvas");
-      canvas.width = img.naturalWidth;
-      canvas.height = img.naturalHeight;
+      canvas.width = w;
+      canvas.height = h;
       const ctx = canvas.getContext("2d");
-      if (!ctx) { reject(new Error("Canvas not supported")); return; }
-      ctx.drawImage(img, 0, 0);
+      if (!ctx) { URL.revokeObjectURL(url); reject(new Error("Canvas not supported")); return; }
+      ctx.drawImage(img, 0, 0, w, h);
       canvas.toBlob(
         (blob) => {
           URL.revokeObjectURL(url);
           blob ? resolve(blob) : reject(new Error("toBlob failed"));
         },
         "image/jpeg",
-        0.9
+        0.85
       );
     };
     img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Image load failed")); };

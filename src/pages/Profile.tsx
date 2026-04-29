@@ -154,7 +154,18 @@ const Profile = () => {
     setUploadStatus("idle");
     try {
       // Upload image first
-      const url = await uploadImage(file, user.id, "body-photos");
+      const url = await uploadImage("body-photos", user.id, file);
+
+      // Guard: if upload returned null, treat as failure — don't proceed to
+      // heavy AI detection which can crash iOS due to memory pressure
+      if (!url) {
+        setUploadingPhoto(false);
+        setUploadStatus("error");
+        setTimeout(() => setUploadStatus("idle"), 3000);
+        e.target.value = "";
+        return;
+      }
+
       setBodyPhoto(url);
       await updateProfile(user.id, { body_photo_url: url });
       setUploadingPhoto(false);

@@ -712,8 +712,29 @@ export async function detectBodyAttributes(
   file: File
 ): Promise<BodyAttributes> {
   try {
-    const base64 = await fileToBase64(file);
-    const compressed = await compressBase64Image(base64, 800, 0.8);
+    // v30: Convert HEIC/HEIF to JPEG before processing (iOS camera default)
+    let processFile = file;
+    const ext = file.name?.split(".").pop()?.toLowerCase() || "";
+    if (
+      file.type === "image/heic" ||
+      file.type === "image/heif" ||
+      ["heic", "heif"].includes(ext)
+    ) {
+      try {
+        const heic2any = (await import("heic2any")).default;
+        const blob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.85 });
+        processFile = new File(
+          [Array.isArray(blob) ? blob[0] : blob],
+          file.name.replace(/\.heic$/i, ".jpg").replace(/\.heif$/i, ".jpg"),
+          { type: "image/jpeg" }
+        );
+      } catch (heicErr) {
+        console.warn("HEIC conversion failed, using original:", heicErr);
+      }
+    }
+
+    const base64 = await fileToBase64(processFile);
+    const compressed = await compressBase64Image(base64, "image/jpeg", 800, 0.8);
 
     const response = await fetch("/api/detect-body-type", {
       method: "POST",
