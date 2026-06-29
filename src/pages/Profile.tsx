@@ -259,7 +259,7 @@ const Profile = () => {
       }
 
       setBodyPhoto(url);
-      await updateProfile(user.id, { body_photo_url: url });
+      await updateProfile(user.id, { body_image_url: url });
       setUploadingPhoto(false);
       setUploadStatus("success");
       setTimeout(() => setUploadStatus("idle"), 2000);
@@ -293,7 +293,7 @@ const Profile = () => {
     if (!user) return;
     setBodyPhoto(null);
     try {
-      await updateProfile(user.id, { body_photo_url: null, body_image_url: null });
+      await updateProfile(user.id, { body_image_url: null });
     } catch (err) {
       console.error("Failed to remove photo:", err);
     }
