@@ -238,7 +238,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Call Vertex AI Gemini
     const project = "fynd-jio-impetus-non-prod";
     const region = "us-central1";
-    const model = "gemini-2.0-flash";
+    const model = "gemini-2.5-flash";
     const url = `https://${region}-aiplatform.googleapis.com/v1/projects/${project}/locations/${region}/publishers/google/models/${model}:generateContent`;
 
     const prompt = buildPrompt(occasion, items, profile, weather);

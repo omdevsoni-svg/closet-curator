@@ -118,7 +118,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const prompt = buildSizePrompt(measurements, category || "general", brand);
 
     const geminiRes = await fetch(
-      `https://${region}-aiplatform.googleapis.com/v1/projects/${project}/locations/${region}/publishers/google/models/gemini-2.0-flash:generateContent`,
+      `https://${region}-aiplatform.googleapis.com/v1/projects/${project}/locations/${region}/publishers/google/models/gemini-2.5-flash:generateContent`,
       {
         method: "POST",
         headers: {
