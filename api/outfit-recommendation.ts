@@ -459,6 +459,10 @@ async function callGeminiOutfits(
 /*  Vercel Serverless Handler                                          */
 /* ------------------------------------------------------------------ */
 
+// Give the AI path room to finish for large closets (call ~8s+); the
+// platform allows minutes, so 60s is a safe ceiling well above our budget.
+export const config = { maxDuration: 60 };
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // CORS headers
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -509,11 +513,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const prompt = buildPrompt(occasion, items, profile, weather);
 
         const start = Date.now();
-        const AI_BUDGET_MS = 9000; // stay well under the serverless timeout
+        // Function maxDuration is generous (minutes); the prior 9s budget was
+        // far too tight and aborted large-closet calls (~8s+) mid-flight.
+        const AI_BUDGET_MS = 45000;
         const MAX_ATTEMPTS = 2;
         for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
           const remaining = AI_BUDGET_MS - (Date.now() - start);
-          if (remaining < 2500) break;
+          if (remaining < 8000) break;
           // Attempt 1 uses the strict schema; a retry drops it in case Vertex
           // rejects the responseSchema (which would 400 every time otherwise).
           const useSchema = attempt === 1;
@@ -522,7 +528,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               accessToken,
               url,
               prompt,
-              Math.min(7000, remaining),
+              Math.min(30000, remaining),
               useSchema
             );
             const clean = sanitizeCombinations(combos, items);
