@@ -526,7 +526,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               useSchema
             );
             const clean = sanitizeCombinations(combos, items);
-            diags.push(`a${attempt} ${diag} sanitized=${clean.length}`);
+            if (clean.length === 0 && combos.length > 0) {
+              // AI returned combos but none survived ID validation — show the mismatch.
+              const aiIds = combos.flatMap((c) => c.item_ids || []).slice(0, 4);
+              const closetIds = items.map((i) => i.id).slice(0, 4);
+              diags.push(
+                `a${attempt} ${diag} sanitized=0 aiIds=${JSON.stringify(aiIds)} closetIds=${JSON.stringify(closetIds)}`
+              );
+            } else {
+              diags.push(`a${attempt} ${diag} sanitized=${clean.length}`);
+            }
             if (clean.length > 0) {
               aiCombos = clean;
               break;
@@ -561,8 +570,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({
       success: true,
       source,
-      // Surface why the AI path didn't serve, visible in the Network tab.
-      ...(source === "fallback" ? { debug: { reason: diags.join(" | ") || "unknown" } } : {}),
+      // Always surface the AI-path trace so we can diagnose from the Network tab.
+      debug: { reason: diags.join(" | ") || "unknown", items: items.length },
       combinations,
     });
   } catch (err: any) {
