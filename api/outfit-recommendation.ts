@@ -191,6 +191,262 @@ IMPORTANT: If the closet has fewer items and you cannot make 3 truly different c
 }
 
 /* ------------------------------------------------------------------ */
+/*  Controlled-generation response schema (forces valid JSON)          */
+/* ------------------------------------------------------------------ */
+
+// Vertex AI OpenAPI subset: type names are UPPERCASE.
+const RESPONSE_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    combinations: {
+      type: "ARRAY",
+      items: {
+        type: "OBJECT",
+        properties: {
+          label: { type: "STRING" },
+          slots: {
+            type: "ARRAY",
+            items: {
+              type: "OBJECT",
+              properties: {
+                slot: { type: "STRING" },
+                item_id: { type: "STRING" },
+              },
+              required: ["slot", "item_id"],
+            },
+          },
+          item_ids: { type: "ARRAY", items: { type: "STRING" } },
+          tip: { type: "STRING" },
+          reasoning: {
+            type: "ARRAY",
+            items: {
+              type: "OBJECT",
+              properties: {
+                id: { type: "STRING" },
+                reason: { type: "STRING" },
+              },
+              required: ["id", "reason"],
+            },
+          },
+          missing: { type: "STRING" },
+        },
+        required: ["label", "slots", "item_ids", "tip"],
+      },
+    },
+  },
+  required: ["combinations"],
+};
+
+interface Combination {
+  label: string;
+  slots: { slot: string; item_id: string }[];
+  item_ids: string[];
+  tip: string;
+  reasoning: { id: string; reason: string }[];
+  missing?: string | null;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Slot classification (mirrors the frontend SLOT_DEFS)               */
+/* ------------------------------------------------------------------ */
+
+type Slot = "topwear" | "bottomwear" | "footwear" | "dress";
+
+const ACTIVEWEAR_BOTTOM_RE = /legging|jogger|short|pant|trouser|track|tight|capri|sweatpant/i;
+
+function slotForItem(item: ClosetItem): Slot | null {
+  switch ((item.category || "").toLowerCase()) {
+    case "tops":
+    case "outerwear":
+      return "topwear";
+    case "bottoms":
+      return "bottomwear";
+    case "footwear":
+      return "footwear";
+    case "dresses":
+      return "dress";
+    case "activewear":
+      return ACTIVEWEAR_BOTTOM_RE.test(`${item.name} ${(item.tags || []).join(" ")}`)
+        ? "bottomwear"
+        : "topwear";
+    default:
+      return null; // Accessories / unknown — not a primary slot
+  }
+}
+
+// neutral (or unset) profile accepts everything; otherwise matching gender + unisex.
+function genderOk(item: ClosetItem, modelGender?: string): boolean {
+  if (!modelGender || modelGender === "neutral") return true;
+  const g = (item.gender || "unisex").toLowerCase();
+  return g === "unisex" || g === modelGender;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Tolerant JSON parsing + validation against the real closet         */
+/* ------------------------------------------------------------------ */
+
+function parseCombosLoose(rawText: string): Combination[] {
+  if (!rawText) return [];
+  // responseMimeType already yields clean JSON, but stay defensive.
+  const txt = rawText.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+  const tryParse = (s: string): any => {
+    try {
+      return JSON.parse(s);
+    } catch {
+      return null;
+    }
+  };
+  let obj = tryParse(txt);
+  if (!obj) {
+    const first = txt.indexOf("{");
+    const last = txt.lastIndexOf("}");
+    if (first !== -1 && last > first) obj = tryParse(txt.slice(first, last + 1));
+  }
+  if (!obj || !Array.isArray(obj.combinations)) return [];
+  return obj.combinations as Combination[];
+}
+
+// Drop any item_id the AI invented; keep only combos with >= 2 real items.
+function sanitizeCombinations(combos: Combination[], items: ClosetItem[]): Combination[] {
+  const byId = new Map(items.map((i) => [i.id, i]));
+  const out: Combination[] = [];
+  for (const c of combos || []) {
+    if (!c) continue;
+    const validSlots = (Array.isArray(c.slots) ? c.slots : []).filter(
+      (s) => s && byId.has(s.item_id)
+    );
+    const validIds = (Array.isArray(c.item_ids) ? c.item_ids : []).filter((id) => byId.has(id));
+    const idSet = new Set<string>([...validIds, ...validSlots.map((s) => s.item_id)]);
+    if (idSet.size < 2) continue;
+    out.push({
+      label: typeof c.label === "string" && c.label.trim() ? c.label : "Your Outfit",
+      slots: validSlots,
+      item_ids: Array.from(idSet),
+      tip: typeof c.tip === "string" ? c.tip : "",
+      reasoning: Array.isArray(c.reasoning)
+        ? c.reasoning.filter((r) => r && byId.has(r.id))
+        : [],
+      missing: c.missing ?? null,
+    });
+  }
+  return out;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Deterministic fallback — builds outfits with no AI at all          */
+/* ------------------------------------------------------------------ */
+
+function buildFallbackCombinations(
+  occasion: string,
+  items: ClosetItem[],
+  profile?: ProfileInfo
+): Combination[] {
+  const modelGender = profile?.model_gender;
+
+  // Prefer gender-compatible items, but never let a slot go empty over gender.
+  const pick = (slot: Slot): ClosetItem[] => {
+    const all = items.filter((i) => slotForItem(i) === slot);
+    const preferred = all.filter((i) => genderOk(i, modelGender));
+    return preferred.length > 0 ? preferred : all;
+  };
+
+  const tops = pick("topwear");
+  const bottoms = pick("bottomwear");
+  const shoes = pick("footwear");
+  const dresses = pick("dress");
+
+  const LABELS = ["Everyday Look", "Smart Casual", "Off-Duty"];
+  const occ = occasion.toLowerCase();
+  const combos: Combination[] = [];
+  const seen = new Set<string>();
+
+  const addCombo = (chosen: (ClosetItem | undefined)[]) => {
+    const valid = chosen.filter(Boolean) as ClosetItem[];
+    if (valid.length < 2 || combos.length >= 3) return;
+    const sig = valid
+      .map((i) => i.id)
+      .sort()
+      .join("|");
+    if (seen.has(sig)) return;
+    seen.add(sig);
+    combos.push({
+      label: LABELS[combos.length % LABELS.length],
+      slots: valid.map((i) => ({ slot: slotForItem(i) as string, item_id: i.id })),
+      item_ids: valid.map((i) => i.id),
+      tip: `A balanced ${occ} outfit pulled straight from your closet.`,
+      reasoning: valid.map((i) => ({
+        id: i.id,
+        reason: `${i.color ? i.color + " " : ""}${i.name} is a solid pick for ${occ}.`,
+      })),
+      missing: null,
+    });
+  };
+
+  // Strategy 1: separates (top + bottom [+ shoes]).
+  const sep = Math.max(tops.length, bottoms.length);
+  for (let i = 0; i < sep && combos.length < 3; i++) {
+    const top = tops[i % tops.length];
+    const bottom = bottoms[i % bottoms.length];
+    if (!top || !bottom) break;
+    const shoe = shoes.length ? shoes[i % shoes.length] : undefined;
+    addCombo([top, bottom, shoe]);
+  }
+
+  // Strategy 2: dress (+ shoes).
+  for (let i = 0; i < dresses.length && combos.length < 3; i++) {
+    const shoe = shoes.length ? shoes[i % shoes.length] : undefined;
+    if (shoe) addCombo([dresses[i], shoe]);
+  }
+
+  return combos;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Single AI attempt (schema-locked, time-bounded)                    */
+/* ------------------------------------------------------------------ */
+
+async function callGeminiOutfits(
+  accessToken: string,
+  url: string,
+  prompt: string,
+  timeoutMs: number
+): Promise<Combination[]> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const geminiRes = await fetch(url, {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.8,
+          maxOutputTokens: 8192,
+          thinkingConfig: { thinkingBudget: 0 },
+          responseMimeType: "application/json",
+          responseSchema: RESPONSE_SCHEMA,
+        },
+      }),
+    });
+
+    if (!geminiRes.ok) {
+      const errText = await geminiRes.text().catch(() => "");
+      throw new Error(`Vertex AI ${geminiRes.status}: ${errText.slice(0, 200)}`);
+    }
+
+    const data = await geminiRes.json();
+    const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    return parseCombosLoose(rawText);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /*  Vercel Serverless Handler                                          */
 /* ------------------------------------------------------------------ */
 
@@ -209,115 +465,103 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { occasion, items, profile, weather } = req.body as {
-      occasion: string;
-      items: ClosetItem[];
+    const body = (req.body || {}) as {
+      occasion?: string;
+      items?: ClosetItem[];
       profile?: ProfileInfo;
       weather?: WeatherInfo;
     };
+    const items = Array.isArray(body.items) ? body.items.filter((i) => i && i.id) : [];
+    const profile = body.profile;
+    const weather = body.weather;
+    const occasion = (body.occasion && String(body.occasion).trim()) || "everyday";
 
-    if (!occasion || !items || items.length === 0) {
+    // Need at least two items before any outfit is possible.
+    if (items.length < 2) {
       return res.status(400).json({
         success: false,
-        error: "occasion and items are required",
+        error: "Add at least 2 clothing items to your closet to get outfit recommendations.",
       });
     }
 
-    // Parse service account key from env
-    const saKeyJson = process.env.GCP_SERVICE_ACCOUNT_KEY;
-    if (!saKeyJson) {
-      return res.status(500).json({
-        success: false,
-        error: "Server misconfigured: missing GCP credentials",
-      });
-    }
+    // Deterministic fallback computed up front — guarantees we always have an answer.
+    const fallback = buildFallbackCombinations(occasion, items, profile);
 
-    const saKey: ServiceAccountKey = JSON.parse(saKeyJson);
-    const accessToken = await getAccessToken(saKey);
-
-    // Call Vertex AI Gemini
-    const project = "fynd-jio-impetus-non-prod";
-    const region = "us-central1";
-    const model = "gemini-2.5-flash";
-    const url = `https://${region}-aiplatform.googleapis.com/v1/projects/${project}/locations/${region}/publishers/google/models/${model}:generateContent`;
-
-    const prompt = buildPrompt(occasion, items, profile, weather);
-
-    const geminiRes = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.8, maxOutputTokens: 4096, thinkingConfig: { thinkingBudget: 0 } },
-      }),
-    });
-
-    if (!geminiRes.ok) {
-      const errText = await geminiRes.text();
-      console.error("Vertex AI error:", geminiRes.status, errText);
-      return res.status(502).json({
-        success: false,
-        error: `Vertex AI error: ${geminiRes.status}`,
-      });
-    }
-
-    const data = await geminiRes.json();
-
-    // Extract text from Gemini response
-    const rawText =
-      data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-
-    // Parse JSON from response (strip markdown fences if present)
-    const jsonStr = rawText.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
-
-    let parsed: {
-      combinations: {
-        label: string;
-        slots: { slot: string; item_id: string }[];
-        item_ids: string[];
-        tip: string;
-        reasoning: { id: string; reason: string }[];
-        missing?: string | null;
-      }[];
-    };
-
+    // Best-quality path: Gemini. Never let its failure become the user's failure.
+    let aiCombos: Combination[] = [];
     try {
-      parsed = JSON.parse(jsonStr);
-    } catch {
-      console.error("Failed to parse Gemini response:", rawText);
-      return res.status(502).json({
-        success: false,
-        error: "AI returned an invalid response. Please try again.",
-      });
+      const saKeyJson = process.env.GCP_SERVICE_ACCOUNT_KEY;
+      if (saKeyJson) {
+        const saKey: ServiceAccountKey = JSON.parse(saKeyJson);
+        const accessToken = await getAccessToken(saKey);
+        const url =
+          "https://us-central1-aiplatform.googleapis.com/v1/projects/fynd-jio-impetus-non-prod/locations/us-central1/publishers/google/models/gemini-2.5-flash:generateContent";
+        const prompt = buildPrompt(occasion, items, profile, weather);
+
+        const start = Date.now();
+        const AI_BUDGET_MS = 9000; // stay well under the serverless timeout
+        const MAX_ATTEMPTS = 2;
+        for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+          const remaining = AI_BUDGET_MS - (Date.now() - start);
+          if (remaining < 2500) break;
+          try {
+            const raw = await callGeminiOutfits(
+              accessToken,
+              url,
+              prompt,
+              Math.min(7000, remaining)
+            );
+            const clean = sanitizeCombinations(raw, items);
+            if (clean.length > 0) {
+              aiCombos = clean;
+              break;
+            }
+            console.warn(`Outfit AI attempt ${attempt}: no valid combinations after sanitize`);
+          } catch (e) {
+            console.error(`Outfit AI attempt ${attempt} failed:`, (e as Error).message);
+          }
+          if (attempt < MAX_ATTEMPTS) await new Promise((r) => setTimeout(r, 400));
+        }
+      } else {
+        console.warn("GCP_SERVICE_ACCOUNT_KEY missing — serving deterministic fallback.");
+      }
+    } catch (e) {
+      console.error("Outfit AI path error (falling back):", (e as Error).message);
     }
 
-    // Validate we have at least one combination
-    if (!parsed.combinations || parsed.combinations.length === 0) {
-      return res.status(502).json({
+    const combinations = aiCombos.length > 0 ? aiCombos : fallback;
+
+    if (combinations.length === 0) {
+      // >= 2 items present, but they can't form an outfit (e.g. two pairs of shoes).
+      return res.status(200).json({
         success: false,
-        error: "AI did not return any outfit combinations.",
+        error:
+          "Couldn't assemble an outfit from your current items. Try adding a top, a bottom, or a dress.",
       });
     }
 
     return res.status(200).json({
       success: true,
-      combinations: parsed.combinations.map((c) => ({
-        label: c.label,
-        slots: c.slots,
-        item_ids: c.item_ids,
-        tip: c.tip,
-        reasoning: c.reasoning,
-        missing: c.missing || null,
-      })),
+      source: aiCombos.length > 0 ? "ai" : "fallback",
+      combinations,
     });
   } catch (err: any) {
+    // Last resort: even on an unexpected error, try to serve the deterministic fallback.
     console.error("Outfit recommendation error:", err);
+    try {
+      const b = (req.body || {}) as { occasion?: string; items?: ClosetItem[]; profile?: ProfileInfo };
+      const items = Array.isArray(b.items) ? b.items.filter((i) => i && i.id) : [];
+      const occasion = (b.occasion && String(b.occasion).trim()) || "everyday";
+      const fb = buildFallbackCombinations(occasion, items, b.profile);
+      if (fb.length > 0) {
+        return res.status(200).json({ success: true, source: "fallback", combinations: fb });
+      }
+    } catch (e) {
+      console.error("Fallback also failed:", (e as Error).message);
+    }
     return res.status(500).json({
       success: false,
-      error: err.message || "Internal server error",
+      error: "Couldn't generate recommendations right now. Please try again.",
     });
   }
 }
