@@ -152,7 +152,7 @@ async function analyzeBodyImage(
               ],
             },
           ],
-          generationConfig: { temperature: 0.1, maxOutputTokens: 512 },
+          generationConfig: { temperature: 0.1, maxOutputTokens: 512, thinkingConfig: { thinkingBudget: 0 } },
         }),
       }
     );

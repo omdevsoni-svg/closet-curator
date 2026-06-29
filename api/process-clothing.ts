@@ -140,7 +140,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             { inlineData: { mimeType, data: imageBase64 } },
             { text: CLOTHING_PROMPT },
           ]}],
-          generationConfig: { temperature: 0.1, maxOutputTokens: 1024 },
+          generationConfig: { temperature: 0.1, maxOutputTokens: 1024, thinkingConfig: { thinkingBudget: 0 } },
         }),
       }
     );

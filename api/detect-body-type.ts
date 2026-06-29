@@ -125,7 +125,7 @@ No markdown, no code fences, no explanation. Just the JSON.`;
               { text: BODY_ANALYSIS_PROMPT },
             ],
           }],
-          generationConfig: { temperature: 0.1, maxOutputTokens: 512 },
+          generationConfig: { temperature: 0.1, maxOutputTokens: 512, thinkingConfig: { thinkingBudget: 0 } },
         }),
       }
     );
