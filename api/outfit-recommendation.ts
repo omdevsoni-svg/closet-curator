@@ -355,8 +355,9 @@ function buildFallbackCombinations(
   const shoes = pick("footwear");
   const dresses = pick("dress");
 
-  const LABELS = ["Everyday Look", "Smart Casual", "Off-Duty"];
   const occ = occasion.toLowerCase();
+  const cap = occasion.charAt(0).toUpperCase() + occasion.slice(1);
+  const LABELS = [`${cap} Staple`, `Smart ${cap}`, `Easy ${cap}`];
   const combos: Combination[] = [];
   const seen = new Set<string>();
 
@@ -376,7 +377,7 @@ function buildFallbackCombinations(
       tip: `A balanced ${occ} outfit pulled straight from your closet.`,
       reasoning: valid.map((i) => ({
         id: i.id,
-        reason: `${i.color ? i.color + " " : ""}${i.name} is a solid pick for ${occ}.`,
+        reason: `${i.name} is a versatile ${occ} pick.`,
       })),
       missing: null,
     });
@@ -402,18 +403,28 @@ function buildFallbackCombinations(
 }
 
 /* ------------------------------------------------------------------ */
-/*  Single AI attempt (schema-locked, time-bounded)                    */
+/*  Single AI attempt (time-bounded). Returns combos + a diag string.  */
+/*  useSchema=false drops responseSchema (in case Vertex rejects it).  */
 /* ------------------------------------------------------------------ */
 
 async function callGeminiOutfits(
   accessToken: string,
   url: string,
   prompt: string,
-  timeoutMs: number
-): Promise<Combination[]> {
+  timeoutMs: number,
+  useSchema: boolean
+): Promise<{ combos: Combination[]; diag: string }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
+    const generationConfig: Record<string, unknown> = {
+      temperature: 0.8,
+      maxOutputTokens: 8192,
+      thinkingConfig: { thinkingBudget: 0 },
+      responseMimeType: "application/json",
+    };
+    if (useSchema) generationConfig.responseSchema = RESPONSE_SCHEMA;
+
     const geminiRes = await fetch(url, {
       method: "POST",
       signal: controller.signal,
@@ -423,24 +434,22 @@ async function callGeminiOutfits(
       },
       body: JSON.stringify({
         contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.8,
-          maxOutputTokens: 8192,
-          thinkingConfig: { thinkingBudget: 0 },
-          responseMimeType: "application/json",
-          responseSchema: RESPONSE_SCHEMA,
-        },
+        generationConfig,
       }),
     });
 
     if (!geminiRes.ok) {
       const errText = await geminiRes.text().catch(() => "");
-      throw new Error(`Vertex AI ${geminiRes.status}: ${errText.slice(0, 200)}`);
+      throw new Error(`http ${geminiRes.status}: ${errText.slice(0, 300)}`);
     }
 
     const data = await geminiRes.json();
-    const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-    return parseCombosLoose(rawText);
+    const cand = data?.candidates?.[0];
+    const finishReason = cand?.finishReason || "none";
+    const rawText = cand?.content?.parts?.[0]?.text || "";
+    const combos = parseCombosLoose(rawText);
+    const diag = `schema=${useSchema} finishReason=${finishReason} rawLen=${rawText.length} parsed=${combos.length}`;
+    return { combos, diag };
   } finally {
     clearTimeout(timer);
   }
@@ -489,6 +498,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Best-quality path: Gemini. Never let its failure become the user's failure.
     let aiCombos: Combination[] = [];
+    const diags: string[] = [];
     try {
       const saKeyJson = process.env.GCP_SERVICE_ACCOUNT_KEY;
       if (saKeyJson) {
@@ -504,28 +514,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
           const remaining = AI_BUDGET_MS - (Date.now() - start);
           if (remaining < 2500) break;
+          // Attempt 1 uses the strict schema; a retry drops it in case Vertex
+          // rejects the responseSchema (which would 400 every time otherwise).
+          const useSchema = attempt === 1;
           try {
-            const raw = await callGeminiOutfits(
+            const { combos, diag } = await callGeminiOutfits(
               accessToken,
               url,
               prompt,
-              Math.min(7000, remaining)
+              Math.min(7000, remaining),
+              useSchema
             );
-            const clean = sanitizeCombinations(raw, items);
+            const clean = sanitizeCombinations(combos, items);
+            diags.push(`a${attempt} ${diag} sanitized=${clean.length}`);
             if (clean.length > 0) {
               aiCombos = clean;
               break;
             }
-            console.warn(`Outfit AI attempt ${attempt}: no valid combinations after sanitize`);
           } catch (e) {
+            diags.push(`a${attempt} schema=${useSchema} ERROR ${(e as Error).message}`);
             console.error(`Outfit AI attempt ${attempt} failed:`, (e as Error).message);
           }
           if (attempt < MAX_ATTEMPTS) await new Promise((r) => setTimeout(r, 400));
         }
       } else {
+        diags.push("GCP_SERVICE_ACCOUNT_KEY missing");
         console.warn("GCP_SERVICE_ACCOUNT_KEY missing — serving deterministic fallback.");
       }
     } catch (e) {
+      diags.push(`auth/setup ERROR ${(e as Error).message}`);
       console.error("Outfit AI path error (falling back):", (e as Error).message);
     }
 
@@ -540,9 +557,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
+    const source = aiCombos.length > 0 ? "ai" : "fallback";
     return res.status(200).json({
       success: true,
-      source: aiCombos.length > 0 ? "ai" : "fallback",
+      source,
+      // Surface why the AI path didn't serve, visible in the Network tab.
+      ...(source === "fallback" ? { debug: { reason: diags.join(" | ") || "unknown" } } : {}),
       combinations,
     });
   } catch (err: any) {
