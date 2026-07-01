@@ -2,8 +2,20 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
 const NOTIFY_EMAIL = process.env.DEMO_NOTIFY_EMAIL || "omdevsoni@gofynd.com";
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "";
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+
+function getSupabaseConfig() {
+  const url =
+    process.env.SUPABASE_URL ||
+    process.env.VITE_SUPABASE_URL ||
+    process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    "";
+  const key =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_ANON_KEY ||
+    process.env.VITE_SUPABASE_ANON_KEY ||
+    "";
+  return { url, key };
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // CORS
@@ -20,14 +32,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   // 1. Insert into Supabase
+  const { url: sbUrl, key: sbKey } = getSupabaseConfig();
   let dbOk = false;
   try {
-    const dbRes = await fetch(`${SUPABASE_URL}/rest/v1/demo_requests`, {
+    const dbRes = await fetch(`${sbUrl}/rest/v1/demo_requests`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        apikey: SUPABASE_SERVICE_KEY,
-        Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+        apikey: sbKey,
+        Authorization: `Bearer ${sbKey}`,
         Prefer: "return=minimal",
       },
       body: JSON.stringify({ name, email, company, message: message || null }),
