@@ -23,6 +23,7 @@ import EmailVerification from "./pages/EmailVerification";
 import UnwornItems from "./pages/UnwornItems";
 import NotFound from "./pages/NotFound";
 import Privacy from "./pages/Privacy";
+import Business from "./pages/Business";
 
 const queryClient = new QueryClient();
 
@@ -71,6 +72,7 @@ const App = () => {
                   <Route path="/unworn" element={<UnwornItems />} />
                 </Route>
                 <Route path="/privacy" element={<Privacy />} />
+                <Route path="/business" element={<Business />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </BrowserRouter>
