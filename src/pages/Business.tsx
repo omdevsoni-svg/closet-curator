@@ -5,7 +5,6 @@ import {
   BarChart3, TrendingUp, RotateCcw, Heart, Layers, Shield, Zap,
   Play, Send, CheckCircle2, ArrowRight, ChevronDown, Menu, X,
 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
 
 /* ------------------------------------------------------------------ */
 /*  Animated section wrapper                                           */
@@ -109,13 +108,17 @@ const Business = () => {
     if (!formData.name || !formData.email || !formData.company) return;
     setFormStatus("sending");
     try {
-      const { error } = await supabase.from("demo_requests").insert({
-        name: formData.name,
-        email: formData.email,
-        company: formData.company,
-        message: formData.message,
+      const resp = await fetch("/api/demo-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          company: formData.company,
+          message: formData.message,
+        }),
       });
-      if (error) throw error;
+      if (!resp.ok) throw new Error("Request failed");
       setFormStatus("success");
       setFormData({ name: "", email: "", company: "", message: "" });
     } catch (err) {
