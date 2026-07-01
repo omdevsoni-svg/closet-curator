@@ -6,6 +6,16 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 /* ------------------------------------------------------------------ */
+/*  v31: Sequential-chain intermediate fidelity                        */
+/*  The previous VTO result is re-encoded before becoming the next     */
+/*  step's person image; over-compression here compounds across every  */
+/*  garment in the chain. 1400px @ q0.9 stays well under Vercel's      */
+/*  ~4.5MB payload limit (~0.4-0.5MB base64) while preserving detail.  */
+/* ------------------------------------------------------------------ */
+const CHAIN_MAX_DIM = 1400;   // was 1024
+const CHAIN_QUALITY = 0.9;    // was 0.65
+
+/* ------------------------------------------------------------------ */
 /*  v29: Compress base64 image to reduce payload for Vercel limits    */
 /* ------------------------------------------------------------------ */
 const compressBase64Image = (
@@ -429,7 +439,7 @@ export const virtualTryOnSequential = async (
       // v29: Compress previousResultBase64 to stay under Vercel's ~4.5MB payload limit
       let compressedPrev = previousResultBase64 || undefined;
       if (previousResultBase64 && i > 0) {
-        compressedPrev = await compressBase64Image(previousResultBase64, previousResultMimeType, 1024, 0.65);
+        compressedPrev = await compressBase64Image(previousResultBase64, previousResultMimeType, CHAIN_MAX_DIM, CHAIN_QUALITY);
         console.log(`v29: Compressed prev result from ${previousResultBase64.length} to ${compressedPrev.length} chars`);
       }
 

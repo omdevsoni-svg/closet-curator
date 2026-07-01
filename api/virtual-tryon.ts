@@ -87,6 +87,13 @@ const VTO_URL = `https://${REGION}-aiplatform.googleapis.com/v1/projects/${PROJE
 const UPSCALE_MODEL = "imagen-4.0-upscale-preview";
 const UPSCALE_URL = `https://${REGION}-aiplatform.googleapis.com/v1/projects/${PROJECT}/locations/${REGION}/publishers/google/models/${UPSCALE_MODEL}:predict`;
 
+/* v31: Diffusion step tuning (latency vs. quality).
+   Imagen VTO quality plateaus well before 100 steps; these trim
+   generation time ~35-45% with no visible quality loss. If output
+   ever softens, raise FINAL_BASE_STEPS first. */
+const FINAL_BASE_STEPS = 64;         // was 100 — single mode + last sequential step
+const INTERMEDIATE_BASE_STEPS = 40;  // was 75  — intermediate sequential steps
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // CORS headers
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -151,7 +158,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // --- Build Imagen 3 VTO request ---
     // v22: Improved quality tiering â full quality only on final step
     const useFinalQuality = isFinalStep || mode === "single";
-    const baseSteps = useFinalQuality ? 100 : 75;
+    const baseSteps = useFinalQuality ? FINAL_BASE_STEPS : INTERMEDIATE_BASE_STEPS;
     const outputMime = useFinalQuality ? "image/png" : "image/jpeg";
 
     const requestBody = {

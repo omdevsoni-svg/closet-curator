@@ -21,7 +21,13 @@ function base64url(input: Buffer | string): string {
   return buf.toString("base64").replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
 }
 
+let _cachedToken: string | null = null;
+let _tokenExpiry = 0;
+
 async function getAccessToken(sa: ServiceAccountKey): Promise<string> {
+  // v31: Cache the token (55 min) so deferred upscales on a warm serverless
+  // instance skip the ~200-500ms JWT round-trip.
+  if (_cachedToken && Date.now() < _tokenExpiry) return _cachedToken;
   const now = Math.floor(Date.now() / 1000);
   const header = base64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
   const payload = base64url(
@@ -52,6 +58,8 @@ async function getAccessToken(sa: ServiceAccountKey): Promise<string> {
   }
 
   const data = await res.json();
+  _cachedToken = data.access_token;
+  _tokenExpiry = Date.now() + 55 * 60 * 1000; // 55 min TTL
   return data.access_token;
 }
 

@@ -339,8 +339,8 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
         const bodyUrl = profile?.body_image_url;
         if (bodyUrl) {
           setPersonPhoto(bodyUrl);
-          // v12: Higher resolution body photo (768px, quality 0.85) to preserve face detail
-          const bodyB64 = await urlToBase64(bodyUrl, { maxDim: 768, quality: 0.85 });
+          // v31: Higher resolution body photo (1024px, quality 0.85) to preserve face/skin detail
+          const bodyB64 = await urlToBase64(bodyUrl, { maxDim: 1024, quality: 0.85 });
           setBodyPhotoBase64(bodyB64);
 
           // v10: Load face close-up for identity preservation
@@ -348,7 +348,7 @@ const TryOnModal = ({ isOpen, onClose, outfitItems, allClosetItems, userId, comb
           let faceB64: string | null = null;
           if (faceUrl) {
             try {
-              faceB64 = await urlToBase64(faceUrl, { maxDim: 512, quality: 0.85 });
+              faceB64 = await urlToBase64(faceUrl, { maxDim: 640, quality: 0.85 });
               setFacePhotoBase64(faceB64);
             } catch (e) {
               console.warn("Could not load face photo, continuing without it:", e);
@@ -1652,11 +1652,11 @@ const AiStylist = () => {
                   setTryOnGenerating(true);
                   setTryOnError(null);
                   try {
-                    const bodyB64 = await urlToBase64(profile.body_image_url, { maxDim: 768, quality: 0.85 });
+                    const bodyB64 = await urlToBase64(profile.body_image_url, { maxDim: 1024, quality: 0.85 });
                     const productB64 = await fileToBase64(tryOnFile);
                     let faceB64: string | undefined;
                     if (profile.face_image_url) {
-                      try { faceB64 = await urlToBase64(profile.face_image_url, { maxDim: 512, quality: 0.85 }); } catch {}
+                      try { faceB64 = await urlToBase64(profile.face_image_url, { maxDim: 640, quality: 0.85 }); } catch {}
                     }
                     const results = await virtualTryOn(bodyB64, productB64, 1, profile.model_gender || undefined, faceB64);
                     if (results.length > 0) {
