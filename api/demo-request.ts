@@ -55,6 +55,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // 2. Send email notification via Resend
   let emailOk = false;
+  console.log("RESEND_API_KEY present:", !!RESEND_API_KEY, "length:", RESEND_API_KEY.length);
   if (RESEND_API_KEY) {
     try {
       const emailRes = await fetch("https://api.resend.com/emails", {
