@@ -142,9 +142,7 @@ const Business = () => {
       <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 bg-[#09090b]/80 backdrop-blur-2xl">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
           <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-violet-500 to-amber-400 flex items-center justify-center text-white font-bold text-sm">
-              S
-            </div>
+            <img src="/icons/logo.svg" alt="StyleOS" className="h-8 w-8 rounded-lg object-contain" draggable={false} />
             <span className="text-lg font-bold tracking-tight">StyleOS</span>
           </div>
           <div className="hidden md:flex items-center gap-8">
@@ -826,9 +824,7 @@ const Business = () => {
       <footer className="border-t border-white/5 py-10 px-6">
         <div className="mx-auto max-w-6xl flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-violet-500 to-amber-400 flex items-center justify-center text-white font-bold text-xs">
-              S
-            </div>
+            <img src="/icons/logo.svg" alt="StyleOS" className="h-7 w-7 rounded-lg object-contain" draggable={false} />
             <span className="text-sm font-semibold">StyleOS</span>
             <span className="text-xs text-white/30">by Impetus / Fynd</span>
           </div>
