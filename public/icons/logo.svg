@@ -1,25 +1,29 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
-    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#7C3AED"/>
-      <stop offset="50%" stop-color="#A855F7"/>
-      <stop offset="100%" stop-color="#F59E0B"/>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8B5CF6"/>
+      <stop offset="100%" stop-color="#6D28D9"/>
     </linearGradient>
-    <radialGradient id="innerGlow" cx="35%" cy="30%" r="65%">
-      <stop offset="0%" stop-color="rgba(255,255,255,0.18)"/>
-      <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
-    </radialGradient>
   </defs>
-  <circle cx="256" cy="256" r="248" fill="url(#bgGrad)"/>
-  <circle cx="256" cy="256" r="248" fill="url(#innerGlow)"/>
-  <g transform="translate(256, 256)">
-    <path d="M 60,-120 C 20,-120 -80,-120 -80,-60 C -80,0 0,10 40,20 C 80,30 80,60 80,60 C 80,120 -20,120 -60,120"
-      fill="none" stroke="white" stroke-width="40" stroke-linecap="round"/>
-    <g transform="translate(78, -98)" fill="white" opacity="0.95">
-      <path d="M 0,-16 L 3.5,-3.5 L 16,0 L 3.5,3.5 L 0,16 L -3.5,3.5 L -16,0 L -3.5,-3.5 Z"/>
-    </g>
-    <g transform="translate(-76, 96)" fill="white" opacity="0.7">
-      <path d="M 0,-10 L 2.2,-2.2 L 10,0 L 2.2,2.2 L 0,10 L -2.2,2.2 L -10,0 L -2.2,-2.2 Z"/>
-    </g>
-  </g>
+
+  <!-- Background rounded square -->
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+
+  <!-- Left wardrobe door -->
+  <rect x="128" y="132" width="110" height="248" rx="18" fill="none" stroke="white" stroke-width="12" opacity="0.92"/>
+
+  <!-- Right wardrobe door -->
+  <rect x="274" y="132" width="110" height="248" rx="18" fill="none" stroke="white" stroke-width="12" opacity="0.92"/>
+
+  <!-- Left door handle -->
+  <circle cx="218" cy="256" r="12" fill="white" opacity="0.85"/>
+
+  <!-- Right door handle -->
+  <circle cx="294" cy="256" r="12" fill="white" opacity="0.85"/>
+
+  <!-- AI sparkle top-right -->
+  <path d="M420,72 L428,100 L456,108 L428,116 L420,144 L412,116 L384,108 L412,100 Z" fill="white" opacity="0.75"/>
+
+  <!-- Small sparkle accent -->
+  <path d="M448,160 L452,174 L466,178 L452,182 L448,196 L444,182 L430,178 L444,174 Z" fill="white" opacity="0.45"/>
 </svg>
